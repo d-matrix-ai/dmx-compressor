@@ -1,3 +1,3 @@
-# compression
+# Neural net compression
 
-Machine Learning R&D at d-MATRiX.  
+Machine Learning R&D at d-MATRiX Corp.
