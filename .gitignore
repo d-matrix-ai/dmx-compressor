@@ -117,4 +117,5 @@ Dockerfile
 
 # experiment
 sandbox/
-runs/
+data_dir/
+out_dir/
