@@ -7,8 +7,9 @@
 #include <time.h>
 typedef unsigned char uchar;
 typedef unsigned short ushort;
-#define M 384
-#define N 384
+// x: M x K, W: K x N
+#define M 384 // input
+#define N 384 // output
 #define K 64//1024
 #define ARANGE 50.0
 #define BRANGE 3.0

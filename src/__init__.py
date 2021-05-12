@@ -1,4 +1,6 @@
 from . import (
     utils,
-    layers,
+    modules,
+    bfp,
+    sparse,
 )

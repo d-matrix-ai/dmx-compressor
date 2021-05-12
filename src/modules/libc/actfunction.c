@@ -1,4 +1,5 @@
-#include "actfunction.h"                                                                                                                                                 
+#include "actfunction.h"                                                                                                  
+#define MSL 384                                               
 
 #if 0
 int main(void) { 
@@ -50,8 +51,8 @@ return 0;
 
 double* gelu(double *xi) { 
 
-  static igen_op idx_mu[384*4098];
-  static double  xop[384*4098];
+  static igen_op idx_mu[MSL*4098];
+  static double  xop[MSL*4098];
 
   static float LUT[128]; 
 
@@ -72,7 +73,7 @@ double* gelu(double *xi) {
   idx_gen(xi, mnum_precal, l2span_nfrac, (igen_op *) idx_mu);
   intrp_lut((igen_op *) idx_mu, lutout_unsigned, LUT, xop);
 
-  for(i=0; i<384*4096; i++) {
+  for(i=0; i<MSL*4096; i++) {
     xop[i] -= outzeroPoint;
     xop[i] /= 32.0;
   }
@@ -92,7 +93,7 @@ double lutdiff_xmu;
 double lut_outcode1, lut_outcode2;
 double intrp_val, intrp_rnd;
 
-  for(vec = 0; vec<384*4096; vec++) {
+  for(vec = 0; vec<MSL*4096; vec++) {
     //printf("   index = %d and Mu = %f and LUT content=%f \n", idx_mu[vec].index, idx_mu[vec].mu, LUT[idx_mu[vec].index]);
     lut_outcode1 = (double) (1.0*LUT[idx_mu[vec].index]);
     lut_outcode2 = (double) (1.0*LUT[(int) fmin((idx_mu[vec].index+1), 127)]);
@@ -132,7 +133,7 @@ double  xmin  = -4;
 int     log2span = 4; 
 int     addr_nbits = 7;
 
-  for(vec = 0; vec<384*4096; vec++) {
+  for(vec = 0; vec<MSL*4096; vec++) {
     igen_sum = xi[vec] + (double) (1.0*mnum_precal);  // mnum_precal range: -8 to 8
     igen_dbl0 = (double) floor(igen_sum*4096)/4096.0;  // Signed 34.13 representation
 
