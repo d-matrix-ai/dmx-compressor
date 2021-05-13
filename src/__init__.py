@@ -1,6 +1,6 @@
 from . import (
     utils,
     modules,
-    bfp,
+    numerical,
     sparse,
 )
