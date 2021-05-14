@@ -7,18 +7,33 @@ import ctypes
 import ipdb
 import numpy.ctypeslib as ctl
 import numpy as np
+from qtorch.quant.quant_function import float_quantize
 import torch
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import lr_scheduler
 import transformers
+import qtorch
+from qtorch.quant import Quantizer, fixed_point_quantize, block_quantize, float_quantize
 from data import MNIST
+from transformers.utils.dummy_pt_objects import BertForMaskedLM
+from functools import partial
 
 # env
 load_dotenv(verbose=True)
 DATA_PATH = os.getenv("DATA_PATH") or "./data_dir"
 MODEL_PATH = os.getenv("MODEL_PATH") or "./model_dir"
+
+# numerical
+IMC_INPUT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
+IMC_WEIGHT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
+IMC_BIAS_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
+IMC_OUTPUT_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
+
+SIMD_INPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
+SIMD_OUTPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
 
 # components
 libc = ctypes.CDLL("./src/modules/libc/actfunction.so")
@@ -28,7 +43,7 @@ libc.gelu.restype = ctl.ndpointer(
 )
 
 
-def dmgelu(arr, lid):
+def dmgelu(arr, lid=None):
     mx = torch.max(arr).item()
     inp = torch.reshape(arr, (1000, 1024))
     inp = inp.numpy().astype(np.float64, order="C")
@@ -43,11 +58,105 @@ def dmgelu(arr, lid):
 
 
 class DMGELU(nn.Module):
-    def __init__(self):
+    def __init__(self, bit_scale=0, use_lut=False):
         super().__init__()
+        self.qinput = Quantizer(
+            forward_number=SIMD_INPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qoutput = Quantizer(
+            forward_number=SIMD_OUTPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.bit_scale = bit_scale
+        self.use_lut = use_lut
 
     def forward(self, x):
-        return dmgelu(x, None)
+        # x = self.qinput(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        x = dmgelu(x) if self.use_lut else F.gelu(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        # x = self.qoutput(x)
+        return x
+
+
+class DMReLU(nn.Module):
+    def __init__(self, bit_scale=0, inplace=False):
+        super().__init__()
+        self.inplace = inplace
+        self.qinput = Quantizer(
+            forward_number=SIMD_INPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qoutput = Quantizer(
+            forward_number=SIMD_OUTPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.bit_scale = bit_scale
+
+    def forward(self, x):
+        if self.bit_scale is not None:
+            # x = self.qinput(x)
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        x = torch.relu_(x) if self.inplace else torch.relu(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+            # x = self.qoutput(x)
+        return x
+
+
+class DMLinear(nn.Linear):
+    def __init__(
+        self, in_features: int, out_features: int, bias: bool = True, prec: int = 8
+    ) -> None:
+        super().__init__(in_features, out_features, bias=bias)
+        self.qweight = Quantizer(
+            forward_number=IMC_WEIGHT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qbias = Quantizer(
+            forward_number=IMC_BIAS_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qinput = Quantizer(
+            forward_number=IMC_INPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qoutput = Quantizer(
+            forward_number=IMC_OUTPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.prec = prec
+
+    def forward(self, input: Tensor) -> Tensor:
+
+        # _weight = self.qweight(self.weight)
+        _weight = block_quantize(self.weight, wl=self.prec, dim=1, rounding="nearest")
+
+        # _bias = self.qbias(self.bias) if self.bias is not None else None
+        _bias = self.bias  # (
+        #     float_quantize(self.bias, exp=8, man=23) if self.bias is not None else None
+        # )
+
+        # _input = self.qinput(input)
+        _input = block_quantize(input, wl=self.prec, dim=1, rounding="nearest")
+
+        _output = F.linear(_input, _weight, _bias)
+
+        # output = self.qoutput(_output)
+        output = _output  # float_quantize(_output, exp=8, man=23)
+
+        return output
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -103,7 +212,9 @@ def test(model, device, test_loader):
 
 def main():
     # Training settings
-    parser = argparse.ArgumentParser(description="MNIST LeNet quantization explorations")
+    parser = argparse.ArgumentParser(
+        description="MNIST LeNet quantization explorations"
+    )
     parser.add_argument(
         "--depth",
         type=int,
@@ -123,6 +234,24 @@ def main():
         type=str,
         default="relu",
         help="activation function (default: 'relu')",
+    )
+    parser.add_argument(
+        "--use-lut",
+        action="store_true",
+        default=False,
+        help="use LUT for act_fn (default: False)",
+    )
+    parser.add_argument(
+        "--bfp",
+        type=int,
+        default=None,
+        help="BFP precision, 12-16, None for FP (default: None)",
+    )
+    parser.add_argument(
+        "--xp",
+        type=int,
+        default=None,
+        help="XP bias, None for FP (default: None)",
     )
     parser.add_argument(
         "--batch-size",
@@ -197,15 +326,48 @@ def main():
         train_batch_size=args.batch_size,
         test_batch_size=args.test_batch_size,
     )
-    
-    model_dir = os.path.join(MODEL_PATH, "mnist-lenet"+f"-{args.width}"*args.depth+f"-{args.act_fn}")
-    if not os.path.exists(model_dir): os.makedirs(model_dir)
 
-    nn.GELU = DMGELU
-    from models import LeNet
-    model = LeNet(hidden_dims=[args.width,]*args.depth, act_func=args.act_fn).to(device)
+    model_dir = os.path.join(
+        MODEL_PATH, "mnist-lenet" + f"-{args.width}" * args.depth + f"-{args.act_fn}"
+    )
+    # model_dir = os.path.join(
+    #     MODEL_PATH, "mnist-bert_style_ffn" + f"-{args.width}" * args.depth
+    # )
+    print(f"Model directory: {model_dir}")
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
 
-    # import ipdb; ipdb.set_trace()
+    if args.act_fn == 'relu':
+        if args.xp is not None:
+            nn.ReLU = partial(DMReLU, bit_scale=args.xp) 
+    elif args.act_fn == 'gelu':
+        nn.GELU = partial(DMGELU, bit_scale=args.xp, use_lut=args.use_lut)
+
+        
+    if args.bfp is not None:
+        nn.Linear = partial(DMLinear, prec=args.bfp-8)  
+        
+
+    # nn.GELU = partial(DMGELU, bit_scale=27, use_lut=True)  # XP, LUT
+    # nn.ReLU = partial(DMReLU, bit_scale=2)  # XP
+    # nn.Linear = partial(DMLinear, prec=8)   # BFP
+    cf_str = args.act_fn
+    if args.use_lut: cf_str += "-lut"
+    cf_str += f"-bfp{args.bfp}" if args.bfp is not None else "-fp32"
+    cf_str += f"-xp{args.xp}" if args.xp is not None else "-fp32"
+    print (f"Configuration: {cf_str}")
+
+    from models import LeNet, BERTStyleFFN
+
+    model = LeNet(
+        hidden_dims=[
+            args.width,
+        ]
+        * args.depth,
+        act_func=args.act_fn,
+    ).to(device)
+    # model = BERTStyleFFN(depth=args.depth, width=args.width)
+
     if os.path.exists(os.path.join(model_dir, "trained.pt")) and not args.retrain_model:
         model.load_state_dict(torch.load(os.path.join(model_dir, "trained.pt")))
     else:

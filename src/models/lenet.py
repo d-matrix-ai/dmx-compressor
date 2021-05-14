@@ -27,7 +27,8 @@ class LeNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = torch.flatten(x, start_dim=1, end_dim=-1)
-        x = torch.relu_(self.layers[0](x))
+        x = self.act_func(self.layers[0](x))
+        x = self.dropout(x)
         for layer in self.layers[1:-1]:
             x = layer(x)
             x = self.act_func(x)

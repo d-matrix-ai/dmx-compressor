@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import qtorch
+from qtorch.quant import Quantizer
 
 
 __ALL__ = ["IMCOp", "SIMDOp"]
@@ -19,4 +20,8 @@ class SIMDOp:
 
 
 class IMCOp:
+    pass
+
+
+if __name__ == "__main__":
     pass

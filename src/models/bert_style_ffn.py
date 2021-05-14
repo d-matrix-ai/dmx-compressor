@@ -24,21 +24,21 @@ class Block(nn.Module):
 
 
 class BERTStyleFFN(nn.Module):
-    def __init__(self, depth=1, thinner=1):
+    def __init__(self, depth=1, width=1024):
         super().__init__()
         self.head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(784, 1024 // thinner),
+            nn.Linear(784, width),
             # nn.ReLU(inplace=True),
             nn.Dropout(0.1),
-            nn.LayerNorm(1024 // thinner, eps=1e-12),
+            nn.LayerNorm(width, eps=1e-12),
         )
         self.body = nn.ModuleList(
-            [Block(d=1024 // thinner, d_int=4096) for _ in range(depth)]
+            [Block(d=width, d_int=width*4) for _ in range(depth)]
         )
         self.tail = nn.Sequential(
             # nn.ReLU(inplace=True),
-            nn.Linear(1024 // thinner, 10),
+            nn.Linear(width, 10),
         )
 
     def forward(self, x):
