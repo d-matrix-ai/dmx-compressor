@@ -117,7 +117,7 @@ class DMReLU(nn.Module):
 
 class DMLinear(nn.Linear):
     def __init__(
-        self, in_features: int, out_features: int, bias: bool = True, prec: int = 8
+        self, in_features: int, out_features: int, bias: bool = True, prec: int = 8, block_size: int = 64
     ) -> None:
         super().__init__(in_features, out_features, bias=bias)
         self.qweight = Quantizer(
@@ -137,19 +137,30 @@ class DMLinear(nn.Linear):
             forward_rounding="nearest",
         )
         self.prec = prec
+        self.block_size = block_size
 
     def forward(self, input: Tensor) -> Tensor:
 
+        _weights = torch.split(self.weight, self.block_size, dim=1)
+        _weight = torch.cat(
+            [block_quantize(_w.clone(), wl=self.prec, dim=0, rounding="nearest") for _w in _weights], 
+            dim=1
+        )
         # _weight = self.qweight(self.weight)
-        _weight = block_quantize(self.weight, wl=self.prec, dim=1, rounding="nearest")
+        # _weight = block_quantize(self.weight, wl=self.prec, dim=0, rounding="nearest")
 
         # _bias = self.qbias(self.bias) if self.bias is not None else None
         _bias = self.bias  # (
         #     float_quantize(self.bias, exp=8, man=23) if self.bias is not None else None
         # )
 
+        _inputs = torch.split(input, self.block_size, dim=1)
+        _input = torch.cat(
+            [block_quantize(_i.clone(), wl=self.prec, dim=0, rounding="nearest") for _i in _inputs], 
+            dim=1
+        )
         # _input = self.qinput(input)
-        _input = block_quantize(input, wl=self.prec, dim=1, rounding="nearest")
+        # _input = block_quantize(input, wl=self.prec, dim=0, rounding="nearest")
 
         _output = F.linear(_input, _weight, _bias)
 
@@ -246,6 +257,12 @@ def main():
         type=int,
         default=None,
         help="BFP precision, 12-16, None for FP (default: None)",
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=1024,
+        help="BFP block size (default: 1024)",
     )
     parser.add_argument(
         "--xp",
@@ -345,19 +362,16 @@ def main():
 
         
     if args.bfp is not None:
-        nn.Linear = partial(DMLinear, prec=args.bfp-8)  
+        nn.Linear = partial(DMLinear, prec=args.bfp-8, block_size=args.block_size)  
         
 
-    # nn.GELU = partial(DMGELU, bit_scale=27, use_lut=True)  # XP, LUT
-    # nn.ReLU = partial(DMReLU, bit_scale=2)  # XP
-    # nn.Linear = partial(DMLinear, prec=8)   # BFP
     cf_str = args.act_fn
     if args.use_lut: cf_str += "-lut"
     cf_str += f"-bfp{args.bfp}" if args.bfp is not None else "-fp32"
     cf_str += f"-xp{args.xp}" if args.xp is not None else "-fp32"
     print (f"Configuration: {cf_str}")
 
-    from models import LeNet, BERTStyleFFN
+    from models import LeNet
 
     model = LeNet(
         hidden_dims=[
@@ -376,10 +390,6 @@ def main():
         )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
         # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.gamma)
-        # optimizer = transformers.AdamW(model.parameters(), lr=5e-5, eps=1e-8)
-        # scheduler = transformers.get_linear_schedule_with_warmup(
-        #     optimizer, num_warmup_steps=0, num_training_steps=args.epochs
-        # )
 
         for epoch in range(1, args.epochs + 1):
             train(args, model, device, ds.train, optimizer, epoch)
@@ -387,12 +397,8 @@ def main():
 
         torch.save(model.state_dict(), os.path.join(model_dir, "trained.pt"))
 
-    # quantized_model = torch.quantization.quantize_dynamic(
-    #     model, {torch.nn.Linear}, dtype=torch.qint8
-    # )
 
     test(model, device, ds.test)
-    # test(quantized_model, device, ds.test)
 
     # import ipdb; ipdb.set_trace()
 
