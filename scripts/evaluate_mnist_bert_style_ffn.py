@@ -251,12 +251,12 @@ def main():
         metavar="N",
         help="hidden dimension (default: 1024)",
     )
-    # parser.add_argument(
-    #     "--act-fn",
-    #     type=str,
-    #     default="relu",
-    #     help="activation function (default: 'relu')",
-    # )
+    parser.add_argument(
+        "--act-fn",
+        type=str,
+        default="gelu",
+        help="activation function (default: 'gelu')",
+    )
     parser.add_argument(
         "--use-lut",
         action="store_true",
@@ -356,7 +356,7 @@ def main():
     )
 
     model_dir = os.path.join(
-        MODEL_PATH, "mnist-bert_style_ffn" + f"-{args.width}" * args.depth
+        MODEL_PATH, "mnist-bert_style_ffn" + f"-{args.width}{'-relu' if args.act_fn=='relu' else ''}" * args.depth
     )
     print(f"Model directory: {model_dir}")
     if not os.path.exists(model_dir):
@@ -369,9 +369,9 @@ def main():
     if args.bfp is not None:
         nn.Linear = partial(DMLinear, prec=args.bfp - 8, block_size=args.block_size)
 
-    cf_str = ''
+    cf_str = args.act_fn
     if args.use_lut:
-        cf_str += "gelu-lut"
+        cf_str += "-lut"
     cf_str += f"-bfp{args.bfp}" if args.bfp is not None else "-fp32"
     cf_str += f"-xp{args.xp}" if args.xp is not None else "-fp32"
     print(f"Configuration: {cf_str}")
