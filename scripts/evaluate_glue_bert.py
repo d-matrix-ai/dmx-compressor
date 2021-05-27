@@ -7,17 +7,22 @@ import random
 import sys
 import time
 import torch
+from torch import Tensor
+import torch.nn as nn
+import torch.nn.functional as F
 from dotenv import load_dotenv
 from argparse import Namespace
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from tqdm import tqdm
-from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,)
-from transformers import glue_compute_metrics as compute_metrics
-from transformers import glue_output_modes as output_modes
-from transformers import glue_processors as processors
-from transformers import glue_convert_examples_to_features as convert_examples_to_features
-from transformers.utils.dummy_pt_objects import IBertPreTrainedModel
+import ctypes
+import numpy.ctypeslib as ctl
+import numpy as np
+import qtorch
+from qtorch.quant import Quantizer, fixed_point_quantize, block_quantize, float_quantize
+from functools import partial
+
+import corsair
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -31,17 +36,117 @@ logging.getLogger("transformers.modeling_utils").setLevel(
 # env
 load_dotenv(verbose=True)
 DATA_PATH = os.getenv("DATA_PATH") or './data_dir'
-OUTPUT_PATH = os.getenv("OUTPUT_PATH") or './out_dir'
+MODEL_PATH = os.getenv("MODEL_PATH") or './model_dir'
+TASK_NAME = 'MRPC'
+MODEL_NAME = 'bert-base-uncased'
+
+# numerical
+IMC_INPUT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
+IMC_WEIGHT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
+IMC_BIAS_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
+IMC_OUTPUT_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
+
+SIMD_INPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
+SIMD_OUTPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
+
+# components
+libc = ctypes.CDLL("./src/modules/libc/actfunction.so")
+libc.gelu.argtypes = [ctl.ndpointer(np.float64, flags="aligned, c_contiguous")]
+libc.gelu.restype = ctl.ndpointer(
+    np.float64, shape=(1000 * 1024,), flags="aligned, c_contiguous"
+)
+
+
+def dmgelu(arr, lid=None):
+    mx = torch.max(arr).item()
+    inp = torch.reshape(arr, (1000, 1024))
+    inp = inp.numpy().astype(np.float64, order="C")
+    # print(mx)
+    # inp *= (8/mx)
+    out = libc.gelu(inp)
+    out = torch.Tensor(out)
+    # out *= (mx/8)
+    # out /= 32
+    out = torch.reshape(out, (1000, 1024))
+    return out
+
+
+class DMGELU(nn.Module):
+    def __init__(self, bit_scale=0, use_lut=False):
+        super().__init__()
+        self.qinput = Quantizer(
+            forward_number=SIMD_INPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qoutput = Quantizer(
+            forward_number=SIMD_OUTPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.bit_scale = bit_scale
+        self.use_lut = use_lut
+
+    def forward(self, x):
+        # x = self.qinput(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        x = dmgelu(x) if self.use_lut else F.gelu(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        # x = self.qoutput(x)
+        return x
+
+
+class DMReLU(nn.Module):
+    def __init__(self, bit_scale=0, inplace=False):
+        super().__init__()
+        self.inplace = inplace
+        self.qinput = Quantizer(
+            forward_number=SIMD_INPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.qoutput = Quantizer(
+            forward_number=SIMD_OUTPUT_FORMAT,
+            forward_rounding="nearest",
+        )
+        self.bit_scale = bit_scale
+
+    def forward(self, x):
+        if self.bit_scale is not None:
+            # x = self.qinput(x)
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+        x = torch.relu_(x) if self.inplace else torch.relu(x)
+        if self.bit_scale is not None:
+            x = fixed_point_quantize(
+                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
+            )
+            # x = self.qoutput(x)
+        return x
+
+
+nn.Linear = corsair.Linear 
+
+# HF transformers
+from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,)
+from transformers import glue_compute_metrics as compute_metrics
+from transformers import glue_output_modes as output_modes
+from transformers import glue_processors as processors
+from transformers import glue_convert_examples_to_features as convert_examples_to_features
 
 # Hard-coded configs
 configs = Namespace()
-configs.output_dir = os.path.join(OUTPUT_PATH, "MRPC")
-configs.data_dir = os.path.join(DATA_PATH, "glue", "MRPC")
-configs.model_name_or_path = "bert-base-uncased"
+configs.output_dir = os.path.join(MODEL_PATH, "glue", TASK_NAME)
+configs.data_dir = os.path.join(DATA_PATH, "glue", TASK_NAME)
+configs.model_name_or_path = MODEL_NAME
 configs.max_seq_length = 128
 
 # Prepare GLUE task
-configs.task_name = "MRPC".lower()
+configs.task_name = TASK_NAME.lower()
 configs.processor = processors[configs.task_name]()
 configs.output_mode = output_modes[configs.task_name]
 configs.label_list = configs.processor.get_labels()
@@ -49,7 +154,7 @@ configs.model_type = "bert".lower()
 configs.do_lower_case = True
 
 # Set the device, batch size, topology, and caching flags.
-configs.device = "cpu"
+configs.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 configs.per_gpu_eval_batch_size = 8
 configs.n_gpu = 0
 configs.local_rank = -1
@@ -60,13 +165,14 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-set_seed(42)
+set_seed(0)
 
 tokenizer = BertTokenizer.from_pretrained(
     configs.output_dir, do_lower_case=configs.do_lower_case)
 
 model = BertForSequenceClassification.from_pretrained(configs.output_dir)
 model.to(configs.device)
+print(model)
 
 def evaluate(args, model, tokenizer, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
@@ -188,11 +294,6 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
     return dataset
 
 
-quantized_model = torch.quantization.quantize_dynamic(
-    model, {torch.nn.Linear}, dtype=torch.qint8
-)
-
-
 def time_model_evaluation(model, configs, tokenizer):
     eval_start_time = time.time()
     result = evaluate(configs, model, tokenizer, prefix="")
@@ -202,10 +303,6 @@ def time_model_evaluation(model, configs, tokenizer):
     print("Evaluate total time (seconds): {0:.1f}".format(eval_duration_time))
 
 
-# Evaluate the original FP32 BERT model
 print("Evaluating model...")
 time_model_evaluation(model, configs, tokenizer)
 
-# Evaluate the INT8 BERT model after the dynamic quantization
-print("Evaluating quantized model...")
-time_model_evaluation(quantized_model, configs, tokenizer)

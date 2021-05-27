@@ -298,9 +298,9 @@ def main():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10,
+        default=20,
         metavar="N",
-        help="number of epochs to train (default: 10)",
+        help="number of epochs to train (default: 20)",
     )
     parser.add_argument(
         "--fine-tune-epochs",
@@ -356,7 +356,7 @@ def main():
     )
 
     model_dir = os.path.join(
-        MODEL_PATH, "mnist-bert_style_ffn" + f"-{args.width}{'-relu' if args.act_fn=='relu' else ''}" * args.depth
+        MODEL_PATH, "mnist-bert_style_ffn" + f"-{args.width}" * args.depth + f"{'-relu' if args.act_fn=='relu' else ''}"
     )
     print(f"Model directory: {model_dir}")
     if not os.path.exists(model_dir):
@@ -378,8 +378,8 @@ def main():
 
     from models import BERTStyleFFN
 
-    model = BERTStyleFFN(depth=args.depth, width=args.width).to(device)
-
+    model = BERTStyleFFN(depth=args.depth, width=args.width, act_func=args.act_fn).to(device)
+    
     if os.path.exists(os.path.join(model_dir, "trained.pt")) and not args.retrain_model:
         model.load_state_dict(torch.load(os.path.join(model_dir, "trained.pt")))
     else:
