@@ -78,8 +78,7 @@ class FixedPoint(Format):
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        # TODO: check this
-        return f"XP[{self.precision}]-{self.fraction}"
+        return f"XP[{self.precision}]{self.fraction:+d}"
 
 
 class FloatingPoint(Format):
@@ -113,7 +112,6 @@ class FloatingPoint(Format):
         return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, \ncasting behavior: rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        # TODO: check this
         return f"FP[1|{self.exponent}|{self.mantissa}]"
 
 
@@ -162,7 +160,6 @@ class BlockFloatingPoint(Format):
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        # TODO: check this
         return f"BFP[{self.precision}|8]-{self.block_size}"
 
 

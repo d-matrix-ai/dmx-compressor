@@ -42,7 +42,6 @@ class CorsairConfig:
         rounding="nearest"
     )
 
-
 class Linear(nn.Linear):
     def __init__(
         self,
@@ -51,8 +50,8 @@ class Linear(nn.Linear):
         bias: bool = True,
     ) -> None:
         super().__init__(in_features, out_features, bias=bias)
-        self.input_cast = CastTo(CorsairConfig.IMC_INPUT_FORMAT_HIGH)
-        self.weight_cast = CastTo(CorsairConfig.IMC_WEIGHT_FORMAT_HIGH)
+        self.input_cast = CastTo()
+        self.weight_cast = CastTo()
         self.product_cast = CastTo()
         self.bias_cast = CastTo()
         self.output_cast = CastTo()
