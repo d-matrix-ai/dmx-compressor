@@ -1,35 +1,46 @@
 import math
+from collections import UserDict
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 
-from numerical import FixedPoint, FloatingPoint, BlockFloatingPoint, CastTo
-from sparse import WeightSparseMixin
-# from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
+from numerical import Same, FixedPoint, FloatingPoint, BlockFloatingPoint, CastTo
+# from sparse import WeightSparseMixin
 
 
 __ALL__ = ["Linear",]
 
-# TODO: class CorsairConfig 
-# Corsair configuration
-IMC_INPUT_FORMAT = BlockFloatingPoint(
-    precision=8,
-    block_size=64,
-    rounding="nearest",
-)
-IMC_WEIGHT_FORMAT = BlockFloatingPoint(
-    precision=8,
-    block_size=64,
-    rounding="nearest",
-)
-IMC_OUTPUT_FORMAT = FloatingPoint()
-OB_FORMAT = FloatingPoint()
-SIMD_FORMAT = FloatingPoint()  # FixedPoint(
-#     precision=25,
-#     fraction=12,
-#     symmetric=True,
-#     rounding="nearest"
-# )
+
+class CorsairConfig:
+    IMC_INPUT_FORMAT_HIGH = BlockFloatingPoint(
+        precision=8,
+        block_size=64,
+        rounding="nearest",
+    )
+    IMC_WEIGHT_FORMAT_HIGH = BlockFloatingPoint(
+        precision=8,
+        block_size=64,
+        rounding="nearest",
+    )
+    IMC_INPUT_FORMAT_LOW = BlockFloatingPoint(
+        precision=4,
+        block_size=128,
+        rounding="nearest",
+    )
+    IMC_WEIGHT_FORMAT_LOW = BlockFloatingPoint(
+        precision=4,
+        block_size=128,
+        rounding="nearest",
+    )
+    IMC_ACCUM_FORMAT = FloatingPoint()
+    IMC_OUTPUT_FORMAT = FloatingPoint()
+    OB_FORMAT = FloatingPoint()
+    SIMD_FORMAT = FixedPoint(
+        precision=25,
+        fraction=12,
+        symmetric=True,
+        rounding="nearest"
+    )
 
 
 class Linear(nn.Linear):
@@ -40,11 +51,11 @@ class Linear(nn.Linear):
         bias: bool = True,
     ) -> None:
         super().__init__(in_features, out_features, bias=bias)
-        self.input_cast = CastTo(format=IMC_INPUT_FORMAT)
-        self.weight_cast = CastTo(format=IMC_WEIGHT_FORMAT)
-        self.product_cast = CastTo(format=IMC_OUTPUT_FORMAT, enabled=False)
-        self.bias_cast = CastTo(format=OB_FORMAT, enabled=False)
-        self.output_cast = CastTo(format=OB_FORMAT, enabled=False)
+        self.input_cast = CastTo(CorsairConfig.IMC_INPUT_FORMAT_HIGH)
+        self.weight_cast = CastTo(CorsairConfig.IMC_WEIGHT_FORMAT_HIGH)
+        self.product_cast = CastTo()
+        self.bias_cast = CastTo()
+        self.output_cast = CastTo()
 
     @classmethod
     def from_existing(cls, obj):
@@ -60,6 +71,3 @@ class Linear(nn.Linear):
         _output = torch.add(_product, _bias)
         output = self.output_cast(_output)
         return output
-
-    # def extra_repr(self) -> str:
-    #     return super().extra_repr() + "\nCorsair simulation"
