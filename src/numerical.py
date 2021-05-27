@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Function
-import qtorch
 from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 
@@ -61,7 +60,7 @@ class FixedPoint(Format):
 
     def __repr__(self) -> str:
         # TODO: check this
-        return f"XP{self.precision}-{self.fraction}"
+        return f"XP[{self.precision}]-{self.fraction}"
 
 
 class FloatingPoint(Format):
@@ -96,7 +95,7 @@ class FloatingPoint(Format):
 
     def __repr__(self) -> str:
         # TODO: check this
-        return f"FP[1+{self.exponent}+{self.mantissa}]"
+        return f"FP[1|{self.exponent}|{self.mantissa}]"
 
 
 class BlockFloatingPoint(Format):
@@ -115,17 +114,27 @@ class BlockFloatingPoint(Format):
         self.precision = precision
         self.block_size = block_size
         self.block_dim = block_dim
+        self.rounding = rounding
 
     def cast(self, x):
-        # TODO: make sure this works for conv
-        _x = torch.split(x, self.block_size, dim=self.block_dim)
+        # input of Linear: [B, ..., Cin], dim=-1
+        # weight of Linear: [Cout, Cin], dim=-1
+        # input of Conv1D: [B, Cin, L], dim=1
+        # weight of Conv1D: [Cout, Cin//G, K], dim=1
+        # input of Conv2D: [B, Cin, H, W], dim=1
+        # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
+        
+        x.transpose_(self.block_dim, -1) # dim swap
+        xshape = x.shape # remember shape
+        _x = torch.split(x.view(-1, xshape[-1]), self.block_size, dim=-1) # slice to blocks
         x = torch.cat(
             [
                 block_quantize(block, wl=self.precision, dim=0, rounding=self.rounding)
                 for block in _x
             ],
             dim=self.block_dim,
-        )
+        ) # quantize
+        x = x.view(xshape).transpose_(self.block_dim, -1) # recover shape
         return x
 
     def __str__(self) -> str:
@@ -133,23 +142,7 @@ class BlockFloatingPoint(Format):
 
     def __repr__(self) -> str:
         # TODO: check this
-        return f"BFP[{self.precision}+8]-{self.block_size}"
-
-
-class CastTo(nn.Module):
-    r"""
-    Simulated numerical cast to a target format
-    """
-
-    def __init__(self, format=FloatingPoint()):
-        super().__init__()
-        self.format = format
-
-    def forward(self, x):
-        CastToFormat.apply(x, self.format)
-
-    def extra_repr(self):
-        return self.format.__repr__()
+        return f"BFP[{self.precision}|8]-{self.block_size}"
 
 
 class CastToFormat(Function):
@@ -164,6 +157,23 @@ class CastToFormat(Function):
     @staticmethod
     def backward(ctx, g):
         return g, None
+
+
+class CastTo(nn.Module):
+    r"""
+    Simulated numerical cast to a target format
+    """
+
+    def __init__(self, format=FloatingPoint(), enabled=True):
+        super().__init__()
+        self.format = format
+        self.enabled = enabled
+
+    def forward(self, x):
+        return CastToFormat.apply(x, self.format) if self.enabled else x
+
+    def extra_repr(self):
+        return f"{self.format.__repr__()}, enabled = {self.enabled}"
 
 
 if __name__ == "__main__":
