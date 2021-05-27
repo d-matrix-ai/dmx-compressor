@@ -6,7 +6,7 @@ from torch.autograd import Function
 from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 
-__ALL__ = ["FixedPoint", "FloatingPoint", "BlockFloatingPoint", "CastTo"]
+__ALL__ = ["Same", "FixedPoint", "FloatingPoint", "BlockFloatingPoint", "CastTo"]
 
 
 class Format:
@@ -14,6 +14,7 @@ class Format:
     This is an abstract class of tensor numerical format.
     Child classes to implement `cast()` method.
     """
+
     def __init__(self):
         pass
 
@@ -22,6 +23,24 @@ class Format:
 
     def cast(self, *input: Any) -> None:
         raise NotImplementedError
+
+
+class Same(Format):
+    r"""
+    This is a dummy numerical format whose `cast()` does not do anything but passing same input through.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def cast(self, x):
+        return x
+
+    def __str__(self) -> str:
+        return f"Dummy numerical format: no casting"
+
+    def __repr__(self) -> str:
+        return f"SAME"
 
 
 class FixedPoint(Format):
@@ -123,18 +142,20 @@ class BlockFloatingPoint(Format):
         # weight of Conv1D: [Cout, Cin//G, K], dim=1
         # input of Conv2D: [B, Cin, H, W], dim=1
         # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
-        
-        x.transpose_(self.block_dim, -1) # dim swap
-        xshape = x.shape # remember shape
-        _x = torch.split(x.view(-1, xshape[-1]), self.block_size, dim=-1) # slice to blocks
+
+        x.transpose_(self.block_dim, -1)  # dim swap
+        xshape = x.shape  # remember shape
+        _x = torch.split(
+            x.view(-1, xshape[-1]), self.block_size, dim=-1
+        )  # slice to blocks
         x = torch.cat(
             [
                 block_quantize(block, wl=self.precision, dim=0, rounding=self.rounding)
                 for block in _x
             ],
             dim=self.block_dim,
-        ) # quantize
-        x = x.view(xshape).transpose_(self.block_dim, -1) # recover shape
+        )  # quantize
+        x = x.view(xshape).transpose_(self.block_dim, -1)  # recover shape
         return x
 
     def __str__(self) -> str:
@@ -164,16 +185,15 @@ class CastTo(nn.Module):
     Simulated numerical cast to a target format
     """
 
-    def __init__(self, format=FloatingPoint(), enabled=True):
+    def __init__(self, format=Same()):
         super().__init__()
         self.format = format
-        self.enabled = enabled
 
     def forward(self, x):
-        return CastToFormat.apply(x, self.format) if self.enabled else x
+        return CastToFormat.apply(x, self.format) 
 
     def extra_repr(self):
-        return f"{self.format.__repr__()}, enabled = {self.enabled}"
+        return f"format = {self.format.__repr__()}"
 
 
 if __name__ == "__main__":
