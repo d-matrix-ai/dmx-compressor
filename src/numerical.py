@@ -1,4 +1,5 @@
 from typing import Any
+from sparse import Embedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,7 +7,14 @@ from torch.autograd import Function
 from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 
-__ALL__ = ["Same", "FixedPoint", "FloatingPoint", "BlockFloatingPoint", "CastTo"]
+__ALL__ = [
+    "BoundaryCastMixin",
+    "Same",
+    "FixedPoint",
+    "FloatingPoint",
+    "BlockFloatingPoint",
+    "CastTo",
+]
 
 
 class Format:
@@ -120,7 +128,7 @@ class BlockFloatingPoint(Format):
     This is a block floating point format simulated in FP32, using QPyTorch.
     """
 
-    def __init__(self, precision, block_size=64, block_dim=-1, rounding="nearest"):
+    def __init__(self, precision=8, block_size=64, block_dim=-1, rounding="nearest"):
         super().__init__()
         # check validity of format configuration
         assert (
@@ -140,11 +148,11 @@ class BlockFloatingPoint(Format):
         # weight of Conv1D: [Cout, Cin//G, K], dim=1
         # input of Conv2D: [B, Cin, H, W], dim=1
         # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
-
+        # TODO: modify qtorch kernels do the following at C++ level
         x.transpose_(self.block_dim, -1)  # dim swap
         xshape = x.shape  # remember shape
         _x = torch.split(
-            x.view(-1, xshape[-1]), self.block_size, dim=-1
+            x.reshape((-1, xshape[-1])), self.block_size, dim=-1
         )  # slice to blocks
         x = torch.cat(
             [
@@ -153,7 +161,7 @@ class BlockFloatingPoint(Format):
             ],
             dim=self.block_dim,
         )  # quantize
-        x = x.view(xshape).transpose_(self.block_dim, -1)  # recover shape
+        x = x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
         return x
 
     def __str__(self) -> str:
@@ -182,15 +190,47 @@ class CastTo(nn.Module):
     Simulated numerical cast to a target format
     """
 
-    def __init__(self, format=Same()):
+    def __init__(self, format=Same(), dump_to=None):
         super().__init__()
         self.format = format
+        self.dump_to = dump_to
 
     def forward(self, x):
-        return CastToFormat.apply(x, self.format) 
+        x = CastToFormat.apply(x, self.format) if x is not None else None
+        if self.dump_to is not None:
+            pass
+        return x
 
     def extra_repr(self):
         return f"format = {self.format.__repr__()}"
+
+
+class BoundaryCastMixin:
+    r"""
+    Mixin for modules with boundary casting
+    """
+
+    def init_casts(self):
+        # dynamic i/o casts
+        self.input_cast = CastTo()
+        self.output_cast = CastTo()
+        # dynamic intermediate casts
+        if (
+            type(self)
+            in (
+                nn.Linear,
+                nn.Bilinear,
+                nn.EmbeddingBag,
+            )
+            or isinstance(self, nn.modules.conv._ConvNd)
+        ):
+            self.accum_cast = CastTo()
+        else:
+            self.accum_cast = None
+        # static paramter casts
+        pnames = [n for n, _ in self.named_parameters()]
+        self.weight_cast = CastTo() if "weight" in pnames else None
+        self.bias_cast = CastTo() if "bias" in pnames else None
 
 
 if __name__ == "__main__":

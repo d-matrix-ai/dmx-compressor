@@ -8,21 +8,23 @@ import sys
 import time
 import torch
 from torch import Tensor
-import torch.nn as nn
 import torch.nn.functional as F
+import corsair
+# import torch.nn as nn
+from corsair import nn
 from dotenv import load_dotenv
 from argparse import Namespace
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from tqdm import tqdm
-import ctypes
-import numpy.ctypeslib as ctl
 import numpy as np
-import qtorch
-from qtorch.quant import Quantizer, fixed_point_quantize, block_quantize, float_quantize
-from functools import partial
 
-import corsair
+# HF transformers
+from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,)
+from transformers import glue_compute_metrics as compute_metrics
+from transformers import glue_output_modes as output_modes
+from transformers import glue_processors as processors
+from transformers import glue_convert_examples_to_features as convert_examples_to_features
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -39,104 +41,6 @@ DATA_PATH = os.getenv("DATA_PATH") or './data_dir'
 MODEL_PATH = os.getenv("MODEL_PATH") or './model_dir'
 TASK_NAME = 'MRPC'
 MODEL_NAME = 'bert-base-uncased'
-
-# numerical
-IMC_INPUT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
-IMC_WEIGHT_FORMAT = qtorch.BlockFloatingPoint(wl=23, dim=1)
-IMC_BIAS_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
-IMC_OUTPUT_FORMAT = qtorch.FloatingPoint(exp=8, man=23)
-
-SIMD_INPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
-SIMD_OUTPUT_FORMAT = qtorch.FixedPoint(wl=24, fl=4)
-
-# components
-libc = ctypes.CDLL("./src/modules/libc/actfunction.so")
-libc.gelu.argtypes = [ctl.ndpointer(np.float64, flags="aligned, c_contiguous")]
-libc.gelu.restype = ctl.ndpointer(
-    np.float64, shape=(1000 * 1024,), flags="aligned, c_contiguous"
-)
-
-
-def dmgelu(arr, lid=None):
-    mx = torch.max(arr).item()
-    inp = torch.reshape(arr, (1000, 1024))
-    inp = inp.numpy().astype(np.float64, order="C")
-    # print(mx)
-    # inp *= (8/mx)
-    out = libc.gelu(inp)
-    out = torch.Tensor(out)
-    # out *= (mx/8)
-    # out /= 32
-    out = torch.reshape(out, (1000, 1024))
-    return out
-
-
-class DMGELU(nn.Module):
-    def __init__(self, bit_scale=0, use_lut=False):
-        super().__init__()
-        self.qinput = Quantizer(
-            forward_number=SIMD_INPUT_FORMAT,
-            forward_rounding="nearest",
-        )
-        self.qoutput = Quantizer(
-            forward_number=SIMD_OUTPUT_FORMAT,
-            forward_rounding="nearest",
-        )
-        self.bit_scale = bit_scale
-        self.use_lut = use_lut
-
-    def forward(self, x):
-        # x = self.qinput(x)
-        if self.bit_scale is not None:
-            x = fixed_point_quantize(
-                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
-            )
-        x = dmgelu(x) if self.use_lut else F.gelu(x)
-        if self.bit_scale is not None:
-            x = fixed_point_quantize(
-                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
-            )
-        # x = self.qoutput(x)
-        return x
-
-
-class DMReLU(nn.Module):
-    def __init__(self, bit_scale=0, inplace=False):
-        super().__init__()
-        self.inplace = inplace
-        self.qinput = Quantizer(
-            forward_number=SIMD_INPUT_FORMAT,
-            forward_rounding="nearest",
-        )
-        self.qoutput = Quantizer(
-            forward_number=SIMD_OUTPUT_FORMAT,
-            forward_rounding="nearest",
-        )
-        self.bit_scale = bit_scale
-
-    def forward(self, x):
-        if self.bit_scale is not None:
-            # x = self.qinput(x)
-            x = fixed_point_quantize(
-                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
-            )
-        x = torch.relu_(x) if self.inplace else torch.relu(x)
-        if self.bit_scale is not None:
-            x = fixed_point_quantize(
-                x, wl=24, fl=self.bit_scale, symmetric=True, rounding="nearest"
-            )
-            # x = self.qoutput(x)
-        return x
-
-
-nn.Linear = corsair.Linear 
-
-# HF transformers
-from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,)
-from transformers import glue_compute_metrics as compute_metrics
-from transformers import glue_output_modes as output_modes
-from transformers import glue_processors as processors
-from transformers import glue_convert_examples_to_features as convert_examples_to_features
 
 # Hard-coded configs
 configs = Namespace()
@@ -171,6 +75,7 @@ tokenizer = BertTokenizer.from_pretrained(
     configs.output_dir, do_lower_case=configs.do_lower_case)
 
 model = BertForSequenceClassification.from_pretrained(configs.output_dir)
+model = corsair.transform(model)
 model.to(configs.device)
 print(model)
 

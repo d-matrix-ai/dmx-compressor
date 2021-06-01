@@ -3,4 +3,7 @@ from . import (
     modules,
     numerical,
     sparse,
+    corsair,
+    data,
+    models,
 )
