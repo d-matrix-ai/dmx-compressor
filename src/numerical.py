@@ -86,7 +86,7 @@ class FixedPoint(Format):
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"XP[{self.precision}]{self.fraction:+d}"
+        return f"XP[{self.precision}{self.fraction:+d}]({'C' if self.clamp else 'U'}{'S' if self.symmetric else 'A'}{'S' if self.rounding=='stochastic' else 'N'})"
 
 
 class FloatingPoint(Format):
@@ -120,7 +120,7 @@ class FloatingPoint(Format):
         return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, \ncasting behavior: rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"FP[1|{self.exponent}|{self.mantissa}]"
+        return f"FP[1|{self.exponent}|{self.mantissa}]({'S' if self.rounding=='stochastic' else 'N'})"
 
 
 class BlockFloatingPoint(Format):
@@ -149,26 +149,26 @@ class BlockFloatingPoint(Format):
         # input of Conv2D: [B, Cin, H, W], dim=1
         # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
         # TODO: modify qtorch kernels do the following at C++ level
-        x.transpose_(self.block_dim, -1)  # dim swap
-        xshape = x.shape  # remember shape
-        _x = torch.split(
-            x.reshape((-1, xshape[-1])), self.block_size, dim=-1
+        _x = x.transpose(self.block_dim, -1)  # dim swap
+        xshape = _x.shape  # remember shape
+        _xs = torch.split(
+            _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
         )  # slice to blocks
-        x = torch.cat(
+        _x = torch.cat(
             [
                 block_quantize(block, wl=self.precision, dim=0, rounding=self.rounding)
-                for block in _x
+                for block in _xs
             ],
             dim=self.block_dim,
         )  # quantize
-        x = x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
-        return x
+        _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
+        return _x
 
     def __str__(self) -> str:
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"BFP[{self.precision}|8]-{self.block_size}"
+        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({'S' if self.rounding=='stochastic' else 'N'})"
 
 
 class CastToFormat(Function):
