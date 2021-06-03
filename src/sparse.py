@@ -134,13 +134,13 @@ class Sparsifier(Function):
     @staticmethod
     def do_backward(x, score, mask, g_x, g_score, mode):
         # TODO: refactor this
-        if mode == "ste":
+        if mode == "STE":
             return g_x, None
         elif mode == "supermask":
             return None, g_score
         elif mode == "joint":
             return g_x, g_score
-        elif mode == "nm":
+        elif mode == "NM":
             return (
                 g_x + 2e-4 * (1 - mask) * x,
                 None,
@@ -149,7 +149,7 @@ class Sparsifier(Function):
             raise ValueError(f"unsupported backward mode: {mode}")
 
     @staticmethod
-    def forward(ctx, x, score, sp, mode="ste"):
+    def forward(ctx, x, score, sp, mode="STE"):
         ctx.mode = mode
         mask = sp.get_mask(score)
         ctx.save_for_backward(x, score, mask)
@@ -168,13 +168,19 @@ class Sparsify(nn.Module):
     """
 
     def __init__(
-        self, tensor_shape, sparseness=Dense(), backward_mode="ste", dump_to=None
+        self, tensor_shape, sparseness=Dense(), backward_mode="STE", dump_to=None
     ):
         super().__init__()
-        self.score = nn.Parameter(torch.ones(tensor_shape))
+        self.score = nn.Parameter(torch.Tensor(tensor_shape))
         self.sparseness = sparseness
         self.backward_mode = backward_mode
         self.dump_to = dump_to
+
+    def set_score(self, score_value):
+        assert (
+            score_value.shape == self.score.shape
+        ), "setting score has to be in the same shape as the weight"
+        self.score.data = score_value
 
     def forward(self, x):
         assert x.shape == self.score.shape, "score and x have to be of the same shape"
@@ -186,7 +192,7 @@ class Sparsify(nn.Module):
         return x
 
     def extra_repr(self):
-        return f"sparseness = {self.sparseness.__repr__()}, sparsifier = {self.sparsifier.__repr__()}"
+        return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}"
 
 
 class WeightSparseMixin:
@@ -195,10 +201,20 @@ class WeightSparseMixin:
     """
 
     def init_sparsifier(self):
-        assert "weight" in [
-            n for n, _ in self.named_parameters()
-        ], "module does not have weight parameter"
-        self.weight_sparsifier = Sparsify(self.weight.shape)
+        if (
+            type(self)
+            in (
+                nn.Linear,
+                nn.Bilinear,
+                nn.Embedding,
+                nn.EmbeddingBag,
+            )
+            or isinstance(self, nn.modules.conv._ConvNd)
+        ):
+            self.weight_sparsifier = Sparsify(self.weight.shape)
+            self.weight_sparsifier.set_score(torch.abs(self.weight))
+        else:
+            self.weight_sparsifier = None
 
     @property
     def effective_weight(self):

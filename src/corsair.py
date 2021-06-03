@@ -10,7 +10,7 @@ from numerical import (
     BlockFloatingPoint,
     CastTo,
 )
-from sparse import WeightSparseMixin
+from sparse import WeightSparseMixin, Dense, TopK, BlockTopK, Bernoulli, Sparsify
 
 
 __ALL__ = ["nn", "transform", "CorsairConfig"]
@@ -42,7 +42,12 @@ class CorsairConfig:
         block_dim=1,
         rounding="nearest",
     )
-    IMC_ACCUM_FORMAT = FloatingPoint()
+    IMC_ACCUM_FORMAT = FloatingPoint()  # BlockFloatingPoint(
+    #     precision=24,
+    #     block_size=64,
+    #     block_dim=-1,
+    #     rounding="nearest",
+    # )
     IMC_OUTPUT_FORMAT = FloatingPoint()
     OB_FORMAT = FloatingPoint()
     SIMD_FORMAT = FloatingPoint()  # FixedPoint(
@@ -51,7 +56,7 @@ class CorsairConfig:
     #     symmetric=True,
     #     rounding="nearest",
     # )
-    # WEIGHT_SPARSITY = Sparsity()
+    WEIGHT_SPARSENESS = Dense()
 
 
 class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
@@ -59,6 +64,7 @@ class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.init_sparsifier()
         self.init_casts()
 
     def transform(self, config):
@@ -72,7 +78,8 @@ class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
         if self.bias_cast is not None:
             self.bias_cast.format = config["bias_format"]
         # sparsity transformation
-        # TODO
+        if self.weight_sparsifier is not None:
+            self.weight_sparsifier.sparseness = config["weight_sparseness"]
 
 
 class Linear(CorsairModule, torch.nn.Linear):
@@ -86,7 +93,7 @@ class Linear(CorsairModule, torch.nn.Linear):
 
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
-        _weight = self.weight_cast(self.weight)
+        _weight = self.weight_cast(self.effective_weight)
         _product = self.accum_cast(F.linear(_input, _weight, None))
         _bias = self.bias_cast(self.bias)
         _output = torch.add(_product, _bias)
@@ -149,22 +156,24 @@ def transform(model):
     TODO: general transformation API with yaml config and regex pattern matching
     """
     config_qkv = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
-        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
-        accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
-        bias_format=CorsairConfig.DUMMY_FORMAT,
-    )
-    config_dense = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
+        input_format=CorsairConfig.DUMMY_FORMAT,
         output_format=CorsairConfig.DUMMY_FORMAT,
         accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
+        weight_format=CorsairConfig.DUMMY_FORMAT,
         bias_format=CorsairConfig.DUMMY_FORMAT,
+        weight_sparseness=CorsairConfig.WEIGHT_SPARSENESS,
+    )
+    config_dense = dict(
+        input_format=CorsairConfig.DUMMY_FORMAT,
+        output_format=CorsairConfig.DUMMY_FORMAT,
+        accum_format=CorsairConfig.DUMMY_FORMAT,
+        weight_format=CorsairConfig.DUMMY_FORMAT,
+        bias_format=CorsairConfig.DUMMY_FORMAT,
+        weight_sparseness=CorsairConfig.WEIGHT_SPARSENESS,
     )
     config_do = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
-        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
+        output_format=CorsairConfig.DUMMY_FORMAT,
     )
     for n, m in model.named_modules():
         if isinstance(m, Linear):
