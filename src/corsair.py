@@ -52,6 +52,7 @@ class CorsairConfig:
     #     symmetric=True,
     #     rounding="nearest",
     # )
+    # WEIGHT_SPARSITY = Sparsity()
 
 
 class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
@@ -149,51 +150,52 @@ def transform(model):
     TODO: general transformation API with yaml config and regex pattern matching
     """
     config_qkv = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
+        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
         accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
         bias_format=CorsairConfig.DUMMY_FORMAT,
     )
     config_dense = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
         output_format=CorsairConfig.DUMMY_FORMAT,
         accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
         bias_format=CorsairConfig.DUMMY_FORMAT,
     )
     config_do = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
-        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+        output_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_LOW,
     )
     for n, m in model.named_modules():
         if isinstance(m, Linear):
-            if "bert.encoder.layer" in n and "attention.self.query" in n:
+            if ".encoder.layer" in n and "attention.self.query" in n:
                 m.transform(
                     config_qkv
                 )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-            elif "bert.encoder.layer" in n and "attention.self.key" in n:
+            elif ".encoder.layer" in n and "attention.self.key" in n:
                 m.transform(
                     config_qkv
                 )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-            elif "bert.encoder.layer" in n and "attention.self.value" in n:
+            elif ".encoder.layer" in n and "attention.self.value" in n:
                 m.transform(
                     config_qkv
                 )  # for torch.matmul(attention_probs, value_layer)
-            elif "bert.encoder.layer" in n and "attention.output.dense" in n:
+            elif ".encoder.layer" in n and "attention.output.dense" in n:
                 m.transform(config_dense)
-            elif "bert.encoder.layer" in n and "intermediate.dense" in n:
+            elif ".encoder.layer" in n and "intermediate.dense" in n:
                 m.transform(config_dense)
             elif (
-                "bert.encoder.layer" in n
+                ".encoder.layer" in n
                 and "output.dense" in n
                 and not "attention" in n
             ):
                 m.transform(config_dense)
         elif isinstance(m, Dropout):
-            if "bert.encoder.layer" in n and "attention.self.dropout" in n:
+            if ".encoder.layer" in n and "attention.self.dropout" in n:
                 m.transform(config_do)  # for torch.matmul(attention_probs, value_layer)
     for m in model.modules():
         if isinstance(m, LayerNorm):
             pass
+    print(model)
     return model
