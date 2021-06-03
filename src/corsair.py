@@ -1,4 +1,3 @@
-import math
 from typing import Union, List, Tuple
 import torch
 from torch import Tensor, Size
@@ -185,11 +184,7 @@ def transform(model):
                 m.transform(config_dense)
             elif ".encoder.layer" in n and "intermediate.dense" in n:
                 m.transform(config_dense)
-            elif (
-                ".encoder.layer" in n
-                and "output.dense" in n
-                and not "attention" in n
-            ):
+            elif ".encoder.layer" in n and "output.dense" in n and not "attention" in n:
                 m.transform(config_dense)
         elif isinstance(m, Dropout):
             if ".encoder.layer" in n and "attention.self.dropout" in n:

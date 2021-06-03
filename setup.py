@@ -12,7 +12,7 @@ setup(
     install_requires=(
         'torch>=1.5',
         'torchvision',
-        'transformers',
+        'transformers>=4.6.0',
         'numpy',
         'qtorch>=0.3',
         'tqdm',
