@@ -1,4 +1,3 @@
-import math
 from typing import Any
 import torch
 import torch.nn as nn
@@ -56,13 +55,20 @@ class TopK(Sparseness):
 
     def __init__(self, density=0.5):
         super().__init__()
+        assert 0 <= density <= 1.0, "density has to be between 0 and 1"
         self.density = density
 
     def get_mask(self, score):
-        idx = score.view(-1).argsort()
-        mask = torch.ones_like(idx, device=score.device)
-        mask[idx[: math.round(score.numel() * (1.0 - self.density))]] = 0
-        return mask.view_as(score)
+        _score = score.view(-1)
+        idx = torch.argsort(_score, dim=0)[
+            : int(score.numel() * (1.0 - self.density))
+        ]
+        mask = (
+            torch.ones_like(_score, device=score.device)
+            .scatter_(dim=0, index=idx, value=0)
+            .view_as(score)
+        )
+        return mask
 
     def __str__(self) -> str:
         return f"Global TopK sparseness: density = {self.density}"
@@ -90,9 +96,7 @@ class BlockTopK(Sparseness):
         _score = score.transpose(self.block_dim, -1)
         score_shape = _score.shape
         _score = _score.reshape(-1, self.block_size)
-        idx = torch.argsort(_score, dim=1)[
-            :, : int(self.block_size - self.K)
-        ]
+        idx = torch.argsort(_score, dim=1)[:, : int(self.block_size - self.K)]
         mask = (
             torch.ones_like(_score, device=score.device)
             .scatter_(dim=1, index=idx, value=0)

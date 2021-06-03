@@ -146,7 +146,6 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
         output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
         return output
 
-
 class Dropout(CorsairModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
@@ -177,7 +176,7 @@ def transform(model):
         accum_format=CorsairConfig.DUMMY_FORMAT,
         weight_format=CorsairConfig.DUMMY_FORMAT,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=BlockTopK(K=7, block_size=8, block_dim=-1),
+        weight_sparseness=TopK(density=1.0),
     )
     config_dense = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
@@ -185,7 +184,7 @@ def transform(model):
         accum_format=CorsairConfig.DUMMY_FORMAT,
         weight_format=CorsairConfig.DUMMY_FORMAT,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=BlockTopK(K=7, block_size=8, block_dim=-1),
+        weight_sparseness=TopK(density=1.0), 
     )
     config_do = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
