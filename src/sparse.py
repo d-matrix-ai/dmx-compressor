@@ -1,7 +1,142 @@
 import math
+from typing import Any
 import torch
-from torch import nn
+import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Function
+
+
+__ALL__ = ["WeightSparseMixin", "Dense", "NOutOfM"]
+
+
+class Sparseness:
+    r"""
+    This is an abstract class of tensor sparseness.
+    Child classes to implement `get_mask()` method.
+    """
+
+    def __init__(self):
+        pass
+
+    def __str__(self) -> str:
+        raise NotImplementedError
+
+    def get_mask(self, *input: Any) -> None:
+        raise NotImplementedError
+
+
+class Dense(Sparseness):
+    r"""
+    This is a dummy sparsity whose `get_mask()` returns ones.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def get_mask(self, score):
+        return torch.ones_like(score, device=score.device)
+
+    def __str__(self) -> str:
+        return f"Dummy sparseness: no pruning"
+
+    def __repr__(self) -> str:
+        return f"DENSE"
+
+
+class TopK(Sparseness):
+    r"""
+    Fine-grain unstructured sparsity with top-K scored entries non-zero
+    """
+
+    def __init__(self, density=0.5):
+        super().__init__()
+        self.density = density
+
+    def get_mask(self, score):
+        idx = score.view(-1).argsort()
+        mask = torch.ones_like(idx, device=score.device)
+        mask[idx[: math.floor(score.numel() * (1.0 - self.density))]] = 0
+        return mask.view_as(score)
+
+    def __str__(self) -> str:
+        return f"Global TopK sparseness: density = {self.density}"
+
+    def __repr__(self) -> str:
+        return f"TOPK{{{self.density}}}"
+
+
+class BlockTopK(Sparseness):
+    r"""
+    Fine-grain structured sparsity with K non-zeros out of `block_size` elements along `block_dim`.
+    """
+
+    def __init__(self, K=4, block_size=8, block_dim=-1):
+        super().__init__()
+        assert 0 < K <= block_size, "N and M must be positive and N no greater than M"
+        self.K = K
+        self.block_size = block_size
+        self.block_dim = block_dim
+
+    def get_mask(self, score):
+        assert (
+            score.shape[self.block_dim] % self.block_size == 0
+        ), f"score has size {score.shape[self.block_dim]} at dimension {self.block_dim}, not a multiple of block size {self.block_size}"
+        _score = score.transpose(self.block_dim, -1)
+        score_shape = _score.shape
+        idx = torch.argsort(_score.reshape(-1, self.block_size), dim=1)[
+            :, : int(self.block_size - self.K)
+        ]
+        mask = (
+            torch.ones_like(_score, device=score.device)
+            .scatter_(dim=1, index=idx, value=0)
+            .reshape(score_shape)
+            .transpose_(self.block_dim, -1)
+        )
+        return mask
+
+    def __str__(self) -> str:
+        return f"Block TopK sparseness: pattern = {self.K}:{self.block_size}, block dimension = {self.block_dim}"
+
+    def __repr__(self) -> str:
+        return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}"
+
+
+class PruneToSparseness(Function):
+    r"""
+    A simple STE backward function for
+    """
+
+    @staticmethod
+    def forward(ctx, x, sp):
+        return sp.prune(x)
+
+    @staticmethod
+    def backward(ctx, g):
+        return g, None
+
+
+class PruneTo(nn.Module):
+    r"""
+    Sparsification
+    """
+
+    def __init__(self, score, sparseness=Dense(), dump_to=None):
+        super().__init__()
+        self.score = score
+        self.sparseness = sparseness
+        self.dump_to = dump_to
+
+    def forward(self, x):
+        assert x.shape == self.score.shape
+        _mask = self.sparseness.mask(self.score)
+
+        x = CastToFormat.apply(x, self.format) if x is not None else None
+        if self.dump_to is not None:
+            pass
+        return x
+
+    def extra_repr(self):
+        return f"format = {self.format.__repr__()}"
 
 
 class WeightSparseMixin:
@@ -170,10 +305,10 @@ class WeightSparseMixin:
         return self.weight * self.get_mask() if self.sparse else self.weight
 
 
-class Bernoulli(torch.autograd.Function):
+class Bernoulli(Function):
     """
     Bernoulli sampler for supermasking.
-    A PyTorch Function with a custom backward pass. 
+    A PyTorch Function with a custom backward pass.
     Backprogate as if the function had been the
     identity function (straight-through estimator).
     See:
@@ -214,34 +349,9 @@ class EdgePopup(torch.autograd.Function):
         return g, None
 
 
-class ComplexMasking(torch.autograd.Function):
-    """
-    A complex mask
-    """
-
-    @staticmethod
-    def forward(ctx, re, im):
-        
-        out = x.clone()
-        _, idx = x.flatten().sort()
-        j = int((1 - k) * x.numel())
-        # flat_out and out access the same memory.
-        flat_out = out.flatten()
-        flat_out[idx[:j]] = -1
-        flat_out[idx[j:]] = 1
-        return out
-
-    @staticmethod
-    def backward(ctx, g):
-        # send the gradient g straight-through on the backward pass.
-        return g, None
-
-
-
-
 class Linear(nn.Linear, WeightSparseMixin):
     """
-    Wrapper of torch.nn.Linear 
+    Wrapper of torch.nn.Linear
     """
 
     def __init__(
@@ -265,18 +375,20 @@ class Linear(nn.Linear, WeightSparseMixin):
         return F.linear(input, self.effective_weight, self.bias)
 
     def extra_repr(self):
-        return "in_features={}, out_features={}, bias={}, sparse={}, supermask={}".format(
-            self.in_features,
-            self.out_features,
-            self.bias is not None,
-            self.sparse,
-            self.supermask,
+        return (
+            "in_features={}, out_features={}, bias={}, sparse={}, supermask={}".format(
+                self.in_features,
+                self.out_features,
+                self.bias is not None,
+                self.sparse,
+                self.supermask,
+            )
         )
 
 
 class Embedding(nn.Embedding, WeightSparseMixin):
     """
-    Wrapper of torch.nn.Embedding 
+    Wrapper of torch.nn.Embedding
     """
 
     def __init__(
@@ -335,7 +447,7 @@ class Embedding(nn.Embedding, WeightSparseMixin):
 
 class Conv2d(nn.Conv2d, WeightSparseMixin):
     r"""
-    Wrapper of torch.nn.Conv2d 
+    Wrapper of torch.nn.Conv2d
     """
 
     def __init__(
@@ -388,3 +500,7 @@ class Conv2d(nn.Conv2d, WeightSparseMixin):
             self.sparse,
             self.supermask,
         )
+
+
+if __name__ == "__main__":
+    pass
