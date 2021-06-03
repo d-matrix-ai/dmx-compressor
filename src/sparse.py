@@ -89,7 +89,8 @@ class BlockTopK(Sparseness):
         ), f"score has size {score.shape[self.block_dim]} at dimension {self.block_dim}, not a multiple of block size {self.block_size}"
         _score = score.transpose(self.block_dim, -1)
         score_shape = _score.shape
-        idx = torch.argsort(_score.reshape(-1, self.block_size), dim=1)[
+        _score = _score.reshape(-1, self.block_size)
+        idx = torch.argsort(_score, dim=1)[
             :, : int(self.block_size - self.K)
         ]
         mask = (
