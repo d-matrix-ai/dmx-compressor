@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Fine-tuning the library models for question answering.
+Fine-tuning the Hugging Face transformers library models for question answering.
 """
-# You can also adapt this script on your own question answering task. Pointers for this are left as comments.
 
 import logging
 import os
