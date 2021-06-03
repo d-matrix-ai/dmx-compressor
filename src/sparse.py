@@ -55,7 +55,7 @@ class TopK(Sparseness):
     def get_mask(self, score):
         idx = score.view(-1).argsort()
         mask = torch.ones_like(idx, device=score.device)
-        mask[idx[: math.floor(score.numel() * (1.0 - self.density))]] = 0
+        mask[idx[: math.round(score.numel() * (1.0 - self.density))]] = 0
         return mask.view_as(score)
 
     def __str__(self) -> str:
@@ -101,42 +101,57 @@ class BlockTopK(Sparseness):
         return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}"
 
 
-class PruneToSparseness(Function):
+class MagnitudeBasedPruning(Function):
     r"""
-    A simple STE backward function for
+    A simple STE backward function for magnitude-based pruning
     """
 
     @staticmethod
     def forward(ctx, x, sp):
-        return sp.prune(x)
+        return x * sp.get_mask(x.abs())
 
     @staticmethod
     def backward(ctx, g):
         return g, None
 
 
-class PruneTo(nn.Module):
+class Bernoulli(Function):
+    """
+    Bernoulli sampler for supermasking
+    """
+
+    @staticmethod
+    def forward(ctx, x):
+        # return torch.sign(x) * torch.bernoulli(torch.abs(x))
+        return torch.bernoulli(x)
+
+    @staticmethod
+    def backward(ctx, g):
+        return g
+
+
+class Sparsify(nn.Module):
     r"""
     Sparsification
     """
 
-    def __init__(self, score, sparseness=Dense(), dump_to=None):
+    def __init__(
+        self, score, sparseness=Dense(), sparsifier=MagnitudeBasedPruning, dump_to=None
+    ):
         super().__init__()
         self.score = score
         self.sparseness = sparseness
+        self.sparsifier = sparsifier
         self.dump_to = dump_to
 
     def forward(self, x):
-        assert x.shape == self.score.shape
-        _mask = self.sparseness.mask(self.score)
-
-        x = CastToFormat.apply(x, self.format) if x is not None else None
+        x = x if isinstance(self.sparseness, Dense) else self.sparsifier.apply(x)
         if self.dump_to is not None:
             pass
         return x
 
     def extra_repr(self):
-        return f"format = {self.format.__repr__()}"
+        return f"sparseness = {self.sparseness.__repr__()}, sparsifier = {self.sparsifier.__repr__()}"
 
 
 class WeightSparseMixin:
@@ -303,50 +318,6 @@ class WeightSparseMixin:
     def effective_weight(self):
         "Effective weight, i.e. masked weight in the sparse case"
         return self.weight * self.get_mask() if self.sparse else self.weight
-
-
-class Bernoulli(Function):
-    """
-    Bernoulli sampler for supermasking.
-    A PyTorch Function with a custom backward pass.
-    Backprogate as if the function had been the
-    identity function (straight-through estimator).
-    See:
-    https://pytorch.org/tutorials/beginner/examples_autograd/two_layer_net_custom_function.html
-    """
-
-    @staticmethod
-    def forward(ctx, x):
-        # return torch.sign(x) * torch.bernoulli(torch.abs(x))
-        return torch.bernoulli(x)
-
-    @staticmethod
-    def backward(ctx, g):
-        # Straight-through
-        return g
-
-
-class EdgePopup(torch.autograd.Function):
-    """
-    Ramanujan et al. 2019 (http://arxiv.org/abs/1911.13299)
-    """
-
-    @staticmethod
-    def forward(ctx, x, k):
-        # Get the subnetwork by sorting the scores and using the top fraction k
-        out = x.clone()
-        _, idx = x.flatten().sort()
-        j = int((1 - k) * x.numel())
-        # flat_out and out access the same memory.
-        flat_out = out.flatten()
-        flat_out[idx[:j]] = -1
-        flat_out[idx[j:]] = 1
-        return out
-
-    @staticmethod
-    def backward(ctx, g):
-        # send the gradient g straight-through on the backward pass.
-        return g, None
 
 
 class Linear(nn.Linear, WeightSparseMixin):
