@@ -1,5 +1,4 @@
 from typing import Any
-from sparse import Embedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -165,7 +164,7 @@ class BlockFloatingPoint(Format):
         return _x
 
     def __str__(self) -> str:
-        return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
+        return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: rounding = {self.rounding}"
 
     def __repr__(self) -> str:
         return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({'S' if self.rounding=='stochastic' else 'N'})"
