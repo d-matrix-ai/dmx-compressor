@@ -11,7 +11,6 @@ __ALL__ = [
     "Dense",
     "TopK",
     "BlockTopK",
-    "MagnitudeBasedPruning",
     "Sparsify",
 ]
 
@@ -165,7 +164,7 @@ class Sparsifier(Function):
 
 class Sparsify(nn.Module):
     r"""
-    Sparsification
+    Sparsification module
     """
 
     def __init__(
@@ -195,267 +194,15 @@ class WeightSparseMixin:
     Mixin for weight-sparse modules
     """
 
-    def init_mask(self, sparsity=0.0):
-        self.register_parameter("mask", nn.Parameter(torch.ones_like(self.weight)))
-        if self.supermask:
-            self.weight.requires_grad = False
-        else:
-            self.mask.requires_grad = False
-        self.reset_mask(sparsity)
-
-    def reset_mask(self, sparsity=0.0):
-        """
-        Reset the mask or supermask for sparse modules
-        """
-        if self.supermask:
-            if self.deterministic_supermask:  # Ramanujan et al. 2019
-                self.mask.data = torch.abs(self.weight.data)
-            else:  # Radiya-Dixit & Wang 2020
-                idx = torch.abs(self.weight).view(-1).argsort()
-                init_val = 1.57  # 5
-                init = torch.zeros_like(idx) + init_val
-                init[idx[: math.floor(self.weight.numel() * sparsity)]] = -init_val
-                self.mask.data = init.float().view_as(self.weight)
-        else:  # static mask
-            self.mask.data.bernoulli_(p=1.0 - sparsity)
-
-    def configure_sparsity(
-        self,
-        sparse=False,
-        supermask=False,
-        deterministic_supermask=False,
-        init_mask=False,
-        sparsity=0.0,
-    ):
-        """
-        Configure sparse states
-        """
-        self.sparse = sparse
-        if supermask ^ self.supermask:  # change of supermask state
-            self.supermask = supermask
-            self.k = 1.0 - sparsity
-            self.deterministic_supermask = deterministic_supermask
-            self.weight.requires_grad = not supermask
-            self.mask.requires_grad = supermask
-            if init_mask:
-                self.reset_mask(sparsity=sparsity)
-
-    def get_mask(self):
-        if self.supermask:
-            mask = (
-                EdgePopup.apply(self.mask, self.k)
-                if self.deterministic_supermask
-                else torch.sin(torch.clamp(self.mask, -math.pi / 2.0, math.pi / 2.0))
-                # else Bernoulli.apply(torch.sigmoid(self.mask))
-            )
-        else:
-            mask = self.mask
-        return mask
-
-    def get_mask_stats(self):
-        """
-        Returns the number of nonzero values in the mask and the total
-        number of values in the mask.
-        """
-        assert self.sparse, "must be a weight sparse module"
-        mask = self.get_mask()
-        n_nonzero, n_total = int(mask.sum()), mask.numel()
-        return n_nonzero, n_total
-
-    @property
-    def sparsity(self):
-        if self.sparse:
-            n_nonzero, n_total = self.get_mask_stats()
-            return 1.0 - float(n_nonzero) / n_total
-        else:
-            return None
-
-    def prune_by_threshold(self, threshold=0.0, zero_pruned=False):
-        """
-        Prune weight by a threshold
-        Args:
-            threshold (float): pruning threshold (default: 0)
-            zero_pruned (bool): whether to set pruned weights to 0 in addition to setting mask to 0 (default: False)
-        """
-        if self.sparse and not self.supermask:
-            to_be_pruned = torch.abs(self.weight * self.mask) < threshold
-            self.mask *= 1 - to_be_pruned.float()
-            if zero_pruned:
-                self.weight.data *= self.mask
-
-    def prune_to_sparsity(self, sparsity=0.0, zero_pruned=False):
-        """
-        Prune weight to at least a sparsity level
-        Args:
-            sparsity (float): target sparsity (default: 0)
-            zero_pruned (bool): whether to set pruned weights to 0 in addition
-                                to setting mask to 0 (default: False)
-        """
-        if self.sparse and not self.supermask:
-            idx = torch.abs(self.weight * self.mask).view(-1).argsort()
-            to_be_pruned = torch.zeros_like(idx)
-            to_be_pruned[idx[: math.floor(self.weight.numel() * sparsity)]] = 1
-            self.mask *= 1 - to_be_pruned.float().view_as(self.mask)
-            if zero_pruned:
-                self.weight.data *= self.mask
+    def init_sparsifier(self):
+        assert "weight" in [
+            n for n, _ in self.named_parameters()
+        ], "module does not have weight parameter"
+        self.weight_sparsifier = Sparsify(self.weight.shape)
 
     @property
     def effective_weight(self):
-        "Effective weight, i.e. masked weight in the sparse case"
-        return self.weight * self.get_mask() if self.sparse else self.weight
-
-
-class Linear(nn.Linear, WeightSparseMixin):
-    """
-    Wrapper of torch.nn.Linear
-    """
-
-    def __init__(
-        self,
-        in_features,
-        out_features,
-        bias=True,
-        sparse=False,
-        supermask=False,
-        deterministic_supermask=False,
-        sparsity=0.0,
-    ):
-        super(Linear, self).__init__(in_features, out_features, bias)
-        self.sparse = sparse
-        self.supermask = supermask
-        self.deterministic_supermask = deterministic_supermask
-        self.k = 1.0 - sparsity
-        self.init_mask(sparsity=0.0)
-
-    def forward(self, input):
-        return F.linear(input, self.effective_weight, self.bias)
-
-    def extra_repr(self):
-        return (
-            "in_features={}, out_features={}, bias={}, sparse={}, supermask={}".format(
-                self.in_features,
-                self.out_features,
-                self.bias is not None,
-                self.sparse,
-                self.supermask,
-            )
-        )
-
-
-class Embedding(nn.Embedding, WeightSparseMixin):
-    """
-    Wrapper of torch.nn.Embedding
-    """
-
-    def __init__(
-        self,
-        num_embeddings,
-        embedding_dim,
-        padding_idx=None,
-        max_norm=None,
-        norm_type=2.0,
-        scale_grad_by_freq=False,
-        _weight=None,
-        sparse=False,
-        supermask=False,
-        deterministic_supermask=False,
-        sparsity=0.0,
-    ):
-        super(Embedding, self).__init__(
-            num_embeddings,
-            embedding_dim,
-            padding_idx,
-            max_norm,
-            norm_type,
-            scale_grad_by_freq,
-            sparse,
-            _weight,
-        )
-        self.sparse = sparse
-        self.supermask = supermask
-        self.deterministic_supermask = deterministic_supermask
-        self.k = 1.0 - sparsity
-        self.init_mask(sparsity=sparsity)
-
-    def forward(self, input):
-        return F.embedding(
-            input,
-            self.effective_weight,
-            self.padding_idx,
-            self.max_norm,
-            self.norm_type,
-            self.scale_grad_by_freq,
-            False,
-        )
-
-    def extra_repr(self):
-        return "num_embeddings={}, embedding_dim={}, padding_idx={}, max_norm={}, norm_type={}, scale_grad_by_freq={}, sparse={}, supermask={}".format(
-            self.num_embeddings,
-            self.embedding_dim,
-            self.padding_idx,
-            self.max_norm,
-            self.norm_type,
-            self.scale_grad_by_freq,
-            self.sparse,
-            self.supermask,
-        )
-
-
-class Conv2d(nn.Conv2d, WeightSparseMixin):
-    r"""
-    Wrapper of torch.nn.Conv2d
-    """
-
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=0,
-        dilation=1,
-        groups=1,
-        bias=True,
-        padding_mode="zeros",
-        sparse=False,
-        supermask=False,
-        deterministic_supermask=False,
-        parsity=0.0,
-    ):
-        super(Conv2d, self).__init__(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            padding,
-            dilation,
-            groups,
-            bias,
-            padding_mode,
-        )
-        self.sparse = sparse
-        self.supermask = supermask
-        self.deterministic_supermask = deterministic_supermask
-        self.k = 1.0 - sparsity
-        self.init_mask(sparsity=sparsity)
-
-    def forward(self, input):
-        return self.conv2d_forward(input, self.effective_weight)
-
-    def extra_repr(self):
-        return "in_channels={}, out_channels={}, kernel_size={}, stride={}, padding={}, dilation={}, groups={}, bias={}, padding_mode={}, sparse={}, supermask={}".format(
-            self.in_channels,
-            self.out_channels,
-            self.kernel_size,
-            self.stride,
-            self.padding,
-            self.dilation,
-            self.groups,
-            self.bias,
-            self.padding_mode,
-            self.sparse,
-            self.supermask,
-        )
+        return self.weight_sparsifier(self.weight)
 
 
 if __name__ == "__main__":
