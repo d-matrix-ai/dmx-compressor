@@ -214,6 +214,7 @@ class WeightSparseMixin:
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
             self.weight_sparsifier.set_score(torch.abs(self.weight))
+            # self.weight_sparsifier.set_score(torch.randn_like(self.weight))
         else:
             self.weight_sparsifier = None
 

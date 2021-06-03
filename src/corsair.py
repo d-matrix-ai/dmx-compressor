@@ -42,21 +42,37 @@ class CorsairConfig:
         block_dim=1,
         rounding="nearest",
     )
-    IMC_ACCUM_FORMAT = FloatingPoint()  # BlockFloatingPoint(
-    #     precision=24,
-    #     block_size=64,
-    #     block_dim=-1,
-    #     rounding="nearest",
-    # )
+    IMC_ACCUM_FORMAT_HIGH = FloatingPoint()
+    IMC_GEMM_ACCUM_FORMAT_LOW = BlockFloatingPoint(
+        precision=24,
+        block_size=64,
+        block_dim=-1,
+        rounding="nearest",
+    )
+    IMC_CONV_ACCUM_FORMAT_LOW = BlockFloatingPoint(
+        precision=24,
+        block_size=64,
+        block_dim=1,
+        rounding="nearest",
+    )
     IMC_OUTPUT_FORMAT = FloatingPoint()
     OB_FORMAT = FloatingPoint()
-    SIMD_FORMAT = FloatingPoint()  # FixedPoint(
-    #     precision=25,
-    #     fraction=12,
-    #     symmetric=True,
-    #     rounding="nearest",
-    # )
-    WEIGHT_SPARSENESS = Dense()
+    SIMD_FORMAT_HIGH = FloatingPoint()
+    SIMD_FORMAT_LOW = FixedPoint(
+        precision=25,
+        fraction=12,
+        symmetric=True,
+        rounding="nearest",
+    )
+    DUMMY_SPARSENESS = Dense()
+    IMC_GEMM_SPARSENESS_4_8 = BlockTopK(K=4, block_size=8, block_dim=-1)
+    IMC_GEMM_SPARSENESS_2_8 = BlockTopK(K=2, block_size=8, block_dim=-1)
+    IMC_GEMM_SPARSENESS_2_4 = BlockTopK(K=2, block_size=4, block_dim=-1)
+    IMC_GEMM_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=-1)
+    IMC_CONV_SPARSENESS_4_8 = BlockTopK(K=4, block_size=8, block_dim=1)
+    IMC_CONV_SPARSENESS_2_8 = BlockTopK(K=2, block_size=8, block_dim=1)
+    IMC_CONV_SPARSENESS_2_4 = BlockTopK(K=2, block_size=4, block_dim=1)
+    IMC_CONV_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=1)
 
 
 class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
@@ -161,7 +177,7 @@ def transform(model):
         accum_format=CorsairConfig.DUMMY_FORMAT,
         weight_format=CorsairConfig.DUMMY_FORMAT,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=CorsairConfig.WEIGHT_SPARSENESS,
+        weight_sparseness=BlockTopK(K=7, block_size=8, block_dim=-1),
     )
     config_dense = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
@@ -169,7 +185,7 @@ def transform(model):
         accum_format=CorsairConfig.DUMMY_FORMAT,
         weight_format=CorsairConfig.DUMMY_FORMAT,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=CorsairConfig.WEIGHT_SPARSENESS,
+        weight_sparseness=BlockTopK(K=7, block_size=8, block_dim=-1),
     )
     config_do = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
