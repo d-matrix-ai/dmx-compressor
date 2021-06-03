@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.autograd import Function
 
 
-__ALL__ = ["WeightSparseMixin", "Dense", "NOutOfM"]
+__ALL__ = ["WeightSparseMixin", "Dense", "TopK", "BlockTopK", "MagnitudeBasedPruning", "Sparsify"]
 
 
 class Sparseness:
