@@ -6,7 +6,14 @@ import torch.nn.functional as F
 from torch.autograd import Function
 
 
-__ALL__ = ["WeightSparseMixin", "Dense", "TopK", "BlockTopK", "MagnitudeBasedPruning", "Sparsify"]
+__ALL__ = [
+    "WeightSparseMixin",
+    "Dense",
+    "TopK",
+    "BlockTopK",
+    "MagnitudeBasedPruning",
+    "Sparsify",
+]
 
 
 class Sparseness:
@@ -101,33 +108,59 @@ class BlockTopK(Sparseness):
         return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}"
 
 
-class MagnitudeBasedPruning(Function):
+class Bernoulli(Sparseness):
     r"""
-    A simple STE backward function for magnitude-based pruning
-    """
-
-    @staticmethod
-    def forward(ctx, x, sp):
-        return x * sp.get_mask(x.abs())
-
-    @staticmethod
-    def backward(ctx, g):
-        return g, None
-
-
-class Bernoulli(Function):
-    """
     Bernoulli sampler for supermasking
     """
 
-    @staticmethod
-    def forward(ctx, x):
+    def __init__(self):
+        super().__init__()
+
+    def get_mask(self, score):
         # return torch.sign(x) * torch.bernoulli(torch.abs(x))
-        return torch.bernoulli(x)
+        return torch.bernoulli(score)
+
+    def __str__(self) -> str:
+        return f"Bernoulli sparseness"
+
+    def __repr__(self) -> str:
+        return f"BERN"
+
+
+class Sparsifier(Function):
+    r"""
+    Sparsifier class
+    """
 
     @staticmethod
-    def backward(ctx, g):
-        return g
+    def do_backward(x, score, mask, g_x, g_score, mode):
+        # TODO: refactor this
+        if mode == "ste":
+            return g_x, None
+        elif mode == "supermask":
+            return None, g_score
+        elif mode == "joint":
+            return g_x, g_score
+        elif mode == "nm":
+            return (
+                g_x + 2e-4 * (1 - mask) * x,
+                None,
+            )  # https://github.com/NM-sparsity/NM-sparsity
+        else:
+            raise ValueError(f"unsupported backward mode: {mode}")
+
+    @staticmethod
+    def forward(ctx, x, score, sp, mode="ste"):
+        ctx.mode = mode
+        mask = sp.get_mask(score)
+        ctx.save_for_backward(x, score, mask)
+        return x * mask
+
+    @staticmethod
+    def backward(ctx, g_x, g_score):
+        x, score, mask = ctx.saved_variables
+        _g_x, _g_score = Sparsifier.do_backward(x, score, mask, g_x, g_score)
+        return _g_x, _g_score, None, None
 
 
 class Sparsify(nn.Module):
@@ -136,16 +169,19 @@ class Sparsify(nn.Module):
     """
 
     def __init__(
-        self, score, sparseness=Dense(), sparsifier=MagnitudeBasedPruning, dump_to=None
+        self, tensor_shape, sparseness=Dense(), backward_mode="ste", dump_to=None
     ):
         super().__init__()
-        self.score = score
+        self.score = nn.Parameter(torch.ones(tensor_shape))
         self.sparseness = sparseness
-        self.sparsifier = sparsifier
+        self.backward_mode = backward_mode
         self.dump_to = dump_to
 
     def forward(self, x):
-        x = x if isinstance(self.sparseness, Dense) else self.sparsifier.apply(x)
+        assert x.shape == self.score.shape, "score and x have to be of the same shape"
+        if not isinstance(self.sparseness, Dense):
+            x = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
+        self.mask = self.sparseness.get_mask(self.score)
         if self.dump_to is not None:
             pass
         return x
@@ -203,57 +239,6 @@ class WeightSparseMixin:
             self.mask.requires_grad = supermask
             if init_mask:
                 self.reset_mask(sparsity=sparsity)
-
-    def _binarize_weight(self, scaling="kaiming"):
-        if scaling == "kaiming":  # Kaiming constant as in Ramanujan et al. 2019
-            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
-            scale = math.sqrt(2.0 / fan_in)
-        elif scaling == "frobenius":  # Unit Frobenius norm
-            scale = 1.0 / self.weight.data.norm()
-        else:
-            raise NotImplementedError
-        self.weight.data = torch.sign(self.weight.data) * scale
-
-    def _quantize_weight(self, bits=8):
-        # fake quantize
-        max_w = self.weight.data.abs().max()
-        max_int = 2 ** (bits - 1) - 1
-        self.weight.data = (
-            torch.round(self.weight.data / max_w * max_int) * max_w / max_int
-        )
-        # real quantize/dequantize requires torch>=1.3
-        # _w = torch.quantize_per_tensor(self.weight.data, self.weight.data.abs().max()/128, 0, torch.qint8)
-        # self.weight.data = _w.dequantize()
-
-    def quantize_weight(self, mode="linear", n=4, bits=4):
-        # uniformly quantize at bits precision between mean +- n*std
-        mu, sigma = self.weight.data.mean(), self.weight.data.std()
-        torch.where(self.weight.data < mu - n * sigma, mu - n * sigma, self.weight.data)
-        torch.where(self.weight.data > mu + n * sigma, mu + n * sigma, self.weight.data)
-        self.weight.data = (
-            (self.weight.data - mu - n * sigma) / (2 * n * sigma) * (2 ** bits - 1)
-        )
-        self.weight.data = torch.round(self.weight.data)
-        self.weight.data = (
-            self.weight.data / (2 ** bits - 1) * (2 * n * sigma) + mu + n * sigma
-        )
-
-    def shuffle_weight(self, fraction=1.0):
-        # shuffle a fraction of weights
-        N = self.weight.data.numel()
-        w_size = self.weight.data.size()
-        k = round(fraction * (N + 1))
-        idx = torch.randperm(N)[:k]
-        _shuffle = lambda x: x[torch.randperm(x.numel())]
-        _w = self.weight.data.view(-1)
-        _w[idx] = _shuffle(_w[idx])
-        self.weight.data = _w.view(w_size)
-
-    def mix_weight(self, fraction=1.0):
-        # mix weights with a random initialization
-        w_rand = torch.zeros_like(self.weight.data)
-        nn.init.kaiming_normal_(w_rand)
-        self.weight.data = self.weight.data * (1.0 - fraction) + w_rand * fraction
 
     def get_mask(self):
         if self.supermask:
