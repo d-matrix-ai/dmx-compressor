@@ -163,8 +163,8 @@ class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
         # sparsity transformation
         if self.weight_sparsifier is not None:
             self.weight_sparsifier.sparseness = config["weight_sparseness"]
+            # TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
-            # self.weight_sparsifier.set_score(torch.randn_like(self.weight))
 
 
 class Linear(CorsairMixin, torch.nn.Linear):
