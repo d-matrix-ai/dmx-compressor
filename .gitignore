@@ -117,5 +117,8 @@ Dockerfile
 
 # experiment
 sandbox/
+model_dir/
 data_dir/
 out_dir/
+runs/
+cached*
