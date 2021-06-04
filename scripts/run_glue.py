@@ -328,7 +328,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = corsair.transform(model)
+    model.transform(config="configs/corsair.yml")
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

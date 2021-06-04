@@ -75,6 +75,73 @@ class CorsairConfig:
     IMC_CONV_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=1)
 
 
+class CorsairModule(torch.nn.Module):
+    r"""
+    Model container equipped with corsair transform
+    """
+    def __init__(self):
+        super().__init__()
+
+    def transform(self, config="configs/corsair.yml"):
+        r"""
+        Quick and dirty model conversion for Corsair numerical simulation/optimization
+        TODO: general transformation API with yaml config and regex pattern matching
+        """
+        config_qkv = dict(
+            input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+            output_format=CorsairConfig.DUMMY_FORMAT,
+            accum_format=CorsairConfig.DUMMY_FORMAT,
+            weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+            bias_format=CorsairConfig.DUMMY_FORMAT,
+            weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
+        )
+        config_dense = dict(
+            input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+            output_format=CorsairConfig.DUMMY_FORMAT,
+            accum_format=CorsairConfig.DUMMY_FORMAT,
+            weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
+            bias_format=CorsairConfig.DUMMY_FORMAT,
+            weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
+        )
+        config_do = dict(
+            input_format=CorsairConfig.DUMMY_FORMAT,
+            output_format=CorsairConfig.DUMMY_FORMAT,
+        )
+        for n, m in self.named_modules():
+            if isinstance(m, Linear):
+                if ".encoder.layer" in n and "attention.self.query" in n:
+                    m.transform(
+                        config_qkv
+                    )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
+                elif ".encoder.layer" in n and "attention.self.key" in n:
+                    m.transform(
+                        config_qkv
+                    )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
+                elif ".encoder.layer" in n and "attention.self.value" in n:
+                    m.transform(
+                        config_qkv
+                    )  # for torch.matmul(attention_probs, value_layer)
+                elif ".encoder.layer" in n and "attention.output.dense" in n:
+                    m.transform(config_dense)
+                elif ".encoder.layer" in n and "intermediate.dense" in n:
+                    m.transform(config_dense)
+                elif (
+                    ".encoder.layer" in n
+                    and "output.dense" in n
+                    and not "attention" in n
+                ):
+                    m.transform(config_dense)
+            elif isinstance(m, Dropout):
+                if ".encoder.layer" in n and "attention.self.dropout" in n:
+                    m.transform(
+                        config_do
+                    )  # for torch.matmul(attention_probs, value_layer)
+        for m in self.modules():
+            if isinstance(m, LayerNorm):
+                pass
+        print(self)
+
+
 class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
     r"""
     Extending torch.nn.Module
@@ -148,6 +215,7 @@ class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
         output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
         return output
 
+
 class Dropout(CorsairMixin, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
@@ -161,62 +229,10 @@ class Dropout(CorsairMixin, torch.nn.Dropout):
 
 # overload torch.nn modules
 nn = torch.nn
+nn.Module = CorsairModule
 nn.Linear = Linear
 nn.Softmax = Softmax
 nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
 
 
-def transform(model):
-    r"""
-    Quick and dirty model conversion for Corsair numerical simulation/optimization
-    TODO: general transformation API with yaml config and regex pattern matching
-    """
-    config_qkv = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-        output_format=CorsairConfig.DUMMY_FORMAT,
-        accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-        bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
-    )
-    config_dense = dict(
-        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-        output_format=CorsairConfig.DUMMY_FORMAT,
-        accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-        bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1), 
-    )
-    config_do = dict(
-        input_format=CorsairConfig.DUMMY_FORMAT,
-        output_format=CorsairConfig.DUMMY_FORMAT,
-    )
-    for n, m in model.named_modules():
-        if isinstance(m, Linear):
-            if ".encoder.layer" in n and "attention.self.query" in n:
-                m.transform(
-                    config_qkv
-                )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-            elif ".encoder.layer" in n and "attention.self.key" in n:
-                m.transform(
-                    config_qkv
-                )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-            elif ".encoder.layer" in n and "attention.self.value" in n:
-                m.transform(
-                    config_qkv
-                )  # for torch.matmul(attention_probs, value_layer)
-            elif ".encoder.layer" in n and "attention.output.dense" in n:
-                m.transform(config_dense)
-            elif ".encoder.layer" in n and "intermediate.dense" in n:
-                m.transform(config_dense)
-            elif ".encoder.layer" in n and "output.dense" in n and not "attention" in n:
-                m.transform(config_dense)
-        elif isinstance(m, Dropout):
-            if ".encoder.layer" in n and "attention.self.dropout" in n:
-                m.transform(config_do)  # for torch.matmul(attention_probs, value_layer)
-    for m in model.modules():
-        if isinstance(m, LayerNorm):
-            pass
-    print(model)
-    return model
