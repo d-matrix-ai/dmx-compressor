@@ -186,12 +186,16 @@ class Sparsify(nn.Module):
             score_value.shape == self.score.shape
         ), "setting score has to be in the same shape as the weight"
         self.score.data = score_value
+        self.mask = self.sparseness.get_mask(score_value)
 
     def forward(self, x):
-        assert x.shape == self.score.shape, "score and x have to be of the same shape"
+        assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
-            x = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
-        self.mask = self.sparseness.get_mask(self.score)
+            if self.training:
+                x = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
+                self.mask = self.sparseness.get_mask(self.score)
+            else: 
+                x *= self.mask 
         if self.dump_to is not None:
             pass
         return x
@@ -205,6 +209,10 @@ class WeightSparseMixin:
     Mixin for weight-sparse modules
     """
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.init_sparsifier()
+
     def init_sparsifier(self):
         if (
             type(self)
@@ -217,10 +225,12 @@ class WeightSparseMixin:
             or isinstance(self, nn.modules.conv._ConvNd)
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
-            self.weight_sparsifier.set_score(torch.abs(self.weight))
-            # self.weight_sparsifier.set_score(torch.randn_like(self.weight))
         else:
             self.weight_sparsifier = None
+
+    @property
+    def weight_mask(self):
+        return self.weight_sparsifier.mask
 
     @property
     def effective_weight(self):

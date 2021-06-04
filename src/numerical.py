@@ -209,6 +209,10 @@ class BoundaryCastMixin:
     Mixin for modules with boundary casting
     """
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.init_casts()
+
     def init_casts(self):
         # dynamic i/o casts
         self.input_cast = CastTo()

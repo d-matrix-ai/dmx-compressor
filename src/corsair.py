@@ -75,13 +75,13 @@ class CorsairConfig:
     IMC_CONV_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=1)
 
 
-class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
-    r""" """
+class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
+    r"""
+    Extending torch.nn.Module
+    """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.init_sparsifier()
-        self.init_casts()
 
     def transform(self, config):
         # numerics transformation
@@ -96,9 +96,11 @@ class CorsairModule(BoundaryCastMixin, WeightSparseMixin):
         # sparsity transformation
         if self.weight_sparsifier is not None:
             self.weight_sparsifier.sparseness = config["weight_sparseness"]
+            self.weight_sparsifier.set_score(torch.abs(self.weight))
+            # self.weight_sparsifier.set_score(torch.randn_like(self.weight))
 
 
-class Linear(CorsairModule, torch.nn.Linear):
+class Linear(CorsairMixin, torch.nn.Linear):
     def __init__(
         self,
         in_features: int,
@@ -117,7 +119,7 @@ class Linear(CorsairModule, torch.nn.Linear):
         return output
 
 
-class Softmax(CorsairModule, torch.nn.Softmax):
+class Softmax(CorsairMixin, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
@@ -128,7 +130,7 @@ class Softmax(CorsairModule, torch.nn.Softmax):
         return output
 
 
-class LayerNorm(CorsairModule, torch.nn.LayerNorm):
+class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
     def __init__(
         self,
         normalized_shape: Union[int, List[int], Size],
@@ -146,7 +148,7 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
         output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
         return output
 
-class Dropout(CorsairModule, torch.nn.Dropout):
+class Dropout(CorsairMixin, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
 
@@ -171,20 +173,20 @@ def transform(model):
     TODO: general transformation API with yaml config and regex pattern matching
     """
     config_qkv = dict(
-        input_format=CorsairConfig.DUMMY_FORMAT,
+        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
         output_format=CorsairConfig.DUMMY_FORMAT,
         accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.DUMMY_FORMAT,
+        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=TopK(density=1.0),
+        weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
     )
     config_dense = dict(
-        input_format=CorsairConfig.DUMMY_FORMAT,
+        input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
         output_format=CorsairConfig.DUMMY_FORMAT,
         accum_format=CorsairConfig.DUMMY_FORMAT,
-        weight_format=CorsairConfig.DUMMY_FORMAT,
+        weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
         bias_format=CorsairConfig.DUMMY_FORMAT,
-        weight_sparseness=TopK(density=1.0), 
+        weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1), 
     )
     config_do = dict(
         input_format=CorsairConfig.DUMMY_FORMAT,
