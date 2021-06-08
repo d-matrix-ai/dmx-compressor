@@ -23,7 +23,7 @@ from sparse import (
 )
 from utils import load_config_file
 
-__ALL__ = ["nn", "transform", "CorsairConfig"]
+__ALL__ = ["nn", "CorsairConfig"]
 
 
 class CorsairModule(torch.nn.Module):
@@ -130,6 +130,28 @@ class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
 class Dropout(CorsairMixin, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
+
+    def forward(self, input: Tensor) -> Tensor:
+        _output = self.input_cast(input)
+        _output = super().forward(_output)
+        output = self.output_cast(_output)
+        return output
+
+
+class ReLU(CorsairMixin, torch.nn.ReLU):
+    def __init__(self, inplace: bool = False) -> None:
+        super().__init__(inplace=inplace)
+
+    def forward(self, input: Tensor) -> Tensor:
+        _output = self.input_cast(input)
+        _output = super().forward(_output)
+        output = self.output_cast(_output)
+        return output
+
+
+class Tanh(CorsairMixin, torch.nn.Tanh):
+    def __init__(self) -> None:
+        super().__init__()
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
