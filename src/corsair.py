@@ -167,7 +167,8 @@ nn.Linear = Linear
 nn.Softmax = Softmax
 nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
-
+nn.ReLU = ReLU
+nn.Tanh = Tanh
 
 if __name__ == "__main__":
     pass
