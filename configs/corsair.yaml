@@ -1,0 +1,93 @@
+# list of Corsair supported numerical formats
+supported_numerical_formats:
+- &DUMMY_FORMAT                 SAME
+- &IMC_GEMM_INPUT_FORMAT_HIGH   BFP[8|8]{64,-1}(N)
+- &IMC_GEMM_INPUT_FORMAT_LOW    BFP[4|8]{128,-1}(N)
+- &IMC_CONV_INPUT_FORMAT_HIGH   BFP[8|8]{64,1}(N)
+- &IMC_CONV_INPUT_FORMAT_LOW    BFP[4|8]{128,1}(N)
+- &IMC_ACCUM_FORMAT_HIGH        FP[1|8|23](N)
+- &IMC_GEMM_ACCUM_FORMAT_LOW    BFP[25|8]{64,-1}(N)
+- &IMC_CONV_ACCUM_FORMAT_LOW    BFP[25|8]{64,1}(N)
+- &IMC_OUTPUT_FORMAT            FP[1|8|23](N)
+- &OB_FORMAT                    FP[1|8|23](N)
+- &SIMD_FORMAT_HIGH             FP[1|8|23](N)
+- &SIMD_FORMAT_LOW              XP[25,+12](CSN)
+# list of Corsair supported sparsity patterns
+supported_sparseness_patterns:
+- &DUMMY_SPARSENESS             DENSE
+- &IMC_GEMM_SPARSENESS_4_8      BTOPK{4:8,-1}
+- &IMC_GEMM_SPARSENESS_2_8      BTOPK{2:8,-1}
+- &IMC_GEMM_SPARSENESS_2_4      BTOPK{2:4,-1}
+- &IMC_GEMM_SPARSENESS_1_4      BTOPK{1:4,-1}
+- &IMC_CONV_SPARSENESS_4_8      BTOPK{4:8,1}
+- &IMC_CONV_SPARSENESS_2_8      BTOPK{2:8,1}
+- &IMC_CONV_SPARSENESS_2_4      BTOPK{2:4,1}
+- &IMC_CONV_SPARSENESS_1_4      BTOPK{1:4,1}
+
+# layer configurations
+config_qkv: &config_qkv
+  input_format:       *IMC_GEMM_INPUT_FORMAT_HIGH
+  output_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
+  accum_format:       *DUMMY_FORMAT
+  weight_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
+  bias_format:        *DUMMY_FORMAT
+  weight_sparseness:  *DUMMY_SPARSENESS
+config_dense: &config_dense
+  input_format:       *IMC_GEMM_INPUT_FORMAT_HIGH
+  output_format:      *DUMMY_FORMAT
+  accum_format:       *DUMMY_FORMAT
+  weight_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
+  bias_format:        *DUMMY_FORMAT
+  weight_sparseness:  *DUMMY_SPARSENESS
+config_do: &config_do
+  input_format:       *DUMMY_FORMAT
+  output_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
+
+# transformation rules
+transformation_rules:
+- rule: |
+    query projection layers in self-attention
+    for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.query"]
+  name_excludes: []
+  config: *config_qkv
+- rule: | 
+    key projection layers in self-attention
+    for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.key"]
+  name_excludes: []
+  config: *config_qkv
+- rule: | 
+    value projection layers in self-attention
+    for `torch.matmul(attention_probs, value_layer)`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.value"]
+  name_excludes: []
+  config: *config_qkv
+- rule: |
+    output projection layers in self-attention
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.output.dense"]
+  name_excludes: []
+  config: *config_dense
+- rule: | 
+    intermediate projection layers in feedforward layers
+  instance: Linear
+  name_includes: [".encoder.layer", "intermediate.dense"]
+  name_excludes: []
+  config: *config_dense
+- rule: |
+    output projection layers in feedforward layers
+  instance: Linear
+  name_includes: [".encoder.layer", "output.dense"]
+  name_excludes: ["attention"]
+  config: *config_dense
+- rule: | 
+    dropout before applying attention
+    for `torch.matmul(attention_probs, value_layer)`
+  instance: Dropout
+  name_includes: [".encoder.layer", "attention.self.dropout"]
+  name_excludes: []
+  config: *config_do

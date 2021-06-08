@@ -1,8 +1,10 @@
 from typing import Union, List, Tuple
+import sys
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 from numerical import (
+    Format,
     BoundaryCastMixin,
     Same,
     FixedPoint,
@@ -10,135 +12,42 @@ from numerical import (
     BlockFloatingPoint,
     CastTo,
 )
-from sparse import WeightSparseMixin, Dense, TopK, BlockTopK, Bernoulli, Sparsify
-
+from sparse import (
+    Sparseness,
+    WeightSparseMixin,
+    Dense,
+    TopK,
+    BlockTopK,
+    Bernoulli,
+    Sparsify,
+)
+from utils import load_config_file
 
 __ALL__ = ["nn", "transform", "CorsairConfig"]
-
-
-class CorsairConfig:
-    DUMMY_FORMAT = Same()
-    IMC_GEMM_INPUT_FORMAT_HIGH = BlockFloatingPoint(
-        precision=8,
-        block_size=64,
-        block_dim=-1,
-        rounding="nearest",
-    )
-    IMC_GEMM_INPUT_FORMAT_LOW = BlockFloatingPoint(
-        precision=4,
-        block_size=128,
-        block_dim=-1,
-        rounding="nearest",
-    )
-    IMC_CONV_INPUT_FORMAT_HIGH = BlockFloatingPoint(
-        precision=8,
-        block_size=64,
-        block_dim=1,
-        rounding="nearest",
-    )
-    IMC_CONV_INPUT_FORMAT_LOW = BlockFloatingPoint(
-        precision=4,
-        block_size=128,
-        block_dim=1,
-        rounding="nearest",
-    )
-    IMC_ACCUM_FORMAT_HIGH = FloatingPoint()
-    IMC_GEMM_ACCUM_FORMAT_LOW = BlockFloatingPoint(
-        precision=24,
-        block_size=64,
-        block_dim=-1,
-        rounding="nearest",
-    )
-    IMC_CONV_ACCUM_FORMAT_LOW = BlockFloatingPoint(
-        precision=24,
-        block_size=64,
-        block_dim=1,
-        rounding="nearest",
-    )
-    IMC_OUTPUT_FORMAT = FloatingPoint()
-    OB_FORMAT = FloatingPoint()
-    SIMD_FORMAT_HIGH = FloatingPoint()
-    SIMD_FORMAT_LOW = FixedPoint(
-        precision=25,
-        fraction=12,
-        symmetric=True,
-        rounding="nearest",
-    )
-    DUMMY_SPARSENESS = Dense()
-    IMC_GEMM_SPARSENESS_4_8 = BlockTopK(K=4, block_size=8, block_dim=-1)
-    IMC_GEMM_SPARSENESS_2_8 = BlockTopK(K=2, block_size=8, block_dim=-1)
-    IMC_GEMM_SPARSENESS_2_4 = BlockTopK(K=2, block_size=4, block_dim=-1)
-    IMC_GEMM_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=-1)
-    IMC_CONV_SPARSENESS_4_8 = BlockTopK(K=4, block_size=8, block_dim=1)
-    IMC_CONV_SPARSENESS_2_8 = BlockTopK(K=2, block_size=8, block_dim=1)
-    IMC_CONV_SPARSENESS_2_4 = BlockTopK(K=2, block_size=4, block_dim=1)
-    IMC_CONV_SPARSENESS_1_4 = BlockTopK(K=1, block_size=4, block_dim=1)
 
 
 class CorsairModule(torch.nn.Module):
     r"""
     Model container equipped with corsair transform
     """
+
     def __init__(self):
         super().__init__()
 
-    def transform(self, config="configs/corsair.yml"):
+    def transform(self, config_file="configs/corsair.yaml"):
         r"""
-        Quick and dirty model conversion for Corsair numerical simulation/optimization
-        TODO: general transformation API with yaml config and regex pattern matching
+        Model conversion for Corsair numerics/sparsity simulation/optimization
         """
-        config_qkv = dict(
-            input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-            output_format=CorsairConfig.DUMMY_FORMAT,
-            accum_format=CorsairConfig.DUMMY_FORMAT,
-            weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-            bias_format=CorsairConfig.DUMMY_FORMAT,
-            weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
-        )
-        config_dense = dict(
-            input_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-            output_format=CorsairConfig.DUMMY_FORMAT,
-            accum_format=CorsairConfig.DUMMY_FORMAT,
-            weight_format=CorsairConfig.IMC_GEMM_INPUT_FORMAT_HIGH,
-            bias_format=CorsairConfig.DUMMY_FORMAT,
-            weight_sparseness=BlockTopK(K=8, block_size=16, block_dim=-1),
-        )
-        config_do = dict(
-            input_format=CorsairConfig.DUMMY_FORMAT,
-            output_format=CorsairConfig.DUMMY_FORMAT,
-        )
+        config = load_config_file(config_file)
+
         for n, m in self.named_modules():
-            if isinstance(m, Linear):
-                if ".encoder.layer" in n and "attention.self.query" in n:
-                    m.transform(
-                        config_qkv
-                    )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-                elif ".encoder.layer" in n and "attention.self.key" in n:
-                    m.transform(
-                        config_qkv
-                    )  # for torch.matmul(query_layer, key_layer.transpose(-1, -2))
-                elif ".encoder.layer" in n and "attention.self.value" in n:
-                    m.transform(
-                        config_qkv
-                    )  # for torch.matmul(attention_probs, value_layer)
-                elif ".encoder.layer" in n and "attention.output.dense" in n:
-                    m.transform(config_dense)
-                elif ".encoder.layer" in n and "intermediate.dense" in n:
-                    m.transform(config_dense)
-                elif (
-                    ".encoder.layer" in n
-                    and "output.dense" in n
-                    and not "attention" in n
+            for r in config["transformation_rules"]:
+                if (
+                    isinstance(m, getattr(sys.modules[__name__], r["instance"]))
+                    and all([_n in n for _n in r["name_includes"]])
+                    and all([not _n in n for _n in r["name_excludes"]])
                 ):
-                    m.transform(config_dense)
-            elif isinstance(m, Dropout):
-                if ".encoder.layer" in n and "attention.self.dropout" in n:
-                    m.transform(
-                        config_do
-                    )  # for torch.matmul(attention_probs, value_layer)
-        for m in self.modules():
-            if isinstance(m, LayerNorm):
-                pass
+                    m.transform(r["config"])
         print(self)
 
 
@@ -152,17 +61,17 @@ class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
 
     def transform(self, config):
         # numerics transformation
-        self.input_cast.format = config["input_format"]
-        self.output_cast.format = config["output_format"]
+        self.input_cast.format = Format.str2format(config["input_format"])
+        self.output_cast.format = Format.str2format(config["output_format"])
         if self.accum_cast is not None:
-            self.accum_cast.format = config["accum_format"]
+            self.accum_cast.format = Format.str2format(config["accum_format"])
         if self.weight_cast is not None:
-            self.weight_cast.format = config["weight_format"]
+            self.weight_cast.format = Format.str2format(config["weight_format"])
         if self.bias_cast is not None:
-            self.bias_cast.format = config["bias_format"]
+            self.bias_cast.format = Format.str2format(config["bias_format"])
         # sparsity transformation
         if self.weight_sparsifier is not None:
-            self.weight_sparsifier.sparseness = config["weight_sparseness"]
+            self.weight_sparsifier.sparseness = Sparseness.str2sparseness(config["weight_sparseness"])
             # TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
 
@@ -236,3 +145,5 @@ nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
 
 
+if __name__ == "__main__":
+    pass
