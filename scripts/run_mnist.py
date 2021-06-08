@@ -253,7 +253,7 @@ if __name__ == "__main__":
 
     model = instantiate_model()  # instantiate pytorch model
 
-    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
+    # model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
     
     print(model)
 
