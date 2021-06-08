@@ -1,4 +1,5 @@
 from typing import Any
+from parse import parse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,6 +7,7 @@ from torch.autograd import Function
 
 
 __ALL__ = [
+    "Sparseness",
     "WeightSparseMixin",
     "Dense",
     "TopK",
@@ -17,7 +19,7 @@ __ALL__ = [
 class Sparseness:
     r"""
     This is an abstract class of tensor sparseness.
-    Child classes to implement `get_mask()` method.
+    Child classes to implement `get_mask()` and `from_shorthand()` method.
     """
 
     def __init__(self):
@@ -26,8 +28,25 @@ class Sparseness:
     def __str__(self) -> str:
         raise NotImplementedError
 
-    def get_mask(self, *input: Any) -> None:
+    def get_mask(self, *input: Any):
         raise NotImplementedError
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        raise NotImplementedError
+
+    @staticmethod
+    def str2sparseness(sh: str):
+        if sh.startswith("DENSE"):
+            return Dense.from_shorthand(sh)
+        elif sh.startswith("TOPK"):
+            return TopK.from_shorthand(sh)
+        elif sh.startswith("BTOPK"):
+            return BlockTopK.from_shorthand(sh)
+        elif sh.startswith("BERN"):
+            return Bernoulli.from_shorthand(sh)
+        else:
+            raise ValueError(f"unrecognized sparseness shorthand: {sh}")
 
 
 class Dense(Sparseness):
@@ -40,6 +59,10 @@ class Dense(Sparseness):
 
     def get_mask(self, score):
         return torch.ones_like(score, device=score.device)
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        return cls()
 
     def __str__(self) -> str:
         return f"Dummy sparseness: no pruning"
@@ -60,15 +83,18 @@ class TopK(Sparseness):
 
     def get_mask(self, score):
         _score = score.view(-1)
-        idx = torch.argsort(_score, dim=0)[
-            : int(score.numel() * (1.0 - self.density))
-        ]
+        idx = torch.argsort(_score, dim=0)[: int(score.numel() * (1.0 - self.density))]
         mask = (
             torch.ones_like(_score, device=score.device)
             .scatter_(dim=0, index=idx, value=0)
             .view_as(score)
         )
         return mask
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse("TOPK{{{density:f}}}", sh)
+        return cls(density=conf["density"])
 
     def __str__(self) -> str:
         return f"Global TopK sparseness: density = {self.density}"
@@ -105,6 +131,15 @@ class BlockTopK(Sparseness):
         )
         return mask
 
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse("BTOPK{{{K:d}:{block_size:d},{block_dim:d}}}", sh)
+        return cls(
+            K=conf["K"],
+            block_size=conf["block_size"],
+            block_dim=conf["block_dim"],
+        )
+
     def __str__(self) -> str:
         return f"Block TopK sparseness: pattern = {self.K}:{self.block_size}, block dimension = {self.block_dim}"
 
@@ -123,6 +158,10 @@ class Bernoulli(Sparseness):
     def get_mask(self, score):
         # return torch.sign(x) * torch.bernoulli(torch.abs(x))
         return torch.bernoulli(score)
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        return cls()
 
     def __str__(self) -> str:
         return f"Bernoulli sparseness"
@@ -173,10 +212,12 @@ class Sparsify(nn.Module):
     """
 
     def __init__(
-        self, tensor_shape, sparseness=Dense(), backward_mode="STE", dump_to=None
+        self, tensor_shape, sparseness='DENSE', backward_mode="STE", dump_to=None
     ):
         super().__init__()
         self.score = nn.Parameter(torch.Tensor(tensor_shape))
+        if not isinstance(sparseness, Sparseness):
+            sparseness = Sparseness.str2sparseness(sparseness)
         self.sparseness = sparseness
         self.backward_mode = backward_mode
         self.dump_to = dump_to
@@ -194,8 +235,8 @@ class Sparsify(nn.Module):
             if self.training:
                 x = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
                 self.mask = self.sparseness.get_mask(self.score)
-            else: 
-                x *= self.mask 
+            else:
+                x *= self.mask
         if self.dump_to is not None:
             pass
         return x
@@ -238,4 +279,4 @@ class WeightSparseMixin:
 
 
 if __name__ == "__main__":
-    pass
+    breakpoint()

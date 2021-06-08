@@ -1,4 +1,5 @@
 from typing import Any
+from parse import parse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,6 +8,7 @@ from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 
 __ALL__ = [
+    "Format",
     "BoundaryCastMixin",
     "Same",
     "FixedPoint",
@@ -19,7 +21,7 @@ __ALL__ = [
 class Format:
     r"""
     This is an abstract class of tensor numerical format.
-    Child classes to implement `cast()` method.
+    Child classes to implement `cast()` and `from_shorthand()` method.
     """
 
     def __init__(self):
@@ -28,8 +30,25 @@ class Format:
     def __str__(self) -> str:
         raise NotImplementedError
 
-    def cast(self, *input: Any) -> None:
+    def cast(self, *input: Any):
         raise NotImplementedError
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        raise NotImplementedError
+
+    @staticmethod
+    def str2format(sh: str):
+        if sh.startswith("SAME"):
+            return Same.from_shorthand(sh)
+        elif sh.startswith("XP"):
+            return FixedPoint.from_shorthand(sh)
+        elif sh.startswith("FP"):
+            return FloatingPoint.from_shorthand(sh)
+        elif sh.startswith("BFP"):
+            return BlockFloatingPoint.from_shorthand(sh)
+        else:
+            raise ValueError(f"unrecognized format shorthand: {sh}")
 
 
 class Same(Format):
@@ -42,6 +61,10 @@ class Same(Format):
 
     def cast(self, x):
         return x
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        return cls()
 
     def __str__(self) -> str:
         return f"Dummy numerical format: no casting"
@@ -81,6 +104,19 @@ class FixedPoint(Format):
             rounding=self.rounding,
         )
 
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "XP[{precision:d},{fraction:d}]({clamp:l}{symmetric:l}{rounding:l})", sh
+        )
+        return cls(
+            precision=conf["precision"],
+            fraction=conf["fraction"],
+            clamp=conf["clamp"] == "C",
+            symmetric=conf["symmetric"] == "S",
+            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
+        )
+
     def __str__(self) -> str:
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
@@ -113,6 +149,17 @@ class FloatingPoint(Format):
             man=self.mantissa,
             exp=self.exponent,
             rounding=self.rounding,
+        )
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "FP[1|{exponent:d}|{mantissa:d}]({rounding:l})", sh
+        )
+        return cls(
+            mantissa=conf["mantissa"],
+            exponent=conf["exponent"],
+            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
         )
 
     def __str__(self) -> str:
@@ -163,6 +210,18 @@ class BlockFloatingPoint(Format):
         _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
         return _x
 
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({rounding:l})", sh
+        )
+        return cls(
+            precision=conf["precision"],
+            block_size=conf["block_size"],
+            block_dim=conf["block_dim"],
+            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
+        )
+
     def __str__(self) -> str:
         return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: rounding = {self.rounding}"
 
@@ -189,8 +248,10 @@ class CastTo(nn.Module):
     Simulated numerical cast to a target format
     """
 
-    def __init__(self, format=Same(), dump_to=None):
+    def __init__(self, format='SAME', dump_to=None):
         super().__init__()
+        if not isinstance(format, Format):
+            format = Format.str2format(format)
         self.format = format
         self.dump_to = dump_to
 
