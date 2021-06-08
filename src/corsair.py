@@ -48,7 +48,6 @@ class CorsairModule(torch.nn.Module):
                     and all([not _n in n for _n in r["name_excludes"]])
                 ):
                     m.transform(r["config"])
-        print(self)
 
 
 class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
@@ -71,9 +70,12 @@ class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
             self.bias_cast.format = Format.str2format(config["bias_format"])
         # sparsity transformation
         if self.weight_sparsifier is not None:
-            self.weight_sparsifier.sparseness = Sparseness.str2sparseness(config["weight_sparseness"])
-            # TODO: need to figure out a better way of handling score setting
+            self.weight_sparsifier.sparseness = Sparseness.str2sparseness(
+                config["weight_sparseness"]
+            )
+            ### TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
+            ###
 
 
 class Linear(CorsairMixin, torch.nn.Linear):

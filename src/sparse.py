@@ -197,12 +197,12 @@ class Sparsifier(Function):
         ctx.mode = mode
         mask = sp.get_mask(score)
         ctx.save_for_backward(x, score, mask)
-        return x * mask
+        return x * mask, score
 
     @staticmethod
     def backward(ctx, g_x, g_score):
         x, score, mask = ctx.saved_variables
-        _g_x, _g_score = Sparsifier.do_backward(x, score, mask, g_x, g_score)
+        _g_x, _g_score = Sparsifier.do_backward(x, score, mask, g_x, g_score, ctx.mode)
         return _g_x, _g_score, None, None
 
 
@@ -233,7 +233,10 @@ class Sparsify(nn.Module):
         assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
-                x = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
+                x, _ = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
+                ### TODO: need to figure out a better way of handling score setting
+                self.set_score(torch.abs(x))
+                ###
                 self.mask = self.sparseness.get_mask(self.score)
             else:
                 x *= self.mask
@@ -279,4 +282,4 @@ class WeightSparseMixin:
 
 
 if __name__ == "__main__":
-    breakpoint()
+    pass
