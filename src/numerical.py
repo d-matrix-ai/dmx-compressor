@@ -60,7 +60,7 @@ class Same(Format):
         super().__init__()
 
     def cast(self, x):
-        return x
+        return x.clone()
 
     @classmethod
     def from_shorthand(cls, sh: str):
