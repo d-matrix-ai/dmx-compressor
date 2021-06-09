@@ -1,6 +1,7 @@
 import os
 import argparse
 from dotenv import load_dotenv
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
@@ -27,15 +28,15 @@ def parse_args():
         help="model name (default: resnet20)",
     )
     parser.add_argument(
-        "-z", "--batch-size", type=int, default=64, help="batch size (default: 64)"
+        "-z", "--batch-size", type=int, default=128, help="batch size (default: 128)"
     )
     parser.add_argument(
         "-e",
         "--epochs",
         type=int,
-        default=100,
+        default=200,
         metavar="N",
-        help="number of epochs to train (default: 100)",
+        help="number of epochs to train (default: 200)",
     )
     parser.add_argument(
         "--lr",
@@ -62,32 +63,24 @@ use_cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.manual_seed(args.seed)
 MODEL_LIST = [
-    "mobilenetv2_x0_5",
-    "mobilenetv2_x0_75",
-    "mobilenetv2_x1_0",
-    "mobilenetv2_x1_4",
-    "repvgg_a0",
-    "repvgg_a1",
-    "repvgg_a2",
     "resnet20",
     "resnet32",
     "resnet44",
     "resnet56",
-    "shufflenetv2_x0_5",
-    "shufflenetv2_x1_0",
-    "shufflenetv2_x1_5",
-    "shufflenetv2_x2_0",
     "vgg11_bn",
     "vgg13_bn",
     "vgg16_bn",
     "vgg19_bn",
-    "vit_b16",
-    "vit_b32",
-    "vit_h14",
-    "vit_l16",
-    "vit_l32",
+    "mobilenetv2_x0_5",
+    "mobilenetv2_x0_75",
+    "mobilenetv2_x1_0",
+    "mobilenetv2_x1_4",
+    "shufflenetv2_x0_5",
+    "shufflenetv2_x1_0",
+    "shufflenetv2_x1_5",
+    "shufflenetv2_x2_0",
 ]
-
+pb_wrap = lambda it: tqdm(it, leave=False, dynamic_ncols=True)
 
 def evaluate(model, ds):
     print("Evaluating model...")
@@ -95,13 +88,14 @@ def evaluate(model, ds):
     correct = 0
     total = 0
     with torch.no_grad():
-        for data in ds:
-            images, labels = data
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+        with pb_wrap(ds) as loader:
+            for (images, labels) in loader:
+                loader.set_description("Evaluation")
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
     print(f"Accuracy : {100. * correct / total :.2f}%")
 
 
@@ -119,13 +113,15 @@ if __name__ == "__main__":
         shuffle=True,
     )
     # load model
-    assert args.model in MODEL_LIST, f"unrecognized model {args.model}"
+    assert (
+        args.model in MODEL_LIST
+    ), f"unrecognized model {args.model}, supported models: \n{MODEL_LIST}"
     model = torch.hub.load(
         "chenyaofo/pytorch-cifar-models",
         args.dataset + "_" + args.model,
         pretrained=True,
-    )
-    model.transform(config_file="configs/corsair_cnns.yaml") 
+    ).to(device)
+    model.transform(config_file="configs/corsair_cnns.yaml")
     print(model)
-    
     evaluate(model, dataset.test)
+    breakpoint()

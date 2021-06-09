@@ -135,10 +135,10 @@ class Conv2d(CorsairMixin, torch.nn.Conv2d):
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
         _weight = self.weight_cast(self.effective_weight)
-        _convolution = self.accum_cast(self._conv_forward(_input, self.weight, None))
+        _convolution = self.accum_cast(self._conv_forward(_input, self.weight))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
-            _output = torch.add(_convolution, _bias)
+            _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
         else:
             _output = _convolution
         output = self.output_cast(_output)
@@ -288,6 +288,17 @@ class ReLU(CorsairMixin, torch.nn.ReLU):
         return output
 
 
+class ReLU6(CorsairMixin, torch.nn.ReLU6):
+    def __init__(self, inplace: bool = False) -> None:
+        super().__init__(inplace=inplace)
+
+    def forward(self, input: Tensor) -> Tensor:
+        _output = self.input_cast(input)
+        _output = super().forward(_output)
+        output = self.output_cast(_output)
+        return output
+
+
 class Tanh(CorsairMixin, torch.nn.Tanh):
     def __init__(self) -> None:
         super().__init__()
@@ -311,6 +322,7 @@ nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
 nn.Softmax = Softmax
 nn.ReLU = ReLU
+nn.ReLU6 = ReLU6
 nn.Tanh = Tanh
 
 if __name__ == "__main__":
