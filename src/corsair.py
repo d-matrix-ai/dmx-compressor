@@ -1,4 +1,5 @@
 from typing import Union, List, Tuple
+from collections import OrderedDict
 import sys
 import torch
 from torch import Tensor, Size
@@ -49,6 +50,11 @@ class CorsairModule(torch.nn.Module):
                 ):
                     m.transform(r["config"])
 
+    def load_state_dict(
+        self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False
+    ):
+        return super().load_state_dict(state_dict, strict=strict)
+
 
 class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
     r"""
@@ -91,8 +97,60 @@ class Linear(CorsairMixin, torch.nn.Linear):
         _input = self.input_cast(input)
         _weight = self.weight_cast(self.effective_weight)
         _product = self.accum_cast(F.linear(_input, _weight, None))
-        _bias = self.bias_cast(self.bias)
-        _output = torch.add(_product, _bias)
+        if self.bias is not None:
+            _bias = self.bias_cast(self.bias)
+            _output = torch.add(_product, _bias)
+        else:
+            _output = _product
+        output = self.output_cast(_output)
+        return output
+
+
+class Conv2d(CorsairMixin, torch.nn.Conv2d):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
+    ) -> None:
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+            padding_mode=padding_mode,
+        )
+
+    def forward(self, input: Tensor) -> Tensor:
+        _input = self.input_cast(input)
+        _weight = self.weight_cast(self.effective_weight)
+        _convolution = self.accum_cast(self._conv_forward(_input, self.weight, None))
+        if self.bias is not None:
+            _bias = self.bias_cast(self.bias)
+            _output = torch.add(_convolution, _bias)
+        else:
+            _output = _convolution
+        output = self.output_cast(_output)
+        return output
+
+
+class AdaptiveAvgPool2d(CorsairMixin, torch.nn.AdaptiveAvgPool2d):
+    def __init__(self, output_size) -> None:
+        super().__init__(output_size)
+
+    def forward(self, input: Tensor) -> Tensor:
+        _input = self.input_cast(input)
+        _output = super().forward(_input)
         output = self.output_cast(_output)
         return output
 
@@ -123,7 +181,61 @@ class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
         _input = self.input_cast(input)
         _weight = self.weight_cast(self.weight)
         _bias = self.bias_cast(self.bias)
-        output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
+        _output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
+        output = self.output_cast(_output)
+        return output
+
+
+class BatchNorm2d(CorsairMixin, torch.nn.BatchNorm2d):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-05,
+        momentum: float = 0.1,
+        affine: bool = True,
+        track_running_stats: bool = True,
+    ) -> None:
+        super().__init__(
+            num_features,
+            eps=eps,
+            momentum=momentum,
+            affine=affine,
+            track_running_stats=track_running_stats,
+        )
+
+    def forward(self, input: Tensor) -> Tensor:
+        _input = self.input_cast(input)
+        _weight = self.weight_cast(self.weight)
+        _bias = self.bias_cast(self.bias)
+        self._check_input_dim(_input)
+        if self.momentum is None:
+            exponential_average_factor = 0.0
+        else:
+            exponential_average_factor = self.momentum
+        if self.training and self.track_running_stats:
+            if self.num_batches_tracked is not None:
+                self.num_batches_tracked = self.num_batches_tracked + 1
+                if self.momentum is None:  # use cumulative moving average
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+                else:  # use exponential moving average
+                    exponential_average_factor = self.momentum
+        if self.training:
+            bn_training = True
+        else:
+            bn_training = (self.running_mean is None) and (self.running_var is None)
+        _output = F.batch_norm(
+            _input,
+            self.running_mean
+            if not self.training or self.track_running_stats
+            else None,
+            self.running_var if not self.training or self.track_running_stats else None,
+            _weight,
+            _bias,
+            bn_training,
+            exponential_average_factor,
+            self.eps,
+        )
+        output = self.output_cast(_output)
         return output
 
 
@@ -164,9 +276,12 @@ class Tanh(CorsairMixin, torch.nn.Tanh):
 nn = torch.nn
 nn.Module = CorsairModule
 nn.Linear = Linear
-nn.Softmax = Softmax
+nn.Conv2d = Conv2d
+nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
+nn.BatchNorm2d = BatchNorm2d
 nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
+nn.Softmax = Softmax
 nn.ReLU = ReLU
 nn.Tanh = Tanh
 

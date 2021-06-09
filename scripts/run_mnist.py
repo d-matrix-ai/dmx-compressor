@@ -9,7 +9,6 @@ import torch.onnx
 
 
 def parse_args():
-    # Training settings
     parser = argparse.ArgumentParser(description="MNIST LeNet deployment on Corsair")
     parser.add_argument(
         "--depth",
@@ -58,7 +57,7 @@ def parse_args():
         type=float,
         default=0.02,
         metavar="LR",
-        help="learning rate (default: 1.0)",
+        help="learning rate (default: 0.02)",
     )
     parser.add_argument(
         "--no-cuda", action="store_true", default=False, help="disables CUDA training"
