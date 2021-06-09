@@ -83,7 +83,7 @@ MODEL_LIST = [
 pb_wrap = lambda it: tqdm(it, leave=False, dynamic_ncols=True)
 
 def evaluate(model, ds):
-    print("Evaluating model...")
+    print(f"Evaluating {args.model} on {args.dataset}...")
     model.eval()
     correct = 0
     total = 0
@@ -96,7 +96,7 @@ def evaluate(model, ds):
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-    print(f"Accuracy : {100. * correct / total :.2f}%")
+    print(f"\tAccuracy : {100. * correct / total :.2f}%")
 
 
 if __name__ == "__main__":
@@ -112,6 +112,7 @@ if __name__ == "__main__":
         test_batch_size=1000,
         shuffle=True,
     )
+
     # load model
     assert (
         args.model in MODEL_LIST
@@ -121,7 +122,9 @@ if __name__ == "__main__":
         args.dataset + "_" + args.model,
         pretrained=True,
     ).to(device)
+
     model.transform(config_file="configs/corsair_cnns.yaml")
     print(model)
+
+    # evaluate model
     evaluate(model, dataset.test)
-    breakpoint()

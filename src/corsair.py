@@ -135,7 +135,7 @@ class Conv2d(CorsairMixin, torch.nn.Conv2d):
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
         _weight = self.weight_cast(self.effective_weight)
-        _convolution = self.accum_cast(self._conv_forward(_input, self.weight))
+        _convolution = self.accum_cast(self._conv_forward(_input, _weight))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
