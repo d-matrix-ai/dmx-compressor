@@ -1,3 +1,4 @@
+from functools import reduce
 from typing import Union, List, Tuple
 from collections import OrderedDict
 import sys
@@ -25,7 +26,7 @@ from sparse import (
 from torch.nn.modules.pooling import MaxPool2d
 from utils import load_config_file
 
-__ALL__ = ["nn", "CorsairConfig"]
+__ALL__ = ["nn", "CorsairModule"]
 
 
 class CorsairModule(torch.nn.Module):
@@ -97,7 +98,27 @@ class Linear(CorsairMixin, torch.nn.Linear):
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
         _weight = self.weight_cast(self.effective_weight)
-        _product = self.accum_cast(F.linear(_input, _weight, None))
+        if isinstance(self.accum_cast.format, BlockFloatingPoint):
+            B_i = (
+                self.input_cast.format.block_size
+                if isinstance(self.input_cast.format, BlockFloatingPoint)
+                else 1
+            )
+            B_w = (
+                self.weight_cast.format.block_size
+                if isinstance(self.weight_cast.format, BlockFloatingPoint)
+                else 1
+            )
+            B = max(64, min(B_i, B_w))
+            _inputs = torch.split(_input, B, dim=-1)
+            _weights = torch.split(_weight, B, dim=-1)
+            _products = [
+                self.accum_cast(F.linear(_i, _w, None))
+                for _i, _w in zip(_inputs, _weights)
+            ]
+            _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
+        else:
+            _product = self.accum_cast(F.linear(_input, _weight, None))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_product, _bias)
