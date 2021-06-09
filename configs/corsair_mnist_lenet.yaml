@@ -27,24 +27,24 @@ supported_sparseness_patterns:
 # layer configurations
 config_input_layer: &config_input_layer
   input_format:       *IMC_GEMM_INPUT_FORMAT_HIGH
-  output_format:      *DUMMY_FORMAT
-  accum_format:       *IMC_GEMM_ACCUM_FORMAT_LOW
+  output_format:      *IMC_OUTPUT_FORMAT
+  accum_format:       *IMC_ACCUM_FORMAT_HIGH
   weight_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
-  bias_format:        *DUMMY_FORMAT
+  bias_format:        *OB_FORMAT
   weight_sparseness:  *DUMMY_SPARSENESS
 config_intermediate_layers: &config_intermediate_layers
   input_format:       *IMC_GEMM_INPUT_FORMAT_HIGH
-  output_format:      *DUMMY_FORMAT
-  accum_format:       *IMC_GEMM_ACCUM_FORMAT_LOW
+  output_format:      *IMC_OUTPUT_FORMAT
+  accum_format:       *IMC_ACCUM_FORMAT_HIGH
   weight_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
-  bias_format:        *DUMMY_FORMAT
+  bias_format:        *OB_FORMAT
   weight_sparseness:  *DUMMY_SPARSENESS
 config_output_layer: &config_output_layer
   input_format:       *IMC_GEMM_INPUT_FORMAT_HIGH
-  output_format:      *DUMMY_FORMAT
-  accum_format:       *IMC_GEMM_ACCUM_FORMAT_LOW
+  output_format:      *IMC_OUTPUT_FORMAT
+  accum_format:       *IMC_ACCUM_FORMAT_HIGH
   weight_format:      *IMC_GEMM_INPUT_FORMAT_HIGH
-  bias_format:        *DUMMY_FORMAT
+  bias_format:        *OB_FORMAT
   weight_sparseness:  *DUMMY_SPARSENESS
 
 # transformation rules
