@@ -10,7 +10,7 @@ setup(
     packages=find_packages('src', exclude=('tests', 'docs', 'experiments', 'sandbox')),
     package_dir={'': 'src'},
     install_requires=(
-        'torch>=1.8',
+        'torch>=1.5,<=1.7',
         'torchvision',
         'transformers>=4.6.0',
         'numpy',
