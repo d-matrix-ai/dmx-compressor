@@ -36,8 +36,26 @@ config_conv: &config_conv
 # transformation rules
 transformation_rules:
 - rule: |
-    all conv2d layers
+    mobilenet conv mapping
+  instance: Conv2d
+  name_includes: ["features."]
+  name_excludes: ["features.0.0"]
+  config: *config_conv
+- rule: |
+    resnet conv mapping
+  instance: Conv2d
+  name_includes: ["layer", "conv"]
+  name_excludes: []
+  config: *config_conv
+- rule: |
+    shufflenet conv mapping
   instance: Conv2d
   name_includes: []
-  name_excludes: []
+  name_excludes: ["conv1.0"]
+  config: *config_conv
+- rule: |
+    vgg conv mapping
+  instance: Conv2d
+  name_includes: []
+  name_excludes: ["features.0"]
   config: *config_conv
