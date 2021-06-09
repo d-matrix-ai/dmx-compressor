@@ -2,6 +2,7 @@
 import os
 import argparse
 from dotenv import load_dotenv
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
@@ -63,12 +64,6 @@ def parse_args():
         "--no-cuda", action="store_true", default=False, help="disables CUDA training"
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="quickly check a single pass",
-    )
-    parser.add_argument(
         "--seed", type=int, default=0, metavar="S", help="random seed (default: 0)"
     )
     parser.add_argument(
@@ -95,29 +90,22 @@ args = parse_args()
 use_cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.manual_seed(args.seed)
+pb_wrap = lambda it: tqdm(it, leave=False, dynamic_ncols=True)
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print(
-                "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                    epoch,
-                    batch_idx * len(data),
-                    len(train_loader.dataset),
-                    100.0 * batch_idx / len(train_loader),
-                    loss.item(),
-                )
-            )
-            if args.dry_run:
-                break
+    with pb_wrap(train_loader) as loader:
+        loader.set_description(f"Epoch {epoch}")
+        for batch_idx, (data, target) in enumerate(loader):
+            data, target = data.to(device), target.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = F.nll_loss(output, target)
+            loss.backward()
+            optimizer.step()
+            loader.set_postfix(
+                    loss="\33[91m{:6.4f}\033[0m".format(loss))
 
 
 def test(model, device, test_loader):
@@ -125,21 +113,23 @@ def test(model, device, test_loader):
     test_loss = 0
     correct = 0
     with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(
-                output, target, reduction="sum"
-            ).item()  # sum up batch loss
-            pred = output.argmax(
-                dim=1, keepdim=True
-            )  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
+        with pb_wrap(test_loader) as loader:
+            loader.set_description(f"Evaluation")
+            for data, target in loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                test_loss += F.nll_loss(
+                    output, target, reduction="sum"
+                ).item()  # sum up batch loss
+                pred = output.argmax(
+                    dim=1, keepdim=True
+                )  # get the index of the max log-probability
+                correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
 
     print(
-        "\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n".format(
+        "\nEvaluation results: \n\tAverage loss: {:.4f} \n\tAccuracy: {}/{} ({:.2f}%)\n".format(
             test_loss,
             correct,
             len(test_loader.dataset),
@@ -217,7 +207,7 @@ def evaluate(model, ds):
 
 def dump_onnx(model):
     onnx_file = os.path.join(args.model_dir, "trained.onnx")
-    print(f"Dumping model to {onnx_file}...")
+    print(f"Dumping model to ONNX format...")
     torch.onnx.export(
         model,
         torch.randn(
@@ -227,7 +217,7 @@ def dump_onnx(model):
                 28,
             ),
             requires_grad=True,
-        ),
+        ).to(device),
         onnx_file,
         export_params=True,
         opset_version=10,
@@ -239,6 +229,7 @@ def dump_onnx(model):
             "output": {0: "batch_size"},
         },
     )
+    print(f"Dumped to {onnx_file}")
 
 
 if __name__ == "__main__":
