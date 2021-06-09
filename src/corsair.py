@@ -22,6 +22,7 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
+from torch.nn.modules.pooling import MaxPool2d
 from utils import load_config_file
 
 __ALL__ = ["nn", "CorsairConfig"]
@@ -155,6 +156,32 @@ class AdaptiveAvgPool2d(CorsairMixin, torch.nn.AdaptiveAvgPool2d):
         return output
 
 
+class MaxPool2d(CorsairMixin, torch.nn.MaxPool2d):
+    def __init__(
+        self,
+        kernel_size,
+        stride=None,
+        padding=0,
+        dilation=1,
+        return_indices=False,
+        ceil_mode=False,
+    ) -> None:
+        super().__init__(
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            return_indices=return_indices,
+            ceil_mode=ceil_mode,
+        )
+
+    def forward(self, input: Tensor) -> Tensor:
+        _input = self.input_cast(input)
+        _output = super().forward(_input)
+        output = self.output_cast(_output)
+        return output
+
+
 class Softmax(CorsairMixin, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
@@ -278,6 +305,7 @@ nn.Module = CorsairModule
 nn.Linear = Linear
 nn.Conv2d = Conv2d
 nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
+nn.MaxPool2d = MaxPool2d
 nn.BatchNorm2d = BatchNorm2d
 nn.LayerNorm = LayerNorm
 nn.Dropout = Dropout
