@@ -47,11 +47,10 @@ class CIFAR():
             'num_workers': num_workers,
             'pin_memory': True
         } if cuda else {}
-        # normalize = tv.transforms.Normalize(
-        #     np.array([125.3, 123.0, 113.9]) / 255.0,
-        #     np.array([63.0, 62.1, 66.7]) / 255.0)
         normalize = tv.transforms.Normalize(
-            [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            # [0.4914, 0.4822, 0.4465], [0.2471, 0.2435, 0.2616]
+            [0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]
+            # [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
         )
         transform_train = tv.transforms.Compose([
             tv.transforms.Pad(4, padding_mode='reflect'),
@@ -65,15 +64,16 @@ class CIFAR():
             eval("tv.datasets.CIFAR{:d}".format(num_classes))(
                 data_dir, train=True, download=True,
                 transform=transform_train),
-            batch_size=batch_size,
+            batch_size=train_batch_size,
             shuffle=shuffle,
             **gpu_conf)
         self.test = torch.utils.data.DataLoader(
             eval("tv.datasets.CIFAR{:d}".format(num_classes))(
                 data_dir, train=False, download=True,
                 transform=transform_test),
-            batch_size=batch_size,
+            batch_size=test_batch_size,
             shuffle=False,
+            drop_last=False,
             **gpu_conf)
 
 
