@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument(
         "--fine-tune-epochs",
         type=int,
-        default=1,
+        default=4,
         metavar="N",
         help="number of epochs to train (default: 1)",
     )
