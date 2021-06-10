@@ -170,10 +170,10 @@ class Conv2d(CorsairMixin, torch.nn.Conv2d):
             B = max(64, min(B_i, B_w), self.groups)
             _inputs = torch.split(_input, B, dim=1)
             _weights = torch.split(_weight, B, dim=1)
-            _convolutions = [
+            _convolutions = (
                 self.accum_cast(self._conv_forward(_i, _w))
                 for _i, _w in zip(_inputs, _weights)
-            ]
+            )
             _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
         else:
             _convolution = self.accum_cast(self._conv_forward(_input, _weight))
