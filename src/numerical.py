@@ -144,18 +144,20 @@ class FloatingPoint(Format):
         self.rounding = rounding
 
     def cast(self, x):
-        return float_quantize(
-            x,
-            man=self.mantissa,
-            exp=self.exponent,
-            rounding=self.rounding,
+        return (
+            x
+            if self.mantissa == 23 and self.exponent == 8
+            else float_quantize(
+                x,
+                man=self.mantissa,
+                exp=self.exponent,
+                rounding=self.rounding,
+            )
         )
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        conf = parse(
-            "FP[1|{exponent:d}|{mantissa:d}]({rounding:l})", sh
-        )
+        conf = parse("FP[1|{exponent:d}|{mantissa:d}]({rounding:l})", sh)
         return cls(
             mantissa=conf["mantissa"],
             exponent=conf["exponent"],
@@ -248,7 +250,7 @@ class CastTo(nn.Module):
     Simulated numerical cast to a target format
     """
 
-    def __init__(self, format='SAME', dump_to=None):
+    def __init__(self, format="SAME", dump_to=None):
         super().__init__()
         if not isinstance(format, Format):
             format = Format.str2format(format)
