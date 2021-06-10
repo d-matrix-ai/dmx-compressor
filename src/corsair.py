@@ -167,7 +167,7 @@ class Conv2d(CorsairMixin, torch.nn.Conv2d):
                 if isinstance(self.weight_cast.format, BlockFloatingPoint)
                 else 1
             )
-            B = max(64, min(B_i, B_w))
+            B = max(64, min(B_i, B_w), self.groups)
             _inputs = torch.split(_input, B, dim=1)
             _weights = torch.split(_weight, B, dim=1)
             _convolutions = [
