@@ -14,16 +14,16 @@ def parse_args():
     parser.add_argument(
         "--depth",
         type=int,
-        default=3,
+        default=2,
         metavar="N",
-        help="number of blocks (default: 2)",
+        help="number of intermediate blocks (default: 2)",
     )
     parser.add_argument(
         "--width",
         type=int,
-        default=1024,
+        default=512,
         metavar="N",
-        help="hidden dimension (default: 1024)",
+        help="hidden dimension (default: 512)",
     )
     parser.add_argument(
         "--train-batch-size",
@@ -49,12 +49,19 @@ def parse_args():
     parser.add_argument(
         "--fine-tune-epochs",
         type=int,
-        default=4,
+        default=10,
         metavar="N",
-        help="number of epochs to train (default: 1)",
+        help="number of epochs to train (default: 10)",
     )
     parser.add_argument(
         "--lr",
+        type=float,
+        default=0.02,
+        metavar="LR",
+        help="learning rate (default: 0.02)",
+    )
+    parser.add_argument(
+        "--fine-tune-lr",
         type=float,
         default=0.02,
         metavar="LR",
@@ -129,7 +136,7 @@ def test(model, device, test_loader):
     test_loss /= len(test_loader.dataset)
 
     print(
-        "\nEvaluation results: \n\tAverage loss: {:.4f} \n\tAccuracy: {}/{} ({:.2f}%)\n".format(
+        "\tAverage loss: {:.4f} \n\tAccuracy: {}/{} ({:.2f}%)\n".format(
             test_loss,
             correct,
             len(test_loader.dataset),
@@ -191,7 +198,7 @@ def fine_tune(model, ds):
         model.load_state_dict(torch.load(ckpt), strict=False)
     else:
         print("No fine-tuned model found, fine-tuning...")
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True)
+        optimizer = optim.SGD(model.parameters(), lr=args.fine_tune_lr, momentum=0.9, nesterov=True)
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=args.fine_tune_epochs
         )
@@ -248,17 +255,17 @@ if __name__ == "__main__":
 
     model = train_or_load_pretrained(model, dataset.train) # train or load model params
 
-    print(f"Original trained model:")
+    print(f"\nEvaluation of the original trained model:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set
 
-    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
-
-    print(f"Transformed model:")
-    evaluate(model, dataset.test)  # evaluate accuracy on test set
+    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # transform model with corsair-specific features
+    
+    print(f"\nEvaluation of original model Corsair-transformed:")
+    evaluate(model, dataset.test)  # evaluate accuracy on test set, again
 
     model = fine_tune(model, dataset.train)  # fine-tune model params
 
-    print(f"Transformed and fine-tuned model:")
+    print(f"\nEvaluation of Corsair-transformed model fine-tuned:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set, again
 
     # # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
