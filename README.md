@@ -41,14 +41,14 @@ Follow these steps to set up as a d-MATRiX internal developer (not for external 
     pip install -e .
     ```
 
-4. (*Recommended*) In the project root directory create a `.env` file for project-specific environmental variable settings such as common data and models directory.  
+4. (*Recommended*) In the project root directory create a `.env` file for project-specific environmental variable settings such as common data and models directories.
 
     ```sh
     echo "DATA_PATH=/tools/d-matrix/ml/data" >> .env
     echo "MODEL_PATH=/tools/d-matrix/ml/models" >> .env
     ```
 
-5. Run the `LeNet-1024-1024-1024` on MNIST example.  
+5. Run the multi-layer perceptron on MNIST example.  
 
     ```sh
     python scripts/run_mnist.py
@@ -58,7 +58,22 @@ Follow these steps to set up as a d-MATRiX internal developer (not for external 
 
 ## API in a nutshell
 
+Given a customer workload training/evaluation Python script, use the high-level API through two steps.
 
+1. Import extended PyTorch that is Corsair-aware.  This is done by adding
+
+    ```python
+    import corsair
+    ```
+
+    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e. (a) all valid PyTorch models are still valid and (b) all PyTorch models still remain functionally equivalent.
+2. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
+
+    ```python
+    model.transform('corsair_config.yaml')
+    ```
+
+    [This](configs/corsair_mnist_lenet.yaml) is an example Corsair configuration file.  
 
 ## Next steps
 
