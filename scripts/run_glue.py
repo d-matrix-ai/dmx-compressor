@@ -24,7 +24,7 @@ from typing import Optional
 import numpy as np
 from datasets import load_dataset, load_metric
 
-import corsair
+# import corsair
 
 import transformers
 from transformers import (
@@ -395,7 +395,8 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model.transform(config_file="configs/corsair_transformers.yaml")
+    print(model)
+    # model.transform(config_file="configs/corsair_transformers.yaml")
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

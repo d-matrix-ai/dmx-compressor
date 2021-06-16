@@ -10,12 +10,15 @@ setup(
     packages=find_packages('src', exclude=('tests', 'docs', 'experiments', 'sandbox')),
     package_dir={'': 'src'},
     install_requires=(
-        'torch>=1.5,<=1.7',
+        'torch==1.7.1',
         'torchvision',
         'transformers>=4.6.0',
         'numpy',
         'qtorch>=0.3',
+        'pyyaml',
         'tqdm',
+        'parse',
+        'ninja',
         'python-dotenv',
     ),
     python_requires='>=3.6')

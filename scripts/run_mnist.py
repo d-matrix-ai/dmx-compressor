@@ -185,29 +185,32 @@ def train_or_load_pretrained(model, ds):
 
 
 def fine_tune(model, ds):
-    print("Fine-tuning model...")
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=args.fine_tune_epochs
-    )
+    ckpt = os.path.join(args.model_dir, "finetuned.pt")
+    if os.path.exists(ckpt) and not args.retrain_model:
+        print(f"Found fine-tuned model {ckpt}, loading...")
+        model.load_state_dict(torch.load(ckpt), strict=False)
+    else:
+        print("No fine-tuned model found, fine-tuning...")
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=args.fine_tune_epochs
+        )
 
-    for epoch in range(1, args.fine_tune_epochs + 1):
-        train(args, model, device, ds, optimizer, epoch)
-        scheduler.step()
+        for epoch in range(1, args.fine_tune_epochs + 1):
+            train(args, model, device, ds, optimizer, epoch)
+            scheduler.step()
 
-        # print(f"Saving model to {ckpt}...")
-        # torch.save(model.state_dict(), ckpt)
+        print(f"Saving model to {ckpt}...")
+        torch.save(model.state_dict(), ckpt)
     return model
 
 
 def evaluate(model, ds):
-    print("Evaluating model...")
     test(model, device, ds)
 
 
 def dump_onnx(model):
     onnx_file = os.path.join(args.model_dir, "trained.onnx")
-    print(f"Dumping model to ONNX format...")
     torch.onnx.export(
         model,
         torch.randn(
@@ -242,19 +245,20 @@ if __name__ == "__main__":
     dataset = load_data()  # load dataset
 
     model = instantiate_model()  # instantiate pytorch model
-    
-    evaluate(model, dataset.test)  # evaluate accuracy on test set
-
-    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
-    
-    print(model)
 
     model = train_or_load_pretrained(model, dataset.train) # train or load model params
 
+    print(f"Original trained model:")
+    evaluate(model, dataset.test)  # evaluate accuracy on test set
+
+    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
+
+    print(f"Transformed model:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set
 
     model = fine_tune(model, dataset.train)  # fine-tune model params
 
+    print(f"Transformed and fine-tuned model:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set, again
 
-    # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
+    # # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume

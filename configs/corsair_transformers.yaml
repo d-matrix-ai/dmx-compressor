@@ -159,19 +159,19 @@ transformation_rules:
 #   config: *config_qkv
 # - rule: |
 #     output projection layers in self-attention
-#   instance: Conv1d
+#   instance: Linear
 #   name_includes: [".transformer.encoder.layers", "post_attention.conv1d"]
 #   name_excludes: []
 #   config: *config_conv1d
 # - rule: | 
 #     intermediate projection layers in feedforward layers
-#   instance: Conv1d
+#   instance: Linear
 #   name_includes: [".transformer.encoder.layers", "intermediate.conv1d"]
 #   name_excludes: []
 #   config: *config_conv1d
 # - rule: |
 #     output projection layers in feedforward layers
-#   instance: Conv1d
+#   instance: Linear
 #   name_includes: [".transformer.encoder.layers", "output.conv1d"]
 #   name_excludes: ["attention"]
 #   config: *config_conv1d
