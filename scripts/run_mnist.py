@@ -234,7 +234,7 @@ def dump_onnx(model):
 
 if __name__ == "__main__":
 
-    # import corsair  # pytorch is now extended to be "corsair-aware"
+    import corsair  # pytorch is now extended to be "corsair-aware"
 
     from data import MNIST  # mnist data
     from models import LeNet  # model implementation in pytorch
@@ -242,8 +242,10 @@ if __name__ == "__main__":
     dataset = load_data()  # load dataset
 
     model = instantiate_model()  # instantiate pytorch model
+    
+    evaluate(model, dataset.test)  # evaluate accuracy on test set
 
-    # model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
+    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # corsair-specific config
     
     print(model)
 
@@ -251,8 +253,8 @@ if __name__ == "__main__":
 
     evaluate(model, dataset.test)  # evaluate accuracy on test set
 
-    # model = fine_tune(model, dataset.train)  # fine-tune model params
+    model = fine_tune(model, dataset.train)  # fine-tune model params
 
-    # evaluate(model, dataset.test)  # evaluate accuracy on test set, again
+    evaluate(model, dataset.test)  # evaluate accuracy on test set, again
 
-    dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
+    # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
