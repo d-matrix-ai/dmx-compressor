@@ -53,7 +53,7 @@ Shorthand strings are composed of four parts:
 
     IDENTIFIER[element_bit_map]{tensor_spec}(cast_behavior)
 
-Only the first part, the identifier is required, the rest being conditional upon specific formats.  
+Only the first part, i.e. the identifier, is required, the rest being conditional upon specific formats.  
 
 Same
 ~~~~
@@ -67,7 +67,7 @@ The shorthand is::
 Floating point
 ~~~~~~~~~~~~~~
 
-This is a floating point format, with each element having a sign bit, a ``m``-bit mantissa and a ``e``-bit exponent.  
+This is a floating point format, with each element having a sign bit, a ``m``-bit mantissa and an ``e``-bit exponent.  
 
 One casting behavior ``B`` is supported: 
 
@@ -80,7 +80,7 @@ The shorthand is::
 Block floating point
 ~~~~~~~~~~~~~~~~~~~~
 
-This is a block floating point format, with each element having a ``n``-bit signed integer significand and a ``8``-bit shared exponent.  
+This is a block floating point format, with each element having a ``n``-bit signed integer significand and an ``8``-bit shared exponent.  
 
 Blocks are groups of ``b`` contiguous elements along tensor dimension ``d``.
 
