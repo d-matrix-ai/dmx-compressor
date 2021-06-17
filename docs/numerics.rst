@@ -98,7 +98,7 @@ Fixed point
 This is a fixed point format, with each element having a ``n``-bit signed integer significand. 
 Position of the radix point is specified by a bias of ``±b``-bit shift.
 
-Three casting behavior ``BBB`` are supported: 
+Three casting behavior ``BBB`` are supported, in exact order as follows: 
 
 * Clamping of out-of-range numbers, which is ``C`` for clamp, ``U`` for unclamp.
 * Symmetric/asymmetric quantization range, which is ``S`` for symmetric, ``A`` for asymmetric.
