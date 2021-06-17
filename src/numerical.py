@@ -80,7 +80,7 @@ class FixedPoint(Format):
         super().__init__()
         # check validity of format configuration
         assert (
-            1 <= precision <= 25
+            1 <= precision <= 24
         ), f"highest integer precision simulated by FP32 is 25, got {precision}"
         # [TODO] check fraction validity, considering 8-bit exponent of FP32
 
@@ -176,7 +176,7 @@ class BlockFloatingPoint(Format):
         super().__init__()
         # check validity of format configuration
         assert (
-            1 <= precision <= 25
+            2 <= precision <= 25
         ), f"highest integer precision simulated by FP32 is 25, got {precision}"
         assert block_size > 0, f"block size has to be positive, got {block_size}"
 

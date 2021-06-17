@@ -126,7 +126,7 @@ For more detailed information, go over the following documents on specific topic
 ### Corsair-aware features
 
 - Corsair execution
-- Numerics
+- [Numerics](docs/numerics.rst)
 - Weight sparsity
 - Custom logic
 - Configurations for Corsair-specific transformation
