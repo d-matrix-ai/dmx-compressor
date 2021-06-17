@@ -3,7 +3,7 @@ Corsair numerics
 
 We employ `QPyTorch`_ to realize numerical capabilities of Corsair.
 All formats are simulated with single-precision floating point.  
-Thus, the highest integer precision that can be realized is ``24``, and the highest floating point dynamic range ``8``-bit.  
+Thus, the highest integer precision that can be realized is ``24``-bit, and the highest floating point dynamic range ``8``-bit.  
 
 .. _QPyTorch: https://github.com/Tiiiger/QPyTorch
 
