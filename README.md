@@ -75,7 +75,7 @@ Given a customer workload training/evaluation Python script, use the high-level 
 
     [This](configs/corsair_mnist_lenet.yaml) is an example Corsair configuration file.  
 
-In sum, 
+The following code blocks show a simplest example usage.  
 
 <table>
 <tr>
