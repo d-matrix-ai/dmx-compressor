@@ -11,7 +11,7 @@ This project hosts ***Machine Learning Team***'s R&D effort at d-MATRiX Corp.
 
 ## Overview
 
-In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements Corsair-specific features, inclusing 
+In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements Corsair-specific features, including 
 - ***custom low-precision integer formats and arithmetic*** (for both activations and parameters), 
 - ***fine-grain structured weight sparsity*** (for linear and convolutional weights), and 
 - ***custom integer operation logics*** (for element-wise activation functions and normalizations).
