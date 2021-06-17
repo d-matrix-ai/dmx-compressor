@@ -1,6 +1,6 @@
 # Neural net compression for Corsair deployment
 
-This project hosts Machine Learning Team's R&D at d-MATRiX Corp.
+This project hosts ***Machine Learning Team***'s R&D effort at d-MATRiX Corp.
 
   - [Overview](#overview)
   - [Getting started](#getting-started)
@@ -34,7 +34,7 @@ Follow these steps to set up as a d-MATRiX internal developer (not for external 
 
 1. Clone the repo.
 2. (*Recommended*) Start a new virtual environment with Python version 3.6 or higher.
-3. In the virtual environment set up the package as a developer and dependencies.
+3. In the virtual environment set up the package and dependencies for development.
 
     ```sh
     cd compression
@@ -66,7 +66,7 @@ Given a customer workload training/evaluation Python script, use the high-level 
     import corsair
     ```
 
-    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e. (a) all valid PyTorch models are still valid and (b) all PyTorch models still remain functionally equivalent.
+    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e. (a) all valid PyTorch models are still valid and (b) all PyTorch models remain functionally equivalent to those in native PyTorch.
 2. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
 
     ```python
@@ -74,6 +74,45 @@ Given a customer workload training/evaluation Python script, use the high-level 
     ```
 
     [This](configs/corsair_mnist_lenet.yaml) is an example Corsair configuration file.  
+
+In sum, 
+
+<table>
+<tr>
+<th>Original evaluation script</th>
+<th>Modified evaluation script</th>
+</tr>
+<tr>
+<td>
+
+```python
+import torch​
+​
+
+data = data_loader()​
+model = some_network()​
+
+​​
+results = evaluate(model, data)​
+```
+
+</td>
+<td>
+
+```python
+import torch​
+import corsair ​
+​
+data = data_loader()​
+model = some_network()​
+model.transform('corsair_config.yaml') ​
+
+results = evaluate(model, data)​
+```
+
+</td>
+</tr>
+</table>
 
 ## Next steps
 
@@ -85,6 +124,8 @@ For more detailed information, go over the following documents on specific topic
 - Numerics
 - Weight sparsity
 - Custom logic
+- Configurations for Corsair-specific transformation
+- List of supported modules and models
 
 ### Examples
 
