@@ -33,12 +33,8 @@ class Format:
     def cast(self, *input: Any):
         raise NotImplementedError
 
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        raise NotImplementedError
-
     @staticmethod
-    def str2format(sh: str):
+    def from_shorthand(sh: str):
         if sh.startswith("SAME"):
             return Same.from_shorthand(sh)
         elif sh.startswith("XP"):
@@ -253,7 +249,7 @@ class CastTo(nn.Module):
     def __init__(self, format="SAME", dump_to=None):
         super().__init__()
         if not isinstance(format, Format):
-            format = Format.str2format(format)
+            format = Format.from_shorthand(format)
         self.format = format
         self.dump_to = dump_to
 

@@ -31,12 +31,8 @@ class Sparseness:
     def get_mask(self, *input: Any):
         raise NotImplementedError
 
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        raise NotImplementedError
-
     @staticmethod
-    def str2sparseness(sh: str):
+    def from_shorthand(sh: str):
         if sh.startswith("DENSE"):
             return Dense.from_shorthand(sh)
         elif sh.startswith("TOPK"):
@@ -217,7 +213,7 @@ class Sparsify(nn.Module):
         super().__init__()
         self.score = nn.Parameter(torch.Tensor(tensor_shape))
         if not isinstance(sparseness, Sparseness):
-            sparseness = Sparseness.str2sparseness(sparseness)
+            sparseness = Sparseness.from_shorthand(sparseness)
         self.sparseness = sparseness
         self.backward_mode = backward_mode
         self.dump_to = dump_to

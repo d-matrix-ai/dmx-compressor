@@ -68,17 +68,17 @@ class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
 
     def transform(self, config):
         # numerics transformation
-        self.input_cast.format = Format.str2format(config["input_format"])
-        self.output_cast.format = Format.str2format(config["output_format"])
+        self.input_cast.format = Format.from_shorthand(config["input_format"])
+        self.output_cast.format = Format.from_shorthand(config["output_format"])
         if self.accum_cast is not None:
-            self.accum_cast.format = Format.str2format(config["accum_format"])
+            self.accum_cast.format = Format.from_shorthand(config["accum_format"])
         if self.weight_cast is not None:
-            self.weight_cast.format = Format.str2format(config["weight_format"])
+            self.weight_cast.format = Format.from_shorthand(config["weight_format"])
         if self.bias_cast is not None:
-            self.bias_cast.format = Format.str2format(config["bias_format"])
+            self.bias_cast.format = Format.from_shorthand(config["bias_format"])
         # sparsity transformation
         if self.weight_sparsifier is not None:
-            self.weight_sparsifier.sparseness = Sparseness.str2sparseness(
+            self.weight_sparsifier.sparseness = Sparseness.from_shorthand(
                 config["weight_sparseness"]
             )
             ### TODO: need to figure out a better way of handling score setting
