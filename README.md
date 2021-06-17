@@ -71,7 +71,11 @@ Given a customer workload training/evaluation Python script, use the high-level 
     import corsair
     ```
 
-    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e. (a) all valid PyTorch models are still valid and (b) all PyTorch models remain functionally equivalent to those in native PyTorch.
+    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e.
+
+    - all valid PyTorch models definitions remain valid and
+    - all PyTorch models remain functionally equivalent to those in native PyTorch.
+
 2. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
 
     ```python
