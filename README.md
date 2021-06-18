@@ -73,7 +73,7 @@ Given a customer workload training/evaluation Python script, use the high-level 
 
     to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e.
 
-    - all valid PyTorch models definitions remain valid and
+    - all valid PyTorch model definitions remain valid and
     - all PyTorch models remain functionally equivalent, in both forward and backward passes, to those in native PyTorch.
 
 2. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
