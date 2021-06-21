@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.onnx
+from torch.utils.tensorboard import SummaryWriter
 
 
 def parse_args():
@@ -98,7 +99,10 @@ use_cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.manual_seed(args.seed)
 pb_wrap = lambda it: tqdm(it, leave=False, dynamic_ncols=True)
-
+args.model_dir = os.path.join(
+    MODEL_PATH, "mnist-lenet" + f"-{args.width}" * args.depth
+)
+writer = SummaryWriter(args.model_dir+'/logs')
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
@@ -155,9 +159,6 @@ def load_data():
 
 
 def instantiate_model():
-    args.model_dir = os.path.join(
-        MODEL_PATH, "mnist-lenet" + f"-{args.width}" * args.depth
-    )
     print(f"Model directory: {args.model_dir}")
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
@@ -174,7 +175,7 @@ def train_or_load_pretrained(model, ds):
     ckpt = os.path.join(args.model_dir, "trained.pt")
     if os.path.exists(ckpt) and not args.retrain_model:
         print(f"Found pretrained model {ckpt}, loading...")
-        model.load_state_dict(torch.load(ckpt), strict=False)
+        model.load_state_dict(torch.load(ckpt, map_location=device), strict=False)
     else:
         print("No pretrained model found, training...")
         optimizer = optim.SGD(
@@ -195,7 +196,7 @@ def fine_tune(model, ds):
     ckpt = os.path.join(args.model_dir, "finetuned.pt")
     if os.path.exists(ckpt) and not args.retrain_model:
         print(f"Found fine-tuned model {ckpt}, loading...")
-        model.load_state_dict(torch.load(ckpt), strict=False)
+        model.load_state_dict(torch.load(ckpt, map_location=device), strict=False)
     else:
         print("No fine-tuned model found, fine-tuning...")
         optimizer = optim.SGD(model.parameters(), lr=args.fine_tune_lr, momentum=0.9, nesterov=True)
@@ -268,4 +269,4 @@ if __name__ == "__main__":
     print(f"\nEvaluation of Corsair-transformed model fine-tuned:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set, again
 
-    # # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
+    # dump_onnx(model)  # dump model to onnx representation for downstream stack to consume
