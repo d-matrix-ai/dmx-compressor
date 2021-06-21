@@ -84,10 +84,11 @@ CIFAR100 = partial(CIFAR, num_classes=100)
 
 class I1K():
     def __init__(self,
-                 data_dir='~/data/I1K/i1k-extracted',
+                 data_dir='~/data/imagenet',
                  cuda=False,
                  num_workers=4,
-                 batch_size=32,
+                 train_batch_size=64,
+                 test_batch_size=500,
                  shuffle=True):
         gpu_conf = {
             'num_workers': num_workers,
@@ -104,19 +105,19 @@ class I1K():
                     tv.transforms.ToTensor(),
                     normalize,
                 ])),
-            batch_size=batch_size,
+            batch_size=train_batch_size,
             shuffle=shuffle,
             **gpu_conf)
         self.val = torch.utils.data.DataLoader(
             tv.datasets.ImageFolder(
-                data_dir + '/validation',
+                data_dir + '/val',
                 tv.transforms.Compose([
                     tv.transforms.Resize(256),
                     tv.transforms.CenterCrop(224),
                     tv.transforms.ToTensor(),
                     normalize,
                 ])),
-            batch_size=batch_size,
+            batch_size=test_batch_size,
             shuffle=False,
             **gpu_conf)
 
