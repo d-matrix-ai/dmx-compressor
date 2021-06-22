@@ -208,7 +208,7 @@ class Sparsify(nn.Module):
     """
 
     def __init__(
-        self, tensor_shape, sparseness='DENSE', backward_mode="STE", dump_to=None
+        self, tensor_shape, sparseness="DENSE", backward_mode="STE", dump_to=None
     ):
         super().__init__()
         self.score = nn.Parameter(torch.Tensor(tensor_shape))
@@ -217,6 +217,7 @@ class Sparsify(nn.Module):
         self.sparseness = sparseness
         self.backward_mode = backward_mode
         self.dump_to = dump_to
+        self.mask = torch.ones(tensor_shape)
 
     def set_score(self, score_value):
         assert (
@@ -229,7 +230,9 @@ class Sparsify(nn.Module):
         assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
-                x, _ = Sparsifier.apply(x, self.score, self.sparseness, self.backward_mode)
+                x, _ = Sparsifier.apply(
+                    x, self.score, self.sparseness, self.backward_mode
+                )
                 ### TODO: need to figure out a better way of handling score setting
                 self.set_score(torch.abs(x))
                 ###
@@ -270,11 +273,15 @@ class WeightSparseMixin:
 
     @property
     def weight_mask(self):
-        return self.weight_sparsifier.mask
+        return None if self.weight_sparsifier is None else self.weight_sparsifier.mask
 
     @property
     def effective_weight(self):
-        return self.weight_sparsifier(self.weight)
+        return (
+            None
+            if self.weight_sparsifier is None
+            else self.weight_sparsifier(self.weight)
+        )
 
 
 if __name__ == "__main__":

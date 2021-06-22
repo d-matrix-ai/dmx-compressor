@@ -29,13 +29,13 @@ from utils import load_config_file
 __ALL__ = ["nn", "CorsairModule"]
 
 
-class CorsairModule(torch.nn.Module):
+class CorsairModule(BoundaryCastMixin, WeightSparseMixin, torch.nn.Module):
     r"""
-    Model container equipped with corsair transform
+    Container equipped with corsair transform, extending torch.nn.Module
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
     def transform(self, config_file="configs/corsair.yaml"):
         r"""
@@ -50,23 +50,14 @@ class CorsairModule(torch.nn.Module):
                     and all([_n in n for _n in r["name_includes"]])
                     and all([not _n in n for _n in r["name_excludes"]])
                 ):
-                    m.transform(r["config"])
+                    m._transform(r["config"])
 
     def load_state_dict(
         self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False
     ):
         return super().load_state_dict(state_dict, strict=strict)
 
-
-class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
-    r"""
-    Extending torch.nn.Module
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-    def transform(self, config):
+    def _transform(self, config):
         # numerics transformation
         self.input_cast.format = Format.from_shorthand(config["input_format"])
         self.output_cast.format = Format.from_shorthand(config["output_format"])
@@ -86,7 +77,7 @@ class CorsairMixin(BoundaryCastMixin, WeightSparseMixin):
             ###
 
 
-class Linear(CorsairMixin, torch.nn.Linear):
+class Linear(CorsairModule, torch.nn.Linear):
     def __init__(
         self,
         in_features: int,
@@ -128,7 +119,7 @@ class Linear(CorsairMixin, torch.nn.Linear):
         return output
 
 
-class Conv2d(CorsairMixin, torch.nn.Conv2d):
+class Conv2d(CorsairModule, torch.nn.Conv2d):
     def __init__(
         self,
         in_channels,
@@ -186,7 +177,7 @@ class Conv2d(CorsairMixin, torch.nn.Conv2d):
         return output
 
 
-class AdaptiveAvgPool2d(CorsairMixin, torch.nn.AdaptiveAvgPool2d):
+class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
     def __init__(self, output_size) -> None:
         super().__init__(output_size)
 
@@ -197,7 +188,7 @@ class AdaptiveAvgPool2d(CorsairMixin, torch.nn.AdaptiveAvgPool2d):
         return output
 
 
-class MaxPool2d(CorsairMixin, torch.nn.MaxPool2d):
+class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
     def __init__(
         self,
         kernel_size,
@@ -223,7 +214,7 @@ class MaxPool2d(CorsairMixin, torch.nn.MaxPool2d):
         return output
 
 
-class Softmax(CorsairMixin, torch.nn.Softmax):
+class Softmax(CorsairModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
@@ -234,7 +225,7 @@ class Softmax(CorsairMixin, torch.nn.Softmax):
         return output
 
 
-class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
+class LayerNorm(CorsairModule, torch.nn.LayerNorm):
     def __init__(
         self,
         normalized_shape: Union[int, List[int], Size],
@@ -254,7 +245,7 @@ class LayerNorm(CorsairMixin, torch.nn.LayerNorm):
         return output
 
 
-class BatchNorm2d(CorsairMixin, torch.nn.BatchNorm2d):
+class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
     def __init__(
         self,
         num_features: int,
@@ -307,7 +298,7 @@ class BatchNorm2d(CorsairMixin, torch.nn.BatchNorm2d):
         return output
 
 
-class Dropout(CorsairMixin, torch.nn.Dropout):
+class Dropout(CorsairModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
 
@@ -318,7 +309,7 @@ class Dropout(CorsairMixin, torch.nn.Dropout):
         return output
 
 
-class ReLU(CorsairMixin, torch.nn.ReLU):
+class ReLU(CorsairModule, torch.nn.ReLU):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
@@ -329,7 +320,7 @@ class ReLU(CorsairMixin, torch.nn.ReLU):
         return output
 
 
-class ReLU6(CorsairMixin, torch.nn.ReLU6):
+class ReLU6(CorsairModule, torch.nn.ReLU6):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
@@ -340,7 +331,7 @@ class ReLU6(CorsairMixin, torch.nn.ReLU6):
         return output
 
 
-class Tanh(CorsairMixin, torch.nn.Tanh):
+class Tanh(CorsairModule, torch.nn.Tanh):
     def __init__(self) -> None:
         super().__init__()
 
