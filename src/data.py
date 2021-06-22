@@ -88,7 +88,7 @@ class I1K():
                  cuda=False,
                  num_workers=4,
                  train_batch_size=64,
-                 test_batch_size=500,
+                 test_batch_size=100,
                  shuffle=True):
         gpu_conf = {
             'num_workers': num_workers,
