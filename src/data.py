@@ -86,7 +86,7 @@ class I1K():
     def __init__(self,
                  data_dir='~/data/imagenet',
                  cuda=False,
-                 num_workers=4,
+                 num_workers=8,
                  train_batch_size=64,
                  test_batch_size=100,
                  shuffle=True):

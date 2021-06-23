@@ -178,8 +178,7 @@ if __name__ == "__main__":
         args.model in MODEL_LIST
     ), f"unrecognized model {args.model}, supported models: \n{MODEL_LIST}"
     model = eval("tv.models."+args.model)(pretrained=True).to(device)
-
     model.transform(config_file=args.config)
-    print(model)
-
+    print(f"model: {args.model}; config: {args.config}")
     top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
+    
