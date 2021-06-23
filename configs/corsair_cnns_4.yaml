@@ -1,0 +1,60 @@
+# list of Corsair supported numerical formats
+supported_numerical_formats:
+  - &DUMMY_FORMAT SAME
+  - &IMC_GEMM_FORMAT_HIGH BFP[8|8]{64,-1}(N)
+  - &IMC_GEMM_FORMAT_LOW BFP[4|8]{128,-1}(N)
+  - &IMC_CONV_FORMAT_HIGH BFP[8|8]{64,1}(N)
+  - &IMC_CONV_FORMAT_LOW BFP[4|8]{128,1}(N)
+  - &IMC_ACCUM_FORMAT_HIGH FP[1|8|23](N)
+  - &IMC_GEMM_ACCUM_FORMAT_LOW BFP[22|8]{64,-1}(N)
+  - &IMC_CONV_ACCUM_FORMAT_LOW BFP[22|8]{64,1}(N)
+  - &OB_FORMAT FP[1|8|23](N)
+  - &SIMD_FORMAT_HIGH FP[1|8|23](N)
+  - &SIMD_FORMAT_LOW XP[25,+12](CSN)
+# list of Corsair supported sparsity patterns
+supported_sparseness_patterns:
+  - &DUMMY_SPARSENESS DENSE
+  - &IMC_GEMM_SPARSENESS_4_8 BTOPK{4:8,-1}
+  - &IMC_GEMM_SPARSENESS_2_8 BTOPK{2:8,-1}
+  - &IMC_GEMM_SPARSENESS_2_4 BTOPK{2:4,-1}
+  - &IMC_GEMM_SPARSENESS_1_4 BTOPK{1:4,-1}
+  - &IMC_CONV_SPARSENESS_4_8 BTOPK{4:8,1}
+  - &IMC_CONV_SPARSENESS_2_8 BTOPK{2:8,1}
+  - &IMC_CONV_SPARSENESS_2_4 BTOPK{2:4,1}
+  - &IMC_CONV_SPARSENESS_1_4 BTOPK{1:4,1}
+
+# layer configurations
+config_conv: &config_conv
+  input_format: *IMC_CONV_FORMAT_LOW
+  output_format: *OB_FORMAT
+  accum_format: *IMC_ACCUM_FORMAT_HIGH
+  weight_format: *IMC_CONV_FORMAT_LOW
+  bias_format: *OB_FORMAT
+  weight_sparseness: *DUMMY_SPARSENESS
+
+# transformation rules
+transformation_rules:
+  - rule: |
+      mobilenet conv mapping
+    instance: Conv2d
+    name_includes: ["features."]
+    name_excludes: ["features.0.0"]
+    config: *config_conv
+  - rule: |
+      resnet conv mapping
+    instance: Conv2d
+    name_includes: ["layer", "conv"]
+    name_excludes: []
+    config: *config_conv
+  - rule: |
+      shufflenet conv mapping
+    instance: Conv2d
+    name_includes: []
+    name_excludes: ["conv1.0"]
+    config: *config_conv
+  - rule: |
+      vgg conv mapping
+    instance: Conv2d
+    name_includes: []
+    name_excludes: ["features.0"]
+    config: *config_conv
