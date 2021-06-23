@@ -17,6 +17,13 @@ def parse_args():
         help="model name (default: resnet50)",
     )
     parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default="configs/corsair_cnns.yaml",
+        help="corsair config file",
+    )
+    parser.add_argument(
         "-z", "--batch-size", type=int, default=128, help="batch size (default: 128)"
     )
     parser.add_argument(
@@ -165,14 +172,14 @@ if __name__ == "__main__":
     from data import I1K
     import torchvision as tv
 
-    ds = I1K(data_dir='/tools/d-matrix/ml/data/imagenet')
+    ds = I1K(data_dir=DATA_PATH+'/imagenet')
 
     assert (
         args.model in MODEL_LIST
     ), f"unrecognized model {args.model}, supported models: \n{MODEL_LIST}"
     model = eval("tv.models."+args.model)(pretrained=True).to(device)
 
-    model.transform(config_file="configs/corsair_cnns.yaml")
+    model.transform(config_file=args.config)
     print(model)
 
     top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
