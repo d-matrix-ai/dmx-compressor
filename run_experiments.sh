@@ -27,11 +27,12 @@
 conda activate py39_dm
 cd ~/proj/compression
 
-for MODEL_NAME in resnet101
-do
-    # python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_0.yaml
-    # python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_1.yaml
-    # python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_2.yaml
-    python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_3.yaml
-    python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_4.yaml
-done
+# for MODEL_NAME in resnet18
+# do
+#     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_0.yaml
+#     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_1.yaml
+#     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_2.yaml
+#     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_3.yaml
+#     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_4.yaml
+# done
+python scripts/run_cifar.py -m resnet20 -c configs/corsair_cnns.yaml -e100

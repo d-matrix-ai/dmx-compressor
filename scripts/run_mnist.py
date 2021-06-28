@@ -259,7 +259,7 @@ if __name__ == "__main__":
     print(f"\nEvaluation of the original trained model:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set
 
-    model.transform(config_file="configs/corsair_mnist_lenet.yaml")  # transform model with corsair-specific features
+    model.transform(config="configs/corsair_mnist_lenet.yaml")  # transform model with corsair-specific features
     
     print(f"\nEvaluation of original model Corsair-transformed:")
     evaluate(model, dataset.test)  # evaluate accuracy on test set, again

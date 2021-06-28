@@ -396,7 +396,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
     print(model)
-    # model.transform(config_file="configs/corsair_transformers.yaml")
+    # model.transform(config="configs/corsair_transformers.yaml")
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

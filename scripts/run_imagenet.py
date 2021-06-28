@@ -24,15 +24,15 @@ def parse_args():
         help="corsair config file",
     )
     parser.add_argument(
-        "-z", "--batch-size", type=int, default=128, help="batch size (default: 128)"
+        "-z", "--batch-size", type=int, default=256, help="batch size (default: 256)"
     )
     parser.add_argument(
         "-e",
         "--epochs",
         type=int,
-        default=100,
+        default=50,
         metavar="N",
-        help="number of epochs to train (default: 100)",
+        help="number of epochs to train (default: 50)",
     )
     parser.add_argument(
         "--lr",
@@ -166,19 +166,50 @@ def validate(val_loader, model, criterion):
     return top1.avg, top5.avg
 
 
+def train(train_loader, model, criterion):
+    optimizer = torch.optim.SGD(
+        model.parameters(), 
+        lr=args.lr, 
+        momentum=0.9,
+        nesterov=True,
+        weight_decay=1e-4,
+    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs*len(train_loader))
+    for epoch in range(1, args.epochs+1):
+        model.train()
+        with pb_wrap(train_loader) as loader:
+            loader.set_description(f"Epoch {epoch}")
+            for i, (images, target) in enumerate(loader):
+                images, target = images.to(device), target.to(device)
+                optimizer.zero_grad()
+                output = model(images)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+                loader.set_postfix(dict(
+                    lr=f"{scheduler.get_last_lr()[0] :.8f}",
+                    loss="\33[91m{:6.4f}\033[0m".format(loss),
+                ))
+                scheduler.step()
+        top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
+    return model
+
 if __name__ == "__main__":
 
     import corsair
     from data import I1K
     import torchvision as tv
 
-    ds = I1K(data_dir=DATA_PATH+'/imagenet')
+    ds = I1K(data_dir=os.path.join(DATA_PATH, 'imagenet'))
 
     assert (
         args.model in MODEL_LIST
     ), f"unrecognized model {args.model}, supported models: \n{MODEL_LIST}"
+
     model = eval("tv.models."+args.model)(pretrained=True).to(device)
-    model.transform(config_file=args.config)
+    model.transform(config=args.config)
     print(f"model: {args.model}; config: {args.config}")
+    top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
+    model = train(ds.train, model, torch.nn.CrossEntropyLoss().to(device))
     top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
     
