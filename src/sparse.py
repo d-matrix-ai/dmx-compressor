@@ -230,13 +230,13 @@ class Sparsify(nn.Module):
         assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
-                x, _ = Sparsifier.apply(
-                    x, self.score, self.sparseness, self.backward_mode
-                )
                 ### TODO: need to figure out a better way of handling score setting
                 self.set_score(torch.abs(x))
                 ###
                 self.mask = self.sparseness.get_mask(self.score)
+                x, _ = Sparsifier.apply(
+                    x, self.score, self.sparseness, self.backward_mode
+                )
             else:
                 x *= self.mask
         if self.dump_to is not None:

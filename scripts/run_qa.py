@@ -307,7 +307,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model.transform(config_file="configs/corsair_transformers.yaml")
+    model.transform(config="configs/corsair_transformers.yaml")
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):

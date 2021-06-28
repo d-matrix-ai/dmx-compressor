@@ -37,11 +37,12 @@ class CorsairModule(BoundaryCastMixin, WeightSparseMixin, torch.nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def transform(self, config_file="configs/corsair.yaml"):
+    def transform(self, config="configs/corsair.yaml"):
         r"""
         Model conversion for Corsair numerics/sparsity simulation/optimization
         """
-        config = load_config_file(config_file)
+        if isinstance(config, str):
+            config = load_config_file(config)
 
         for n, m in self.named_modules():
             for r in config["transformation_rules"]:
