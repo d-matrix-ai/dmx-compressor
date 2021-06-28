@@ -22,7 +22,8 @@ def mask2braille(m, dims=(0, 1)):
     m = m.permute(*ds)
     # reduce mask
     _h, _w = m.size(0), m.size(1)
-    m = m.view(_h, _w, -1).sum(-1) > 0
+    # m = m.reshape(_h, _w, -1).sum(-1) > 0
+    m = m.reshape(_h, _w, -1)[:, :, 0]
     # pad mask
     h, w = math.ceil(_h / 4) * 4, math.ceil(_w / 2) * 2
     m = torch.nn.functional.pad(m, (0, w - _w, 0, h - _h))
