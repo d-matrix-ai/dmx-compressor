@@ -165,14 +165,14 @@ if __name__ == "__main__":
     # evaluate model
     evaluate(model, dataset.test)
     
-    model = train(model, dataset.train, 10)
-    for nnz in [7, 6, 5, 4]:
-        config["transformation_rules"][0]["config"]["weight_sparseness"] = f"BTOPK{{{nnz}:8,1}}"
-        model.transform(config)
-        model = train(model, dataset.train, 10)
-    for nnz in [3, 2]:
-        config["transformation_rules"][0]["config"]["weight_sparseness"] = f"BTOPK{{{nnz}:8,1}}"
-        model.transform(config)
-        model = train(model, dataset.train, 25)
+    model = train(model, dataset.train, args.epochs)
+    # for nnz in [7, 6, 5, 4]:
+    #     config["transformation_rules"][0]["config"]["weight_sparseness"] = f"BTOPK{{{nnz}:8,1}}"
+    #     model.transform(config)
+    #     model = train(model, dataset.train, 10)
+    # for nnz in [3, 2]:
+    #     config["transformation_rules"][0]["config"]["weight_sparseness"] = f"BTOPK{{{nnz}:8,1}}"
+    #     model.transform(config)
+    #     model = train(model, dataset.train, 25)
     # evaluate model
     evaluate(model, dataset.test)
