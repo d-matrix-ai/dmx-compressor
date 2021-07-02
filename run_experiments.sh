@@ -35,4 +35,37 @@ cd ~/proj/compression
 #     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_3.yaml
 #     python scripts/run_imagenet.py --model=$MODEL_NAME --config=configs/corsair_cnns_4.yaml
 # done
-python scripts/run_cifar.py -m resnet20 -c configs/corsair_cnns.yaml -e100
+# python scripts/run_cifar.py -m resnet20 -c configs/corsair_cnns.yaml -e100
+
+export GLUE_DIR=/tools/d-matrix/ml/data/glue
+export GLUE_TASK=MRPC
+# export MODEL_NAME=google/bert_uncased_L-2_H-128_A-2 # bert-tiny
+# export MODEL_NAME=google/bert_uncased_L-4_H-256_A-4 # bert-mini
+# export MODEL_NAME=google/bert_uncased_L-4_H-512_A-8 # bert-small
+# export MODEL_NAME=google/bert_uncased_L-8_H-512_A-8 # bert-medium
+# export MODEL_NAME=google/bert_uncased_L-12_H-768_A-12 # bert-base
+# export MODEL_NAME=bert-base-uncased
+export MODEL_NAME=bert-base-cased
+# export MODEL_NAME=bert-base-cased-finetuned-mrpc
+# export MODEL_NAME=roberta-large-mnli
+# export MODEL_NAME=microsoft/deberta-base-mnli
+# export MODEL_NAME=microsoft/deberta-large-mnli
+# export MODEL_NAME=microsoft/deberta-xlarge-mnli
+# export MODEL_NAME=microsoft/deberta-v2-xlarge-mnli
+# export MODEL_NAME=microsoft/deberta-v2-xxlarge-mnli
+
+python scripts/run_glue.py \
+    --model_name_or_path=$MODEL_NAME \
+    --task_name=$GLUE_TASK \
+    --max_seq_length=128 \
+    --train_file=$GLUE_DIR/$GLUE_TASK/train.tsv \
+    --validation_file=$GLUE_DIR/$GLUE_TASK/dev*.tsv \
+    --test_file=$GLUE_DIR/$GLUE_TASK/test*.tsv \
+    --do_eval \
+    --output_dir=./out_dir \
+    --overwrite_output_dir \
+    --do_train \
+    --per_device_train_batch_size=32 \
+    --num_train_epochs=8 \
+    --learning_rate=5e-5 \
+    --lr_scheduler_type=linear \
