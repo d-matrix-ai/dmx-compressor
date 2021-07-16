@@ -23,7 +23,7 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from torch.nn.modules.pooling import MaxPool2d
+import functions as Fs
 from utils import load_config_file
 
 __ALL__ = ["nn", "CorsairModule"]
@@ -221,7 +221,8 @@ class Softmax(CorsairModule, torch.nn.Softmax):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        _output = super().forward(_output)
+        # _output = super().forward(_output)
+        _output = Fs.softmax(input, self.dim)
         output = self.output_cast(_output)
         return output
 
