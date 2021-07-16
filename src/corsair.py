@@ -221,8 +221,8 @@ class Softmax(CorsairModule, torch.nn.Softmax):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        # _output = super().forward(_output)
-        _output = Fs.softmax(input, self.dim)
+        _output = super().forward(_output)
+        _output.data = Fs.softmax(input, self.dim)
         output = self.output_cast(_output)
         return output
 
