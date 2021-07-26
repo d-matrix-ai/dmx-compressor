@@ -78,6 +78,9 @@ class CorsairModule(
             ### TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
             ###
+        # integer logic transformation
+        if "approximation_function" in config:
+            self.approximation_function = config["approximation_function"]
 
 
 class Linear(CorsairModule, torch.nn.Linear):

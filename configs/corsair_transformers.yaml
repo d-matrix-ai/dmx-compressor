@@ -22,29 +22,31 @@ supported_sparseness_patterns:
 - &IMC_CONV_SPARSENESS_2_8      BTOPK{2:8,1}
 - &IMC_CONV_SPARSENESS_2_4      BTOPK{2:4,1}
 - &IMC_CONV_SPARSENESS_1_4      BTOPK{1:4,1}
+# list of Corsair supported integer approximation functions
+- &SIMD_SOFTMAX_ALGO            poly2softmax
 
 # layer configurations
 config_qkv: &config_qkv
-  input_format:       *IMC_GEMM_FORMAT_HIGH
-  output_format:      *IMC_GEMM_FORMAT_HIGH
-  accum_format:       *IMC_ACCUM_FORMAT_HIGH
-  weight_format:      *IMC_GEMM_FORMAT_HIGH
-  bias_format:        *OB_FORMAT
-  weight_sparseness:  *DUMMY_SPARSENESS
+  input_format:                 *IMC_GEMM_FORMAT_HIGH
+  output_format:                *IMC_GEMM_FORMAT_HIGH
+  accum_format:                 *IMC_ACCUM_FORMAT_HIGH
+  weight_format:                *IMC_GEMM_FORMAT_HIGH
+  bias_format:                  *OB_FORMAT
+  weight_sparseness:            *DUMMY_SPARSENESS
 config_dense: &config_dense
-  input_format:       *IMC_GEMM_FORMAT_HIGH
-  output_format:      *OB_FORMAT
-  accum_format:       *IMC_ACCUM_FORMAT_HIGH
-  weight_format:      *IMC_GEMM_FORMAT_HIGH
-  bias_format:        *OB_FORMAT
-  weight_sparseness:  *DUMMY_SPARSENESS
+  input_format:                 *IMC_GEMM_FORMAT_HIGH
+  output_format:                *OB_FORMAT
+  accum_format:                 *IMC_ACCUM_FORMAT_HIGH
+  weight_format:                *IMC_GEMM_FORMAT_HIGH
+  bias_format:                  *OB_FORMAT
+  weight_sparseness:            *DUMMY_SPARSENESS
 config_do: &config_do
-  input_format:       *DUMMY_FORMAT
-  output_format:      *IMC_GEMM_FORMAT_HIGH
+  input_format:                 *DUMMY_FORMAT
+  output_format:                *IMC_GEMM_FORMAT_HIGH
 config_sm: &config_sm
-  input_format:       *SIMD_FORMAT_LOW
-  output_format:      *DUMMY_FORMAT
-
+  input_format:                 *DUMMY_FORMAT
+  output_format:                *DUMMY_FORMAT
+  approximation_function:       *SIMD_SOFTMAX_ALGO
 # transformation rules, validated for bert, roberta, distilbert.
 transformation_rules:
 - rule: |
