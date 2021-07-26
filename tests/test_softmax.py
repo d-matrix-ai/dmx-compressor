@@ -1,3 +1,4 @@
+from platform import python_branch
 import pytest
 import torch
 import torch.nn.functional as F
@@ -37,16 +38,30 @@ import corsair
 )
 def test_softmax(bsz, shape, dim):
     shape = (bsz,) + shape
+    sm1 = lambda x: F.softmax(x, dim=dim)
+    sm2 = corsair.nn.Softmax(dim=dim)
+    sm2.approximation_function = "poly2softmax"
     x1 = torch.randn(*shape).requires_grad_()
     x2 = x1.clone().detach().requires_grad_()
 
-    ref = F.softmax(x1, dim=dim)
-    res = corsair.nn.Softmax(dim=dim)(x2)
+    y1 = sm1(x1)
+    y2 = sm2(x2)
 
-    assert ref.shape == res.shape
-    assert torch.allclose(ref, res, rtol=1e-2)
+    y1.backward(torch.ones_like(y1))
+    y2.backward(torch.ones_like(y2))
 
-    ref.backward(torch.ones_like(ref))
-    res.backward(torch.ones_like(res))
-
+    assert y1.shape == y2.shape
+    assert torch.allclose(y2, y1, rtol=1e-2)
+    assert torch.allclose(
+        sm2.approximation_error, 
+        torch.zeros_like(y2), 
+        atol=1e-3
+    )
     assert torch.all(x1.grad == x2.grad)
+
+if __name__ == "__main__":
+    test_softmax(
+        bsz=1,
+        shape=(8,),
+        dim=-1,
+    )
