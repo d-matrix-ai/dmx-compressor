@@ -58,10 +58,3 @@ def test_softmax(bsz, shape, dim):
         atol=1e-3
     )
     assert torch.all(x1.grad == x2.grad)
-
-if __name__ == "__main__":
-    test_softmax(
-        bsz=1,
-        shape=(8,),
-        dim=-1,
-    )
