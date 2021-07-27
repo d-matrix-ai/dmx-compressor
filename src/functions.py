@@ -36,9 +36,10 @@ def poly2softmax(x, dim=-1):
 
         y = mult_add2 * 2**(-scale)
 
+        kmax,_ = torch.max(k,dim=dim,keepdim=True) #find max k along softmax dim.
         # shift by k-kmax bits for final result 
-        kmax,_ = torch.max(k,dim=-1)
-        kmax = torch.unsqueeze(kmax,dim=-1)
+        # kmax,_ = torch.max(k,dim=-1)
+        # kmax = torch.unsqueeze(kmax,dim=-1)
         y *= 2**(k-kmax)
 
         # compute softmax (note will need to use 32 bits for sum in HW)
@@ -57,8 +58,9 @@ def base2softmax(x, dim=-1):
         #including integer vector k for re-normalization
         ey,k = base2exp(x,dim=dim)
   
-        kmax,_ = torch.max(k,dim=-1) #find max k along softmax dim.
-        kmax = torch.unsqueeze(kmax,dim=-1)
+        kmax,_ = torch.max(k,dim=dim,keepdim=True) #find max k along softmax dim.
+        # kmax,_ = torch.max(k,dim=-1) #find max k along softmax dim.
+        # kmax = torch.unsqueeze(kmax,dim=-1)
 
         #compute sum with normalization for numerical stability
         ey = ey*2**(k-kmax)
