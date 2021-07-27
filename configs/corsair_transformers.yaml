@@ -46,7 +46,8 @@ config_do: &config_do
 config_sm: &config_sm
   input_format:                 *DUMMY_FORMAT
   output_format:                *DUMMY_FORMAT
-  approximation_function:       *SIMD_SOFTMAX_ALGO
+  # approximation_function:       *SIMD_SOFTMAX_ALGO
+  
 # transformation rules, validated for bert, roberta, distilbert.
 transformation_rules:
 - rule: |
