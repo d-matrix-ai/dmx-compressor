@@ -12,7 +12,7 @@ setup(
     install_requires=(
         'torch==1.7.1',
         'torchvision',
-        'transformers>=4.6.0',
+        'transformers @ git+ssh://git@git.d-matrix.ai/xin/transformers.git@dm-refactor',
         'datasets',
         'numpy',
         'scipy',
@@ -23,5 +23,6 @@ setup(
         'parse',
         'ninja',
         'python-dotenv',
+        'pytest',
     ),
     python_requires='>=3.6')
