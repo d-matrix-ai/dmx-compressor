@@ -23,5 +23,6 @@ setup(
         'parse',
         'ninja',
         'python-dotenv',
+        'pytest',
     ),
     python_requires='>=3.6')
