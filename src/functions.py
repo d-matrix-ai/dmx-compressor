@@ -76,7 +76,7 @@ def base2exp(x, dim=-1):
         #2^v is approximated by a simple linear interpolation d+v.
         #input x should be a vector shape (n,1)
         
-        scale=10 #bits after binary fixed point
+        scale=14 #bits after binary fixed point
         log2e_fp=1.4426950408889634; #log2(e) in floating point 
         log2e=round(log2e_fp*2**scale)/2**scale #log2(e) 
         d=0.957 #minmax solution for d over the input range 0<v<1
