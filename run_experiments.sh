@@ -24,8 +24,8 @@
 # --------------------------------------------------
 # Job Commands go here
 # --------------------------------------------------
-conda activate py39_dm
-cd ~/proj/compression
+# conda activate py39_dm
+# cd ~/proj/compression
 
 # for MODEL_NAME in resnet18
 # do
@@ -45,8 +45,8 @@ export GLUE_TASK=MRPC
 # export MODEL_NAME=google/bert_uncased_L-8_H-512_A-8 # bert-medium
 # export MODEL_NAME=google/bert_uncased_L-12_H-768_A-12 # bert-base
 # export MODEL_NAME=bert-base-uncased
-export MODEL_NAME=bert-base-cased
-# export MODEL_NAME=bert-base-cased-finetuned-mrpc
+# export MODEL_NAME=bert-base-cased
+export MODEL_NAME=bert-base-cased-finetuned-mrpc
 # export MODEL_NAME=roberta-large-mnli
 # export MODEL_NAME=microsoft/deberta-base-mnli
 # export MODEL_NAME=microsoft/deberta-large-mnli
@@ -64,8 +64,8 @@ python scripts/run_glue.py \
     --do_eval \
     --output_dir=./out_dir \
     --overwrite_output_dir \
-    --do_train \
-    --per_device_train_batch_size=32 \
-    --num_train_epochs=8 \
-    --learning_rate=5e-5 \
-    --lr_scheduler_type=linear \
+    # --do_train \
+    # --per_device_train_batch_size=32 \
+    # --num_train_epochs=8 \
+    # --learning_rate=5e-5 \
+    # --lr_scheduler_type=linear \

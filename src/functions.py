@@ -1,11 +1,9 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Function
 
 
 __ALL__ = [
-    "softmax"
+    "ApproximationMixin",
 ]
 
 def poly2softmax(x, dim=-1):
@@ -106,16 +104,22 @@ def softmax(x, dim=-1):
     # pdb.set_trace()
     return _x
 
+    # range reduction to range -log(2)/2 < r < log(2)/2
+    k = torch.round(x * invln2)
+    r = x - k * ln2
 
-# class Softmax(Function):
-#     r"""
-#     d-MATRiX custom softmax in pytorch
-#     """
+    # compute exp(r) emulating fixed point arithmetic
+    rint = torch.round(r * 2 ** scale)
+    r2int = torch.round(rint * rint * 2 ** (-scale))
+    mult_add1 = torch.round(c0int + torch.round(c1int * rint * 2 ** (-scale)))
+    mult_add2 = torch.round(mult_add1 + 0.5 * r2int)
+    y = mult_add2 * 2 ** (-scale)
+    # shift by k bits for final result
+    y *= 2 ** k
 
-#     @staticmethod
-#     def forward(ctx, input, dim):
-#         return poly2softmax(input, dim=dim), F.softmax(input, dim=dim)
+    # compute softmax (note will need to use 32 bits for sum in HW)
+    sum_exp = torch.sum(y, dim=dim, keepdim=True)
+    y /= sum_exp
+    # y = torch.round(y * 256) / 256
 
-#     @staticmethod
-#     def backward(ctx, _g, g_output):
-#         return g_output, None
+    return y

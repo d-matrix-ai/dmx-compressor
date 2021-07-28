@@ -23,13 +23,15 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-import functions as Fs
+from functions import ApproximationMixin
 from utils import load_config_file
 
 __ALL__ = ["nn", "CorsairModule"]
 
 
-class CorsairModule(BoundaryCastMixin, WeightSparseMixin, torch.nn.Module):
+class CorsairModule(
+    ApproximationMixin, BoundaryCastMixin, WeightSparseMixin, torch.nn.Module
+):
     r"""
     Container equipped with corsair transform, extending torch.nn.Module
     """
@@ -76,6 +78,9 @@ class CorsairModule(BoundaryCastMixin, WeightSparseMixin, torch.nn.Module):
             ### TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
             ###
+        # integer logic transformation
+        if "approximation_function" in config:
+            self.approximation_function = config["approximation_function"]
 
 
 class Linear(CorsairModule, torch.nn.Linear):
@@ -184,7 +189,7 @@ class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
 
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
-        _output = super().forward(_input)
+        _output = self._forward(_input)
         output = self.output_cast(_output)
         return output
 
@@ -210,7 +215,7 @@ class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
 
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
-        _output = super().forward(_input)
+        _output = self._forward(_input)
         output = self.output_cast(_output)
         return output
 
@@ -221,8 +226,7 @@ class Softmax(CorsairModule, torch.nn.Softmax):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        # _output = super().forward(_output)
-        _output = Fs.softmax(input, self.dim)
+        _output = self._forward(input, dim=self.dim)
         output = self.output_cast(_output)
         return output
 
@@ -306,7 +310,7 @@ class Dropout(CorsairModule, torch.nn.Dropout):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        _output = super().forward(_output)
+        _output = self._forward(_output)
         output = self.output_cast(_output)
         return output
 
@@ -317,7 +321,7 @@ class ReLU(CorsairModule, torch.nn.ReLU):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        _output = super().forward(_output)
+        _output = self._forward(_output)
         output = self.output_cast(_output)
         return output
 
@@ -328,7 +332,7 @@ class ReLU6(CorsairModule, torch.nn.ReLU6):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        _output = super().forward(_output)
+        _output = self._forward(_output)
         output = self.output_cast(_output)
         return output
 
@@ -339,7 +343,7 @@ class Tanh(CorsairModule, torch.nn.Tanh):
 
     def forward(self, input: Tensor) -> Tensor:
         _output = self.input_cast(input)
-        _output = super().forward(_output)
+        _output = self._forward(_output)
         output = self.output_cast(_output)
         return output
 
