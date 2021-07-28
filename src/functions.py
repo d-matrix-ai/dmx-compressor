@@ -51,52 +51,49 @@ def poly2softmax(x, dim=-1):
     return y
 
 def base2softmax(x, dim=-1):
-    with torch.no_grad():
-        #This function computes Softmax using base2exp
-        #function for the exp(x)
-        eps=1.e-30  #small number to avoid dividing by zero 
-        #compute exp(x) for input vector x
-        #including integer vector k for re-normalization
-        ey,k = base2exp(x,dim=dim)
+    #This function computes Softmax using base2exp
+    #function for the exp(x)
+    eps=1.e-30  #small number to avoid dividing by zero 
+    #compute exp(x) for input vector x
+    #including integer vector k for re-normalization
+    ey,k = base2exp(x,dim=dim)
   
-        kmax,_ = torch.max(k,dim=dim,keepdim=True) #find max k along softmax dim.
-        # kmax,_ = torch.max(k,dim=-1) #find max k along softmax dim.
-        # kmax = torch.unsqueeze(kmax,dim=-1)
+    kmax,_ = torch.max(k,dim=dim,keepdim=True) #find max k along softmax dim.
+    # kmax,_ = torch.max(k,dim=-1) #find max k along softmax dim.
+    # kmax = torch.unsqueeze(kmax,dim=-1)
 
-        #compute sum with normalization for numerical stability
-        ey = ey*2**(k-kmax)
-        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+    #compute sum with normalization for numerical stability
+    ey = ey*2**(k-kmax)
+    sum_ey = torch.sum(ey, dim=dim, keepdim=True)
 
-        #compute softmax 
-        y=ey/(sum_ey+eps)
+    #compute softmax 
+    y=ey/(sum_ey+eps)
 
     return y
 
 def base2exp(x, dim=-1):
-    with torch.no_grad():
-        #This function computes exp(x) using a range reduction
-        #technique exp(x)=(2^k)*2^v, where k is an integer and 0<v<1
-        #2^v is approximated by a simple linear interpolation d+v.
-        #input x should be a vector shape (n,1)
+    #This function computes exp(x) using a range reduction
+    #technique exp(x)=(2^k)*2^v, where k is an integer and 0<v<1
+    #2^v is approximated by a simple linear interpolation d+v.
+    #input x should be a vector shape (n,1)
         
-        scale=14 #bits after binary fixed point
-        log2e_fp=1.4426950408889634; #log2(e) in floating point 
-        log2e=round(log2e_fp*2**scale)/2**scale #log2(e) 
-        d=0.957 #minmax solution for d over the input range 0<v<1
-        d=round(d*2**scale)/2**scale
+    scale=14 #bits after binary fixed point
+    log2e_fp=1.4426950408889634; #log2(e) in floating point 
+    log2e=round(log2e_fp*2**scale)/2**scale #log2(e) 
+    d=0.957 #minmax solution for d over the input range 0<v<1
+    d=round(d*2**scale)/2**scale
         
-        #range reduction to k and v
-        z=x*log2e
-        k=torch.floor(z)
-        v=z-k
-        v=torch.round(v*2**scale)/2**scale
+    #range reduction to k and v
+    z=x*log2e
+    k=torch.floor(z)
+    v=z-k
+    v=torch.round(v*2**scale)/2**scale
 
-        #compute exp(x)
-        two_pow_v = v + d
-        # import pdb
-        # pdb.set_trace()    
-        #ey=2**k*two_pow_v
-        ey = two_pow_v
+    #compute exp(x)
+    two_pow_v = v + d
+  
+    #ey=2**k*two_pow_v
+    ey = two_pow_v
     return ey,k
 
 def softmax(x, dim=-1):
