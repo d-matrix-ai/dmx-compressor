@@ -7,9 +7,11 @@ __ALL__ = [
 ]
 
 def poly2softmax(x, dim=-1):
-#This function computes Softmax using a range
-#reduction technique and second order polynomial approximatin
-#for exp(r), where r is in reduced range 
+    r"""
+    This function computes Softmax using a range
+    reduction technique and second order polynomial approximatin
+    for exp(r), where r is in reduced range 
+    """
     eps=1.e-30  #small number to avoid dividing by zero 
     ln2 = 0.69315  # log(2)
     invln2 = 1.4427  # 1 / log(2)
@@ -49,8 +51,10 @@ def poly2softmax(x, dim=-1):
     return y
 
 def base2softmax(x, dim=-1):
-    #This function computes Softmax using base2exp
-    #function for the exp(x)
+    r"""
+    This function computes Softmax using base2exp
+    function for the exp(x)
+    """
     eps=1.e-30  #small number to avoid dividing by zero 
     #compute exp(x) for input vector x
     #including integer vector k for re-normalization
@@ -70,10 +74,12 @@ def base2softmax(x, dim=-1):
     return y
 
 def base2exp(x, dim=-1):
-    #This function computes exp(x) using a range reduction
-    #technique exp(x)=(2^k)*2^v, where k is an integer and 0<v<1
-    #2^v is approximated by a simple linear interpolation d+v.
-    #input x should be a vector shape (n,1)
+    r"""
+    This function computes exp(x) using a range reduction
+    technique exp(x)=(2^k)*2^v, where k is an integer and 0<v<1
+    2^v is approximated by a simple linear interpolation d+v.
+    input x should be a vector shape (n,1)
+    """
         
     scale=14 #bits after binary fixed point
     log2e_fp=1.4426950408889634; #log2(e) in floating point 
