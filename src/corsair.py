@@ -80,7 +80,7 @@ class CorsairModule(
             ###
         # integer logic transformation
         if "approximation_function" in config:
-            self.approximation_function = config["approximation_function"]
+            self.approximator.function = config["approximation_function"]
 
 
 class Linear(CorsairModule, torch.nn.Linear):
