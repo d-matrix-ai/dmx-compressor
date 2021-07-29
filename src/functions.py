@@ -34,7 +34,7 @@ class ApproximationMixin:
         )
 
 
-def poly2softmax(x, dim=-1):
+def poly2softmax(x, dim=-1, **kwargs):
     r"""
     This function computes Softmax using a range
     reduction technique and second order polynomial approximatin
@@ -79,7 +79,7 @@ def poly2softmax(x, dim=-1):
     return y
 
 
-def base2softmax(x, dim=-1):
+def base2softmax(x, dim=-1, **kwargs):
     r"""
     This function computes Softmax using base2exp
     function for the exp(x)
@@ -130,34 +130,3 @@ def base2exp(x, dim=-1):
     # ey=2**k*two_pow_v
     ey = two_pow_v
     return ey, k
-
-
-# def softmax(x, dim=-1):
-#     _x = F.softmax(x, dim=dim)
-#     # print(_x)
-#     # _x.data = poly2softmax(x, dim=dim)
-#     _x.data = base2softmax(x, dim=dim)
-#     # print(_x)
-#     # import pdb
-#     # pdb.set_trace()
-#     return _x
-
-#     # range reduction to range -log(2)/2 < r < log(2)/2
-#     k = torch.round(x * invln2)
-#     r = x - k * ln2
-
-#     # compute exp(r) emulating fixed point arithmetic
-#     rint = torch.round(r * 2 ** scale)
-#     r2int = torch.round(rint * rint * 2 ** (-scale))
-#     mult_add1 = torch.round(c0int + torch.round(c1int * rint * 2 ** (-scale)))
-#     mult_add2 = torch.round(mult_add1 + 0.5 * r2int)
-#     y = mult_add2 * 2 ** (-scale)
-#     # shift by k bits for final result
-#     y *= 2 ** k
-
-#     # compute softmax (note will need to use 32 bits for sum in HW)
-#     sum_exp = torch.sum(y, dim=dim, keepdim=True)
-#     y /= sum_exp
-#     # y = torch.round(y * 256) / 256
-
-#     return y

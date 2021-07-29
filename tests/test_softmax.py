@@ -33,7 +33,7 @@ import corsair
     "dim",
     (
         -1,
-         1,
+        1,
     ),
 )
 @pytest.mark.parametrize(
