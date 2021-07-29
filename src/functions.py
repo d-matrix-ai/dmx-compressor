@@ -37,47 +37,50 @@ class ApproximationMixin:
 def poly2softmax(x, dim=-1, **kwargs):
     r"""
     This function computes Softmax using a range
-    reduction technique and second order polynomial approximatin
+    reduction technique and second order polynomial approximation
     for exp(r), where r is in reduced range
     """
     eps = 1.0e-30  # small number to avoid dividing by zero
+
+    #compute exp(r) and k, where exp(x)=2^k * exp(r)
+    ey,k = poly2exp(x,dim=dim)
+
+    kmax, _ = torch.max(k, dim=dim, keepdim=True)  # find max k along softmax dim.
+    # shift by k-kmax bits for final result
+    ey = ey * 2 ** (k - kmax)
+
+    # compute softmax (note will need to use 32 bits for sum in HW)
+    sum_exp = torch.sum(ey, dim=dim, keepdim=True)
+    y = ey/(sum_exp + eps)
+
+    return y
+
+def poly2exp(x, dim=-1):
+    r"""
+    This function computes exp(x) using a range reduction
+    technique x = r + k*log(2), where k is an integer and 
+    -log(2)/2 < r < +log(2)/2.  exp(x) = 2^k * exp(r),
+    where exp(r) is approximated by a second degree polynomial
+    """
     ln2 = 0.69315  # log(2)
     invln2 = 1.4427  # 1 / log(2)
-    scale = 14  # for exp() poly approximation assume 16bit integer arithmetic
-    # with 14 bit fractional part
-    c0int = 2 ** scale  # poly coefficient c0 = 1
-    c1int = round(1.0151 * 2 ** scale)  # poly coefficient c1
-    # note poly coefficient c2 is 0.5
-
-    # y = torch.zeros_like(x) # initialize output vector
+    scale = 14  # emulate bits after binary fixed point
+    c0int = 2**scale  # poly coefficient c0 = 1
+    c1int = round(1.0151 * 2**scale)  # poly coefficient c1
+    # note poly coefficient c2 is 0.5 
 
     # range reduction to range -log(2)/2 < r < log(2)/2
     k = torch.round(x * invln2)
     r = x - k * ln2
 
-    # compute exp(r) emulating fixed point arithmetic
-    rint = torch.round(r * 2 ** scale)
-    # r2int = torch.round(rint * rint * 2**(-scale))
-    # mult_add1 = torch.round(c0int + torch.round(c1int * rint * 2**(-scale)))
-    # mult_add2 = torch.round(mult_add1 + 0.5 * r2int)
-    mult_add1 = torch.round(c1int + 0.5 * rint)
-    mult_add2 = torch.round(c0int + torch.round(mult_add1 * rint * 2 ** (-scale)))
-
-    y = mult_add2 * 2 ** (-scale)
-
-    kmax, _ = torch.max(k, dim=dim, keepdim=True)  # find max k along softmax dim.
-    # shift by k-kmax bits for final result
-    # kmax,_ = torch.max(k,dim=-1)
-    # kmax = torch.unsqueeze(kmax,dim=-1)
-    y *= 2 ** (k - kmax)
-
-    # compute softmax (note will need to use 32 bits for sum in HW)
-    sum_exp = torch.sum(y, dim=dim, keepdim=True)
-    y /= sum_exp + eps
-    # y = torch.round(y * 256) / 256
-
-    return y
-
+    # compute exp(r) emulating fixed point arithmetic 
+    rint = torch.round(r * 2**scale)
+        
+    mult_add1 = torch.round(c1int + 0.5*rint)
+    mult_add2 = torch.round(c0int + torch.round(mult_add1*rint*2**(-scale)))
+    ey = mult_add2 * 2**(-scale) #convert back to decimal number
+    
+    return ey, k
 
 def base2softmax(x, dim=-1, **kwargs):
     r"""
@@ -90,8 +93,6 @@ def base2softmax(x, dim=-1, **kwargs):
     ey, k = base2exp(x, dim=dim)
 
     kmax, _ = torch.max(k, dim=dim, keepdim=True)  # find max k along softmax dim.
-    # kmax,_ = torch.max(k,dim=-1) #find max k along softmax dim.
-    # kmax = torch.unsqueeze(kmax,dim=-1)
 
     # compute sum with normalization for numerical stability
     ey = ey * 2 ** (k - kmax)
@@ -111,7 +112,7 @@ def base2exp(x, dim=-1):
     input x should be a vector shape (n,1)
     """
 
-    scale = 14  # bits after binary fixed point
+    scale = 14  # emulate bits after binary fixed point
     log2e_fp = 1.4426950408889634
     # log2(e) in floating point
     log2e = round(log2e_fp * 2 ** scale) / 2 ** scale  # log2(e)
@@ -127,6 +128,5 @@ def base2exp(x, dim=-1):
     # compute exp(x)
     two_pow_v = v + d
 
-    # ey=2**k*two_pow_v
     ey = two_pow_v
     return ey, k
