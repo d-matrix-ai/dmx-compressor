@@ -16,15 +16,15 @@ import corsair
     "shape",
     (
         (8,),
-        (32,),
         (128,),
         (384,),
+        (768,),
         (1024,),
         (2048,),
         (8, 8,),
-        (32, 32,),
         (128, 128,),
         (384, 384,),
+        (768, 768,),
         (1024, 1024,),
         (2048, 2048,),
     ),
@@ -47,7 +47,7 @@ def test_softmax(bsz, shape, dim, algo):
     shape = (bsz,) + shape
     sm1 = lambda x: F.softmax(x, dim=dim)
     sm2 = corsair.nn.Softmax(dim=dim)
-    sm2.approximation_function = algo
+    sm2.approximator.function = algo
     x1 = torch.randn(*shape).requires_grad_()
     x2 = x1.clone().detach().requires_grad_()
 
