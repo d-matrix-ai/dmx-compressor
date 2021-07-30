@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 __ALL__ = [
+    "Approximator",
     "ApproximationMixin",
 ]
 

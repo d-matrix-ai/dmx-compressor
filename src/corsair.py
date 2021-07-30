@@ -23,7 +23,10 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from functions import ApproximationMixin
+from functions import (
+    ApproximationMixin,
+    Approximator,
+)
 from utils import load_config_file
 
 __ALL__ = ["nn", "CorsairModule"]
