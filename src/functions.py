@@ -1,10 +1,32 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
 __ALL__ = [
+    "Approximator",
     "ApproximationMixin",
 ]
+
+
+class Approximator(nn.Module):
+    r"""
+    An approximation operator container
+    """
+
+    def __init__(self, function=None):
+        super().__init__()
+        self.function = function
+
+    def forward(self, input, *args, **kwargs):
+        return (
+            input
+            if self.function is None
+            else eval(self.function)(input, *args, **kwargs)
+        )
+
+    def extra_repr(self):
+        return f"function = {self.function}"
 
 
 class ApproximationMixin:
@@ -14,24 +36,17 @@ class ApproximationMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.approximation_function = None
+        self.approximator = Approximator()
         self.approximation_error = None
 
     def _forward(self, input, *args, **kwargs):
         _output = super().forward(input)
-        if self.approximation_function is not None:
+        if self.approximator.function is not None:
             with torch.no_grad():
-                _approx = eval(self.approximation_function)(input, *args, **kwargs)
+                _approx = self.approximator(input, *args, **kwargs)
                 self.approximation_error = _approx - _output.data
                 _output.data = _approx
         return _output
-
-    def extra_repr(self):
-        return (
-            None
-            if self.approximation_function is None
-            else f"approximation_function = {self.approximation_function}"
-        )
 
 
 # def poly2softmax(x, dim=-1, **kwargs):

@@ -23,7 +23,10 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from functions import ApproximationMixin
+from functions import (
+    ApproximationMixin,
+    Approximator,
+)
 from utils import load_config_file
 
 __ALL__ = ["nn", "CorsairModule"]
@@ -80,7 +83,7 @@ class CorsairModule(
             ###
         # integer logic transformation
         if "approximation_function" in config:
-            self.approximation_function = config["approximation_function"]
+            self.approximator.function = config["approximation_function"]
 
 
 class Linear(CorsairModule, torch.nn.Linear):

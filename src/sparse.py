@@ -238,7 +238,7 @@ class Sparsify(nn.Module):
                     x, self.score, self.sparseness, self.backward_mode
                 )
             else:
-                x *= self.mask
+                x = x * self.mask
         if self.dump_to is not None:
             pass
         return x
