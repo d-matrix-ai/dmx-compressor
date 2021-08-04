@@ -23,7 +23,7 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from functions import (
+from approximate import (
     ApproximationFunction,
     ApproximationMixin,
     NoApproximation,
