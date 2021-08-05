@@ -23,7 +23,7 @@ supported_sparseness_patterns:
 - &IMC_CONV_SPARSENESS_2_4      BTOPK{2:4,1}
 - &IMC_CONV_SPARSENESS_1_4      BTOPK{1:4,1}
 # list of Corsair supported integer approximation functions
-- &SIMD_SOFTMAX_ALGO            poly2softmax
+- &SIMD_SOFTMAX_ALGO            SOFTMAX(poly2,int)
 
 # layer configurations
 config_qkv: &config_qkv

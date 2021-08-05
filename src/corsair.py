@@ -23,8 +23,13 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from functions import (
+from approximate import (
+    ApproximationFunction,
     ApproximationMixin,
+    NoApproximation,
+    SoftmaxApproximation,
+    GELUApproximation,
+    LayerNormApproximation,
     Approximator,
 )
 from utils import load_config_file
@@ -65,25 +70,29 @@ class CorsairModule(
 
     def _transform(self, config):
         # numerics transformation
-        self.input_cast.format = Format.from_shorthand(config["input_format"])
-        self.output_cast.format = Format.from_shorthand(config["output_format"])
-        if self.accum_cast is not None:
+        if "input_format" in config:
+            self.input_cast.format = Format.from_shorthand(config["input_format"])
+        if "output_format" in config:
+            self.output_cast.format = Format.from_shorthand(config["output_format"])
+        if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.format = Format.from_shorthand(config["accum_format"])
-        if self.weight_cast is not None:
+        if self.weight_cast is not None and "weight_format" in config:
             self.weight_cast.format = Format.from_shorthand(config["weight_format"])
-        if self.bias_cast is not None:
+        if self.bias_cast is not None and "bias_format" in config:
             self.bias_cast.format = Format.from_shorthand(config["bias_format"])
         # sparsity transformation
-        if self.weight_sparsifier is not None:
+        if self.weight_sparsifier is not None and "weight_sparseness" in config:
             self.weight_sparsifier.sparseness = Sparseness.from_shorthand(
                 config["weight_sparseness"]
             )
             ### TODO: need to figure out a better way of handling score setting
             self.weight_sparsifier.set_score(torch.abs(self.weight))
             ###
-        # integer logic transformation
+        # custom logic transformation
         if "approximation_function" in config:
-            self.approximator.function = config["approximation_function"]
+            self.approximator.function = ApproximationFunction.from_shorthand(
+                config["approximation_function"]
+            )
 
 
 class Linear(CorsairModule, torch.nn.Linear):

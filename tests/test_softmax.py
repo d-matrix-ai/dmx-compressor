@@ -39,15 +39,30 @@ import corsair
 @pytest.mark.parametrize(
     "algo",
     (
-        "poly2softmax",
-        "base2softmax",
+        "poly2",
+        "base2",
     )
 )
-def test_softmax(bsz, shape, dim, algo):
+@pytest.mark.parametrize(
+    "nform",
+    (
+        "int", 
+        "float32", 
+        "float16", 
+        "bfloat16",
+    )
+)
+def test_softmax(bsz, shape, dim, algo, nform):
     shape = (bsz,) + shape
     sm1 = lambda x: F.softmax(x, dim=dim)
     sm2 = corsair.nn.Softmax(dim=dim)
-    sm2.approximator.function = algo
+    sm2._transform(
+        dict(
+            input_format="SAME",
+            output_format="SAME",
+            approximation_function=f"SOFTMAX({algo},{nform})"
+        )
+    )
     x1 = torch.randn(*shape).requires_grad_()
     x2 = x1.clone().detach().requires_grad_()
 
