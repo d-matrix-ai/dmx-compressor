@@ -5,54 +5,72 @@ package dmir;
 enum NumericalFormat {
   option allow_alias = true;
   UNDEFINED = 0;
-  FLOAT = 1;
   FLOAT32 = 1;
-  UINT8 = 2;
-  INT8 = 3;
-  UINT16 = 4;
-  INT16 = 5;
-  INT32 = 6;
-  INT64 = 7;
-  STRING = 8;
-  BOOL = 9;
-  FLOAT16 = 10;
-  DOUBLE = 11;
+  FLOAT = 1;
+  FLOAT64 = 2;
+  DOUBLE = 2;
+  FLOAT16 = 3;
+  HALF = 3;
+  BFLOAT16 = 4;
+  UINT8 = 5;
+  INT8 = 6;
+  INT16 = 7;
+  SHORT = 7;
+  INT32 = 8;
+  INT = 8;
+  INT64 = 9;
+  LONG = 9;
+  BOOL = 10;
+  UINT16 = 11;
   UINT32 = 12;
   UINT64 = 13;
-  COMPLEX64 = 14;
-  COMPLEX128 = 15;
-  BFLOAT16 = 16;
-  BFP16_64  = 17;
-  BFP12_128 = 18;
+  BFP16_64_FD = 14;
+  BFP12_128_FD = 15;
+  BFP16_64_LD = 16;
+  BFP12_128_LD = 17;
+}
+
+enum Module {
+  NONLEAF = 0; // default, non-leaf nodes, who has non-empty subgraphs, all the rest are leaf nodes
+  NOOP = 1; 
+  CAST = 2; // numerical cast
+  ADD = 3; // element-wise addition with implicit broadcast
+  MUL = 4; // element-wise multiplication with implicit broadcast
+  TRANSPOSE = 5; 
+  MATMUL = 6; // multi-dim matmul 
+  CONV2D = 7; 
+  ADAPTIVEAVGPOOL2D = 8; 
+  MAXPOOL2D = 9;
+  BATCHNORM2D = 10;
+  LAYERNORM = 11;
+  DROPOUT = 12;
+  SOFTMAX = 13;
+  RELU = 14;
+  RELU6 = 15;
+  TANH = 16;
 }
 
 message Tensor {
-  repeated uint32 shape = 1;
-  NumericalFormat format = 2; 
-}
-
-message Variable {
   string name = 1;
-  Tensor value = 2;
-}
-
-message Constant {
-  string name = 1;
-  Tensor value = 2;
+  repeated uint32 shape = 2;
+  NumericalFormat format = 3;
+  repeated float value = 4;
+  string device = 5; // place holder for HW model entities
 }
 
 message Graph {
   string name = 1;
-  repeated Variable vinputs = 2;
-  repeated Constant cinputs = 3;
-  repeated Variable outputs = 4;
-  repeated Graph subgraphs = 5;
-  repeated Dependency dependencies = 6;
+  Module instance = 2;
+  repeated Tensor input = 3;
+  repeated Tensor output = 4;
+  repeated Tensor intermediate = 5;
+  repeated Graph subgraph = 6;
+  repeated Dependency dependency = 7;
+  string device = 8;  // place holder for HW model entities
 }
 
 message Dependency {
-  Graph node = 1;
-  repeated Variable vinputs = 2;
-  repeated Constant cinputs = 3;
-  repeated Variable outputs = 4;
+  string operation = 1;
+  repeated string argument = 2;
+  repeated string result = 3;
 }
