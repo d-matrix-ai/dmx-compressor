@@ -109,10 +109,10 @@ def train(args, model, device, train_loader, optimizer, epoch):
     with pb_wrap(train_loader) as loader:
         loader.set_description(f"Epoch {epoch}")
         for batch_idx, (data, target) in enumerate(loader):
-            data, target = data.to(device), target.to(device)
+            data, target =  torch.flatten(data, start_dim=1, end_dim=-1).to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
-            loss = F.nll_loss(output, target)
+            loss = F.nll_loss(F.log_softmax(output, dim=1), target)
             loss.backward()
             optimizer.step()
             loader.set_postfix(
@@ -127,10 +127,10 @@ def test(model, device, test_loader):
         with pb_wrap(test_loader) as loader:
             loader.set_description(f"Evaluation")
             for data, target in loader:
-                data, target = data.to(device), target.to(device)
+                data, target = torch.flatten(data, start_dim=1, end_dim=-1).to(device), target.to(device)
                 output = model(data)
                 test_loss += F.nll_loss(
-                    output, target, reduction="sum"
+                    F.log_softmax(output, dim=1), target, reduction="sum"
                 ).item()  # sum up batch loss
                 pred = output.argmax(
                     dim=1, keepdim=True
