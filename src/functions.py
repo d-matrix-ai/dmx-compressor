@@ -15,12 +15,37 @@ def poly2softmax(x, dim=-1, nform="float16", **kwargs):
     ey, k = poly2exp(x, nform=nform, dim=dim)
     kmax, _ = torch.max(k, dim=dim, keepdim=True)
 
-    # compute sum with normalization for numerical stability
+    # normalization for numerical stability
     ey = ey * 2 ** (k - kmax)
-    sum_exp = torch.sum(ey, dim=dim, keepdim=True)
 
-    # compute softmax
-    y = ey / (sum_exp + eps)
+    # compute sum and softmax
+
+    if nform=='float16':
+        #compute sum in fl16
+        ey = ey.half()
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+
+        #compute softmax 
+        eps=torch.tensor(2**-24,dtype=torch.float16)
+        y=ey/(sum_ey + eps)
+        y=y.float()
+        
+    elif nform=='bfloat16':
+        #compute sum in bfl16
+        ey = ey.bfloat16()
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+
+        #compute softmax 
+        eps=torch.tensor(eps,dtype=torch.bfloat16)
+        y=ey/(sum_ey + eps)
+        y=y.float()
+        
+    else:
+        #compute sum in fl32
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+
+        #compute softmax 
+        y=ey/(sum_ey + eps) 
 
     return y
 
@@ -125,16 +150,43 @@ def base2softmax(x, dim=-1, nform="float16", **kwargs):
     eps = 1.0e-30  # small number to avoid dividing by zero
     # compute exp(x) for input vector x
     # including integer vector k for normalization
+
     ey, k = base2exp(x, nform=nform, dim=dim)
 
     kmax, _ = torch.max(k, dim=dim, keepdim=True)
 
-    # compute sum with normalization for numerical stability
+    # normalization for numerical stability
     ey = ey * 2 ** (k - kmax)
-    sum_ey = torch.sum(ey, dim=dim, keepdim=True)
 
-    # compute softmax
-    y = ey / (sum_ey + eps)
+    # compute sum and softmax
+
+    if nform=='float16':
+        #compute sum in fl16
+        ey = ey.half()
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+ 
+        #compute softmax 
+        eps=torch.tensor(2**-24,dtype=torch.float16)
+        y=ey/(sum_ey + eps)
+        y=y.float()
+        
+    elif nform=='bfloat16':
+        #compute sum in bfl16
+        ey = ey.bfloat16()
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+
+        #compute softmax 
+        eps=torch.tensor(eps,dtype=torch.bfloat16)
+        y=ey/(sum_ey + eps)
+        y=y.float()
+        
+    else:
+        #compute sum in fl32
+        sum_ey = torch.sum(ey, dim=dim, keepdim=True)
+
+        #compute softmax 
+        y=ey/(sum_ey + eps)  
+
     return y
 
 
