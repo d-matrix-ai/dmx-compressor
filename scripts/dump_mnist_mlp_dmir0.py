@@ -2,7 +2,7 @@ from os import name
 import utils.dmir_pb2 as dmir
 
 layer1 = dmir.Graph(
-    name="layer1",
+    name="input_layer",
     input=(
         dmir.Tensor(name="input", shape=(1, 784), format=dmir.FLOAT),
         dmir.Tensor(name="weight", shape=(512, 784), format=dmir.FLOAT),
@@ -35,7 +35,7 @@ layer1 = dmir.Graph(
 )
 
 layer2 = dmir.Graph(
-    name="layer2",
+    name="intermediate_layer.0",
     input=(
         dmir.Tensor(name="input", shape=(1, 512), format=dmir.FLOAT),
         dmir.Tensor(name="weight", shape=(512, 512), format=dmir.FLOAT),
@@ -68,7 +68,7 @@ layer2 = dmir.Graph(
 )
 
 layer3 = dmir.Graph(
-    name="layer3",
+    name="output_layer",
     input=(
         dmir.Tensor(name="input", shape=(1, 512), format=dmir.FLOAT),
         dmir.Tensor(name="weight", shape=(10, 512), format=dmir.FLOAT),
@@ -144,7 +144,7 @@ model = dmir.Graph(
             result=("v2",),
         ),
         dmir.Dependency(
-            operation=act_fn1.name,
+            operation=act_fn2.name,
             argument=("v2",),
             result=("v3",),
         ),
@@ -159,6 +159,5 @@ model = dmir.Graph(
 
 from google.protobuf.json_format import MessageToJson
 
-f = open("lenet-512-512.json", "w")
-f.write(MessageToJson(model))
-f.close()
+with open("lenet-512-512.dmir", "w") as f:
+    f.write(MessageToJson(model))
