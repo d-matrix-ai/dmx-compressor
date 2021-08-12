@@ -46,6 +46,7 @@ class CorsairModule(
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.dmir0 = None
 
     def transform(self, config="configs/corsair.yaml"):
         r"""
