@@ -1,5 +1,6 @@
 from os import name
 import utils.dmir_pb2 as dmir
+from google.protobuf.json_format import MessageToJson
 
 layer1 = dmir.Graph(
     name="input_layer",
@@ -156,8 +157,15 @@ model = dmir.Graph(
     ),
 )
 
+# dump binary
+with open("lenet-512-512.dmir", "wb") as f:
+    f.write(model.SerializeToString())
 
-from google.protobuf.json_format import MessageToJson
+# read from this binary
+_model = dmir.Graph()
+with open("lenet-512-512.dmir", "rb") as f:
+    _model.ParseFromString(f.read())
 
-with open("lenet-512-512.dmir", "w") as f:
-    f.write(MessageToJson(model))
+# dump json from loaded binary
+with open("lenet-512-512.json", "w") as f:
+    f.write(MessageToJson(_model))
