@@ -30,26 +30,6 @@ enum NumericalFormat {
   BFP12_128_LD = 17;
 }
 
-enum Module {
-  NONLEAF = 0; // default, non-leaf nodes, who has non-empty subgraphs, all the rest are leaf nodes
-  NOOP = 1; 
-  CAST = 2; // numerical cast
-  ADD = 3; // element-wise addition with implicit broadcast
-  MUL = 4; // element-wise multiplication with implicit broadcast
-  TRANSPOSE = 5; 
-  MATMUL = 6; // multi-dim matmul 
-  CONV2D = 7; 
-  ADAPTIVEAVGPOOL2D = 8; 
-  MAXPOOL2D = 9;
-  BATCHNORM2D = 10;
-  LAYERNORM = 11;
-  DROPOUT = 12;
-  SOFTMAX = 13;
-  RELU = 14;
-  RELU6 = 15;
-  TANH = 16;
-}
-
 message Tensor {
   string name = 1;
   repeated uint32 shape = 2;
@@ -60,7 +40,7 @@ message Tensor {
 
 message Graph {
   string name = 1;
-  Module instance = 2;
+  string op_type = 2;
   repeated Tensor input = 3;
   repeated Tensor output = 4;
   repeated Tensor intermediate = 5;

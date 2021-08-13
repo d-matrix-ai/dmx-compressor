@@ -1,4 +1,4 @@
-import utils.dmir_pb2 as dmir
+import dmir
 from google.protobuf.json_format import MessageToJson
 
 layer1 = dmir.Graph(
@@ -13,11 +13,11 @@ layer1 = dmir.Graph(
     subgraph=(
         dmir.Graph(
             name="matmul",
-            instance=dmir.MATMUL,
+            op_type=dmir.MATMUL,
         ),
         dmir.Graph(
             name="add",
-            instance=dmir.ADD,
+            op_type=dmir.ADD,
         ),
     ),
     dependency=(
@@ -46,11 +46,11 @@ layer2 = dmir.Graph(
     subgraph=(
         dmir.Graph(
             name="matmul",
-            instance=dmir.MATMUL,
+            op_type=dmir.MATMUL,
         ),
         dmir.Graph(
             name="add",
-            instance=dmir.ADD,
+            op_type=dmir.ADD,
         ),
     ),
     dependency=(
@@ -79,11 +79,11 @@ layer3 = dmir.Graph(
     subgraph=(
         dmir.Graph(
             name="matmul",
-            instance=dmir.MATMUL,
+            op_type=dmir.MATMUL,
         ),
         dmir.Graph(
             name="add",
-            instance=dmir.ADD,
+            op_type=dmir.ADD,
         ),
     ),
     dependency=(
@@ -102,12 +102,12 @@ layer3 = dmir.Graph(
 
 act_fn1 = dmir.Graph(
     name="act_fn1",
-    instance=dmir.RELU,
+    op_type=dmir.RELU,
 )
 
 act_fn2 = dmir.Graph(
     name="act_fn2",
-    instance=dmir.RELU,
+    op_type=dmir.RELU,
 )
 
 model = dmir.Graph(

@@ -6,4 +6,5 @@ from . import (
     corsair,
     data,
     models,
+    dmir,
 )
