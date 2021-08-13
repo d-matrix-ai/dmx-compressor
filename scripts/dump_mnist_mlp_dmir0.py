@@ -1,4 +1,3 @@
-from os import name
 import utils.dmir_pb2 as dmir
 from google.protobuf.json_format import MessageToJson
 
