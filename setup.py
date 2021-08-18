@@ -32,7 +32,7 @@ setup(
     packages=find_packages("src", exclude=("tests", "docs", "experiments", "sandbox")),
     package_dir={"": "src"},
     install_requires=(
-        "torch==1.7.1",
+        "torch>=1.9",
         "torchvision",
         "transformers @ git+ssh://git@git.d-matrix.ai/xin/transformers.git@dm-refactor",
         "datasets",

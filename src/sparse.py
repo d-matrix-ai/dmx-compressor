@@ -227,7 +227,7 @@ class Sparsify(nn.Module):
         self.mask = self.sparseness.get_mask(score_value)
 
     def forward(self, x):
-        assert x.shape == self.score.shape, "x and score have to be of the same shape"
+        # assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
                 ### TODO: need to figure out a better way of handling score setting

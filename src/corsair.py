@@ -95,7 +95,6 @@ class CorsairModule(
                 config["approximation_function"]
             )
 
-
 class Linear(CorsairModule, torch.nn.Linear):
     def __init__(
         self,
