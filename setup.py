@@ -12,6 +12,7 @@ setup(
     install_requires=(
         'torch==1.7.1',
         'torchvision',
+        'tensorboard',
         'transformers @ git+ssh://git@git.d-matrix.ai/xin/transformers.git@dm-refactor',
         'datasets',
         'numpy',
