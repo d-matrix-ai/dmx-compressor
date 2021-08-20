@@ -279,14 +279,14 @@ class BoundaryCastMixin:
         self.input_cast = CastTo()
         self.output_cast = CastTo()
         # dynamic intermediate casts
-        if (
-            type(self)
-            in (
+        if isinstance(
+            self,
+            (
                 nn.Linear,
                 nn.Bilinear,
                 nn.EmbeddingBag,
-            )
-            or isinstance(self, nn.modules.conv._ConvNd)
+                nn.modules.conv._ConvNd,
+            ),
         ):
             self.accum_cast = CastTo()
         else:
@@ -296,16 +296,9 @@ class BoundaryCastMixin:
         self.weight_cast = CastTo() if "weight" in pnames else None
         self.bias_cast = CastTo() if "bias" in pnames else None
 
-    @staticmethod
-    def apply(forward):
-        def wrapper(self, input, **kwargs):
-            return self.output_cast(
-                forward(
-                    self,
-                    self.input_cast(
-                        input
-                    ), 
-                    **kwargs
-                )
-            )
-        return wrapper
+    # @staticmethod
+    # def apply(forward):
+    #     def wrapper(self, input, **kwargs):
+    #         return self.output_cast(forward(self, self.input_cast(input), **kwargs))
+
+    #     return wrapper
