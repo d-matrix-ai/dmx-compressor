@@ -16,3 +16,4 @@ SOFTMAX             = "Softmax"
 RELU                = "Relu"
 RELU6               = "Relu6"
 TANH                = "Tanh"
+

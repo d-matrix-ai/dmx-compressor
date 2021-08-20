@@ -190,6 +190,7 @@ class Sparsifier(Function):
 
     @staticmethod
     def forward(ctx, x, score, sp, mode="STE"):
+        ctx.set_materialize_grads(False)
         ctx.mode = mode
         mask = sp.get_mask(score)
         ctx.save_for_backward(x, score, mask)

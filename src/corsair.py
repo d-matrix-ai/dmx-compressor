@@ -16,6 +16,7 @@ from numerical import (
 )
 from sparse import (
     Sparseness,
+    Sparsifier,
     WeightSparseMixin,
     Dense,
     TopK,
@@ -46,7 +47,7 @@ class CorsairModule(
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.dmir0 = None
+        self.dmir = None
 
     def transform(self, config="configs/corsair.yaml"):
         r"""
@@ -363,6 +364,9 @@ class Tanh(CorsairModule, torch.nn.Tanh):
 # overload torch.nn modules
 nn = torch.nn
 nn.Module = CorsairModule
+nn.CastTo = CastTo
+nn.Sparsify = Sparsify
+nn.Approximator = Approximator
 nn.Linear = Linear
 nn.Conv2d = Conv2d
 nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d

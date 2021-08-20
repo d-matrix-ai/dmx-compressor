@@ -1,3 +1,4 @@
+from os import XATTR_SIZE_MAX
 from typing import Any
 from parse import parse
 import torch
@@ -234,6 +235,7 @@ class CastToFormat(Function):
 
     @staticmethod
     def forward(ctx, x, fmt):
+        ctx.set_materialize_grads(False)
         return fmt.cast(x)
 
     @staticmethod
