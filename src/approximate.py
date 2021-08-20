@@ -182,7 +182,7 @@ class ApproximationMixin:
         self.approximator = Approximator()
         self.approximation_error = None
 
-    def _forward(self, input, *args, **kwargs):
+    def approx_forward(self, input, *args, **kwargs):
         _output = super().forward(input)
         if not isinstance(self.approximator.function, NoApproximation):
             with torch.no_grad():

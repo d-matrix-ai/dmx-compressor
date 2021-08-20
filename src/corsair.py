@@ -96,6 +96,13 @@ class CorsairModule(
                 config["approximation_function"]
             )
 
+    def forward(self, input: Tensor, *args, **kwargs) -> Tensor:
+        _input = self.input_cast(input)
+        _output = self._forward(_input, *args, **kwargs)
+        output = self.output_cast(_output)
+        return output
+
+
 class Linear(CorsairModule, torch.nn.Linear):
     def __init__(
         self,
@@ -105,8 +112,7 @@ class Linear(CorsairModule, torch.nn.Linear):
     ) -> None:
         super().__init__(in_features, out_features, bias=bias)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
@@ -134,8 +140,7 @@ class Linear(CorsairModule, torch.nn.Linear):
             _output = torch.add(_product, _bias)
         else:
             _output = _product
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class Conv2d(CorsairModule, torch.nn.Conv2d):
@@ -163,8 +168,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             padding_mode=padding_mode,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
@@ -192,19 +196,16 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
         else:
             _output = _convolution
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
     def __init__(self, output_size) -> None:
         super().__init__(output_size)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
-        _output = self._forward(_input)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
@@ -226,22 +227,18 @@ class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
             ceil_mode=ceil_mode,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
-        _output = self._forward(_input)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class Softmax(CorsairModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(input, dim=self.dim)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input, dim=self.dim)
+        return _output
 
 
 class LayerNorm(CorsairModule, torch.nn.LayerNorm):
@@ -255,13 +252,11 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
             normalized_shape, eps=eps, elementwise_affine=elementwise_affine
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.weight)
         _bias = self.bias_cast(self.bias)
         _output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
@@ -281,8 +276,7 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
             track_running_stats=track_running_stats,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.weight)
         _bias = self.bias_cast(self.bias)
         self._check_input_dim(_input)
@@ -313,57 +307,48 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
             exponential_average_factor,
             self.eps,
         )
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class Dropout(CorsairModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class ReLU(CorsairModule, torch.nn.ReLU):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class ReLU6(CorsairModule, torch.nn.ReLU6):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class Tanh(CorsairModule, torch.nn.Tanh):
     def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 # overload torch.nn modules
 nn = torch.nn
-nn.Module = CorsairModule
+# nn.Module = CorsairModule
 nn.CastTo = CastTo
 nn.Sparsify = Sparsify
 nn.Approximator = Approximator

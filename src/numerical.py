@@ -296,6 +296,16 @@ class BoundaryCastMixin:
         self.weight_cast = CastTo() if "weight" in pnames else None
         self.bias_cast = CastTo() if "bias" in pnames else None
 
-
-if __name__ == "__main__":
-    pass
+    @staticmethod
+    def apply(forward):
+        def wrapper(self, input, **kwargs):
+            return self.output_cast(
+                forward(
+                    self,
+                    self.input_cast(
+                        input
+                    ), 
+                    **kwargs
+                )
+            )
+        return wrapper
