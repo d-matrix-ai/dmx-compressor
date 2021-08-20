@@ -38,6 +38,44 @@ message Tensor {
   string device = 5; // place holder for HW model entities
 }
 
+message Attribute {
+  enum AttributeKind {
+    UNDEFINED = 0;
+    FLOAT = 1;
+    INT = 2;
+    STRING = 3;
+    TENSOR = 4;
+    GRAPH = 5;
+    FLOATS = 6;
+    INTS = 7;
+    STRINGS = 8;
+    TENSORS = 9;
+    GRAPHS = 10;
+  }
+  AttributeKind kind = 1;
+  string name = 2;
+  float float_value = 3;
+  int64 integer_value = 4;
+  string string_value = 5;
+  string tensor_name = 6;
+  string graph_name = 7;
+  repeated float float_values = 8;
+  repeated int64 integer_values = 9;
+  repeated string string_values = 10;
+  repeated string tensor_names = 11;
+  repeated string graph_names = 12;
+}
+
+message Dependency {
+  string operation = 1;
+  repeated string argument = 2;
+  repeated string result = 3;
+  repeated Attribute attribute = 4;
+}
+
+// The file will contain only one top level graph to represent
+// the model. All subgraphs will be nested within the top
+// level graph.
 message Graph {
   string name = 1;
   string op_type = 2;
@@ -47,10 +85,4 @@ message Graph {
   repeated Graph subgraph = 6;
   repeated Dependency dependency = 7;
   string device = 8;  // place holder for HW model entities
-}
-
-message Dependency {
-  string operation = 1;
-  repeated string argument = 2;
-  repeated string result = 3;
 }
