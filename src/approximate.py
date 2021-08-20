@@ -11,7 +11,7 @@ __ALL__ = [
     "SoftmaxApproximation",
     "GELUApproximation",
     "LayerNormApproximation",
-    "Approximator",
+    "Approximate",
 ]
 
 
@@ -154,7 +154,7 @@ class GELUApproximation(ApproximationFunction):
         return f"GELU"
 
 
-class Approximator(nn.Module):
+class Approximate(nn.Module):
     r"""
     An approximation operator container
     """
@@ -179,7 +179,7 @@ class ApproximationMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.approximator = Approximator()
+        self.approximator = Approximate()
         self.approximation_error = None
 
     def approx_forward(self, input, *args, **kwargs):

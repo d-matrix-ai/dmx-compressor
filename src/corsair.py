@@ -31,7 +31,7 @@ from approximate import (
     SoftmaxApproximation,
     GELUApproximation,
     LayerNormApproximation,
-    Approximator,
+    Approximate,
 )
 from utils import load_config_file
 
@@ -351,7 +351,7 @@ nn = torch.nn
 # nn.Module = CorsairModule
 nn.CastTo = CastTo
 nn.Sparsify = Sparsify
-nn.Approximator = Approximator
+nn.Approximate = Approximate
 nn.Linear = Linear
 nn.Conv2d = Conv2d
 nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
