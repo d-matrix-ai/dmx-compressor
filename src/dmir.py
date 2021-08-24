@@ -18,7 +18,7 @@ from typing import (
 )
 import torch
 import torch.fx as fx
-import numerical, sparse
+import numerical, sparse, approximate
 
 
 FORMAT_DICT = {
@@ -203,8 +203,37 @@ def _legal_format(torch_format):
 
 
 def _nn_module_meta(m: torch.nn.Module) -> str:
-    # TODO: add metadata of modules that is necessary and useful
+    # TODO: add metadata of modules that is necessary and useful for transformations
     return str(m)
+
+
+def _corsair_specific_attributes(m: torch.nn.Module):
+    attr = []
+    if hasattr(m, "format"):
+        attr.append(
+            Attribute(
+                kind=Attribute.STRING,
+                name="numerical_format",
+                string_value=repr(m.format),
+            )
+        )
+    if hasattr(m, "sparseness"):
+        attr.append(
+            Attribute(
+                kind=Attribute.STRING,
+                name="sparseness_pattern",
+                string_value=repr(m.sparseness),
+            )
+        )
+    if hasattr(m, "approximator"):
+        attr.append(
+            Attribute(
+                kind=Attribute.STRING,
+                name="approximation_function",
+                string_value=repr(m.approximator.function),
+            )
+        )
+    return attr
 
 
 def dump(
@@ -262,15 +291,16 @@ def dump(
                     format=_legal_format(node.meta["tensor_meta"].dtype),
                 )
             )
-            dependency.append(
-                Dependency(
-                    operation=node.name,
-                    argument=(_make_var_name(n.__str__()) for n in node.args),
-                    result=(_make_var_name(node.name),),
-                )
-            )
             if node.op == "call_module":
                 _m = eval(_torch_qualified_name(f"m.{node.target}"))
+                dependency.append(
+                    Dependency(
+                        operation=node.name,
+                        argument=(_make_var_name(n.__str__()) for n in node.args),
+                        result=(_make_var_name(node.name),),
+                        attribute=_corsair_specific_attributes(_m),
+                    )
+                )
                 if isinstance(_m, numerical.CastTo):
                     subgraph.append(
                         Graph(
@@ -287,20 +317,28 @@ def dump(
                                 Tensor(
                                     name="dense",
                                     shape=node.args[0].meta["tensor_meta"].shape,
-                                    format=_legal_format(node.args[0].meta["tensor_meta"].dtype),
+                                    format=_legal_format(
+                                        node.args[0].meta["tensor_meta"].dtype
+                                    ),  # this is a dynamic input
                                 ),
                                 Tensor(
                                     name="mask",
                                     shape=node.meta["tensor_meta"].shape,
-                                    format=_legal_format(node.meta["tensor_meta"].dtype),
-                                    value=[] if omit_value else _m.mask.data.view(-1).numpy().tolist(),
-                                ),
+                                    format=_legal_format(
+                                        node.meta["tensor_meta"].dtype
+                                    ),
+                                    value=[]
+                                    if omit_value
+                                    else _m.mask.data.view(-1).numpy().tolist(),
+                                ),  # this is a static input
                             ),
                             output=(
                                 Tensor(
                                     name="sparse",
                                     shape=node.meta["tensor_meta"].shape,
-                                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                                    format=_legal_format(
+                                        node.meta["tensor_meta"].dtype
+                                    ),
                                 ),
                             ),
                             subgraph=(
@@ -321,7 +359,6 @@ def dump(
                             metadata=_nn_module_meta(_m),
                         )
                     )
-
                 else:  # custom modules
                     subgraph.append(
                         dump(
@@ -340,6 +377,13 @@ def dump(
                         )
                     )
             else:  # built-in function or tensor method
+                dependency.append(
+                    Dependency(
+                        operation=node.name,
+                        argument=(_make_var_name(n.__str__()) for n in node.args),
+                        result=(_make_var_name(node.name),),
+                    )
+                )
                 subgraph.append(
                     Graph(
                         name=node.name,
@@ -419,11 +463,7 @@ if __name__ == "__main__":
 
     model = nn.Sequential(
         nn.CastTo(format="BFP[4|8]{64,-1}(N)"),
-        LeNet(
-            [
-                512, 512
-            ]
-        ),
+        LeNet([512, 512]),
     )
 
     g = dump(
