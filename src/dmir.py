@@ -192,7 +192,7 @@ def _make_var_name(name: str) -> str:
 
 
 def _legal_op_type(opname: str) -> str:
-    # TODO: map built-in functions to ONNX ops
+    # TODO: map built-in functions to ONNX style ops
     return opname
 
 
@@ -287,6 +287,7 @@ def dump(
                             metadata=_nn_module_meta(_m),
                         )
                     )
+                    breakpoint()
                     # TODO: add elem-wise mul here
                 else:  # custom modules
                     subgraph.append(
