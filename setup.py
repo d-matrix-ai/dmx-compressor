@@ -34,7 +34,7 @@ setup(
     install_requires=(
         "torch>=1.9",
         "torchvision",
-        "transformers @ git+ssh://git@git.d-matrix.ai/xin/transformers.git@dm-refactor",
+        "transformers @ git+ssh://git@git.d-matrix.ai/ml-team/transformers.git@dm-refactor",
         "datasets",
         "numpy",
         "scipy",
