@@ -115,6 +115,9 @@ Dockerfile
 # editor
 .vscode
 
+# generated code
+./src/utils/dmir_pb2.py
+
 # experiment
 sandbox/
 model_dir/

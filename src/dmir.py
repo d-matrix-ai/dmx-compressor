@@ -39,7 +39,7 @@ import numerical, sparse
 
 class DMIRTracer(fx.Tracer):
     r"""
-    This is a DMIR-0 tracer that takes a PyTorch module and generates python code that constructs DMIR-0 of it.
+    This is a DMIR-0 tracer that takes a PyTorch module and generates DMIR-0 of it.
     """
 
     def __init__(self, flat: bool = False) -> None:
@@ -86,7 +86,19 @@ def _torch_qualified_name(name: str) -> str:
 
 
 def _make_var_name(name: str) -> str:
+    assert not name.isnumeric(), "numerical args not support as of now"
+    # TODO: treat numerical constant args as input
     return (name + "_").replace(".", "__")
+
+
+def _legal_op_type(opname: str) -> str:
+    # TODO: map built-in functions to ONNX ops
+    return opname
+
+
+def _nn_module_meta(m: torch.nn.Module) -> str:
+    # TODO: add metadata of modules that is necessary and useful
+    return str(m)
 
 
 def dump(
@@ -94,10 +106,9 @@ def dump(
     name: str = "model",
     flat: bool = False,
     omit_value: bool = False,
+    metadata: str = "",
 ) -> Graph:
-    # TODO: treat numerical constant args as input
-    # TODO: add attributes of modules
-    # TODO: map built-in functions to ONNX ops
+    # TODO: shape tracing
 
     tracer = DMIRTracer(flat=flat)
     traced = tracer.trace(m)
@@ -109,14 +120,14 @@ def dump(
     dependency = []
 
     for node in traced.nodes:
-        if node.op == "placeholder":
+        if node.op == "placeholder":  # dynamic inputs
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
                     format=FLOAT,
                 )
             )
-        elif node.op == "get_attr":
+        elif node.op == "get_attr":  # static inputs
             _p = eval(_torch_qualified_name(f"m.{node.target}"))
             input.append(
                 Tensor(
@@ -126,14 +137,14 @@ def dump(
                     value=[] if omit_value else _p.data.view(-1).numpy().tolist(),
                 )
             )
-        elif node.op == "output":
+        elif node.op == "output":  # output
             output.append(
                 Tensor(
                     name=_make_var_name(node.name),
                     format=FLOAT,
                 )
             )
-        elif node.op in ("call_function", "call_method", "call_module"):
+        elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
             intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
@@ -153,26 +164,35 @@ def dump(
                     subgraph.append(
                         Graph(
                             name=node.name,
-                            op_type="cast_to",
+                            op_type=_legal_op_type("cast_to"),
+                            metadata=_nn_module_meta(_m),
                         )
                     )
                 elif isinstance(_m, sparse.Sparsify):
                     subgraph.append(
                         Graph(
                             name=node.name,
-                            op_type="sparsify",
+                            op_type=_legal_op_type("sparsify"),
+                            metadata=_nn_module_meta(_m),
                         )
                     )
-                    # add elem-wise mul here
-                else:
+                    # TODO: add elem-wise mul here
+                else:  # custom modules
                     subgraph.append(
-                        dump(_m, name=node.name, flat=flat, omit_value=omit_value)
+                        dump(
+                            _m,
+                            name=node.name,
+                            flat=flat,
+                            omit_value=omit_value,
+                            metadata=_nn_module_meta(_m),
+                        )
                     )
             else:  # built-in function or tensor method
                 subgraph.append(
                     Graph(
                         name=node.name,
-                        op_type=traced._target_to_str(node.target),
+                        op_type=_legal_op_type(traced._target_to_str(node.target)),
+                        metadata=_nn_module_meta(_m),
                     )
                 )
         else:
@@ -185,6 +205,7 @@ def dump(
         intermediate=intermediate,
         dependency=dependency,
         subgraph=subgraph,
+        metadata=metadata,
     )
 
 

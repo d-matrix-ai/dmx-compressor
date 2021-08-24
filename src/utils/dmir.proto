@@ -85,4 +85,5 @@ message Graph {
   repeated Graph subgraph = 6;
   repeated Dependency dependency = 7;
   string device = 8;  // place holder for HW model entities
+  string metadata = 15; // reserved for meta data passed down the stack
 }
