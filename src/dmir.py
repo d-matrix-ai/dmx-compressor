@@ -241,7 +241,7 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    shape=_p.shape,
+                    shape=node.meta["tensor_meta"].shape,
                     format=_legal_format(node.meta["tensor_meta"].dtype),
                     value=[] if omit_value else _p.data.view(-1).numpy().tolist(),
                 )
@@ -386,6 +386,6 @@ if __name__ == "__main__":
     )
 
     g = dump(
-        model, torch.randn(1, 784), name="lenet-512-512", flat=True, omit_value=True
+        model, torch.randn(1, 784), name="lenet-512-512", flat=False, omit_value=True
     )
     breakpoint()
