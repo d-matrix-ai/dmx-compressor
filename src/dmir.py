@@ -21,6 +21,122 @@ import torch.fx as fx
 import numerical, sparse
 
 
+FORMAT_DICT = {
+    torch.float32: FLOAT32,
+    torch.float: FLOAT,
+    torch.float64: FLOAT64,
+    torch.double: DOUBLE,
+    torch.float16: FLOAT16,
+    torch.half: HALF,
+    torch.bfloat16: BFLOAT16,
+    torch.uint8: UINT8,
+    torch.int8: INT8,
+    torch.int16: INT16,
+    torch.short: SHORT,
+    torch.int32: INT32,
+    torch.int: INT,
+    torch.int64: INT64,
+    torch.long: LONG,
+    torch.bool: BOOL,
+}
+
+
+class TensorMetadata(NamedTuple):
+    r"""
+    TensorMetadata is a structure containing pertinent information
+    about a tensor within a PyTorch program.
+    Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
+    """
+    shape: torch.Size
+    dtype: torch.dtype
+    requires_grad: bool
+    stride: Tuple[int]
+    memory_format: Optional[torch.memory_format]
+
+    # Quantization metadata
+    is_quantized: bool
+    qscheme: Optional[torch.qscheme]
+    q_scale: Optional[float]
+    q_zero_point: Optional[int]
+
+
+def extract_tensor_metadata(result: torch.Tensor) -> TensorMetadata:
+    r"""
+    Extract a TensorMetadata NamedTuple describing `result`.
+    Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
+    """
+    shape = result.shape
+    dtype = result.dtype
+    requires_grad = result.requires_grad
+    stride = result.stride()
+
+    memory_formats = {
+        torch.contiguous_format,
+        torch.channels_last,
+        torch.channels_last_3d,
+    }
+
+    memory_format = None
+
+    for query_format in memory_formats:
+        if result.is_contiguous(memory_format=query_format):
+            memory_format = query_format
+            break
+
+    is_quantized = result.is_quantized
+    qscheme = None
+    q_scale = None
+    q_zero_point = None
+
+    if is_quantized:
+        qscheme = result.qscheme()
+
+        if qscheme in {torch.per_tensor_affine, torch.per_tensor_symmetric}:
+            q_scale = result.q_scale()
+            q_zero_point = result.q_zero_point()
+
+    return TensorMetadata(
+        shape,
+        dtype,
+        requires_grad,
+        stride,
+        memory_format,
+        is_quantized,
+        qscheme,
+        q_scale,
+        q_zero_point,
+    )
+
+
+class ShapeProp(fx.Interpreter):
+    r"""
+    Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
+    """
+
+    def run_node(self, n: fx.node.Node) -> Any:
+        result = super().run_node(n)
+
+        found_tensor = False
+
+        def extract_tensor_meta(obj):
+            if isinstance(obj, torch.Tensor):
+                nonlocal found_tensor
+                found_tensor = True
+                return extract_tensor_metadata(obj)
+            else:
+                return obj
+
+        meta = fx.node.map_aggregate(result, extract_tensor_meta)
+        if found_tensor:
+            n.meta["tensor_meta"] = meta
+
+        n.meta["type"] = type(result)
+        return result
+
+    def propagate(self, *args):
+        return super().run(*args)
+
+
 class DMIRTracer(fx.Tracer):
     r"""
     This is a DMIR-0 tracer that takes a PyTorch module and generates DMIR-0 of it.
@@ -80,6 +196,12 @@ def _legal_op_type(opname: str) -> str:
     return opname
 
 
+def _legal_format(torch_format):
+    return (
+        FORMAT_DICT[torch_format] if torch_format in FORMAT_DICT.keys() else UNDEFINED
+    )
+
+
 def _nn_module_meta(m: torch.nn.Module) -> str:
     # TODO: add metadata of modules that is necessary and useful
     return str(m)
@@ -87,15 +209,17 @@ def _nn_module_meta(m: torch.nn.Module) -> str:
 
 def dump(
     m: torch.nn.Module,
+    *sample_input: torch.Tensor,
     name: str = "model",
     flat: bool = False,
     omit_value: bool = False,
     metadata: str = "",
 ) -> Graph:
-    # TODO: shape tracing
 
     tracer = DMIRTracer(flat=flat)
-    traced = tracer.trace(m)
+    gm = fx.GraphModule(root=m, graph=tracer.trace(m))
+    ShapeProp(gm).propagate(*sample_input)
+    traced = gm.graph
 
     input = []
     output = []
@@ -108,7 +232,8 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    format=FLOAT,
+                    shape=node.meta["tensor_meta"].shape,
+                    format=_legal_format(node.meta["tensor_meta"].dtype),
                 )
             )
         elif node.op == "get_attr":  # static inputs
@@ -117,7 +242,7 @@ def dump(
                 Tensor(
                     name=_make_var_name(node.name),
                     shape=_p.shape,
-                    format=FLOAT,
+                    format=_legal_format(node.meta["tensor_meta"].dtype),
                     value=[] if omit_value else _p.data.view(-1).numpy().tolist(),
                 )
             )
@@ -125,19 +250,21 @@ def dump(
             output.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    format=FLOAT,
+                    shape=node.meta["tensor_meta"].shape,
+                    format=_legal_format(node.meta["tensor_meta"].dtype),
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
             intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    format=FLOAT,
+                    shape=node.meta["tensor_meta"].shape,
+                    format=_legal_format(node.meta["tensor_meta"].dtype),
                 )
             )
             dependency.append(
                 Dependency(
-                    operation=traced._target_to_str(node.target),
+                    operation=node.name,
                     argument=(_make_var_name(n.__str__()) for n in node.args),
                     result=(_make_var_name(node.name),),
                 )
@@ -165,6 +292,10 @@ def dump(
                     subgraph.append(
                         dump(
                             _m,
+                            *[torch.randn(
+                                arg.meta["tensor_meta"].shape,
+                                dtype=arg.meta["tensor_meta"].dtype,
+                            ) for arg in node.args],
                             name=node.name,
                             flat=flat,
                             omit_value=omit_value,
@@ -193,7 +324,7 @@ def dump(
     )
 
 
-def save_dmir_to_file(model: Graph, filename: str, format="binary") -> None:
+def save_to_file(model: Graph, filename: str, format="binary") -> None:
     if format == "binary":
         with open(filename, "wb") as f:
             f.write(model.SerializeToString())
@@ -210,23 +341,51 @@ if __name__ == "__main__":
 
     import corsair
 
-    # class MyModule(torch.nn.Module):
-    #     def __init__(self):
-    #         super().__init__()
-    #         self.param = torch.nn.Parameter(torch.rand(3, 4))
-    #         self.linear = torch.nn.Linear(4, 5)
+    # # class MyModule(torch.nn.Module):
+    # #     def __init__(self):
+    # #         super().__init__()
+    # #         self.param = torch.nn.Parameter(torch.rand(3, 4))
+    # #         self.linear = torch.nn.Linear(4, 5)
+
+    # #     def forward(self, x):
+    # #         return torch.topk(
+    # #             torch.sum(self.linear(x + self.linear.weight).relu(), dim=-1), 3
+    # #         )
+
+    # model = nn.Sequential(
+    #     # nn.CastTo(format="SAME"),
+    #     nn.CastTo(format="BFP[4|8]{64,-1}(N)"),
+    #     LeNet([512, 512]),
+    # )
+    # # model = MyModule()
+
+    # g = dump(model, name="lenet-512-512", flat=False, omit_value=True)
+    # breakpoint()
+
+    # class TwoLayerNet(torch.nn.Module):
+    #     def __init__(self, D_in, H, D_out):
+    #         super(TwoLayerNet, self).__init__()
+    #         self.linear1 = torch.nn.Linear(D_in, H)
+    #         self.linear2 = torch.nn.Linear(H, D_out)
 
     #     def forward(self, x):
-    #         return torch.topk(
-    #             torch.sum(self.linear(x + self.linear.weight).relu(), dim=-1), 3
-    #         )
+    #         h_relu = self.linear1(x).clamp(min=0)
+    #         y_pred = self.linear2(h_relu)
+    #         return y_pred
+
+    # N, D_in, H, D_out = 64, 1000, 100, 10
+    # x = torch.randn(N, D_in)
+    # model = TwoLayerNet(D_in, H, D_out)
+    # gm = torch.fx.symbolic_trace(model)
+    # sample_input = torch.randn(50, D_in)
+    # ShapeProp(gm).propagate(sample_input)
 
     model = nn.Sequential(
-        # nn.CastTo(format="SAME"),
         nn.CastTo(format="BFP[4|8]{64,-1}(N)"),
-        LeNet([512, 512]),
+        LeNet([512,]),
     )
-    # model = MyModule()
 
-    g = dump(model, name="lenet-512-512", flat=False, omit_value=True)
+    g = dump(
+        model, torch.randn(1, 784), name="lenet-512-512", flat=True, omit_value=True
+    )
     breakpoint()
