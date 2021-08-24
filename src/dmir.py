@@ -283,20 +283,56 @@ def dump(
                     subgraph.append(
                         Graph(
                             name=node.name,
-                            op_type=_legal_op_type("sparsify"),
+                            input=(
+                                Tensor(
+                                    name="dense",
+                                    shape=node.args[0].meta["tensor_meta"].shape,
+                                    format=_legal_format(node.args[0].meta["tensor_meta"].dtype),
+                                ),
+                                Tensor(
+                                    name="mask",
+                                    shape=node.meta["tensor_meta"].shape,
+                                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                                    value=[] if omit_value else _m.mask.data.view(-1).numpy().tolist(),
+                                ),
+                            ),
+                            output=(
+                                Tensor(
+                                    name="sparse",
+                                    shape=node.meta["tensor_meta"].shape,
+                                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                                ),
+                            ),
+                            subgraph=(
+                                Graph(
+                                    name="mul",
+                                    op_type=_legal_op_type(
+                                        traced._target_to_str(torch.mul)
+                                    ),
+                                ),
+                            ),
+                            dependency=(
+                                Dependency(
+                                    operation="mul",
+                                    argument=("dense", "mask"),
+                                    result=("sparse",),
+                                ),
+                            ),
                             metadata=_nn_module_meta(_m),
                         )
                     )
-                    breakpoint()
-                    # TODO: add elem-wise mul here
+
                 else:  # custom modules
                     subgraph.append(
                         dump(
                             _m,
-                            *[torch.randn(
-                                arg.meta["tensor_meta"].shape,
-                                dtype=arg.meta["tensor_meta"].dtype,
-                            ) for arg in node.args],
+                            *[
+                                torch.randn(
+                                    arg.meta["tensor_meta"].shape,
+                                    dtype=arg.meta["tensor_meta"].dtype,
+                                )
+                                for arg in node.args
+                            ],
                             name=node.name,
                             flat=flat,
                             omit_value=omit_value,
@@ -383,7 +419,11 @@ if __name__ == "__main__":
 
     model = nn.Sequential(
         nn.CastTo(format="BFP[4|8]{64,-1}(N)"),
-        LeNet([512,]),
+        LeNet(
+            [
+                512, 512
+            ]
+        ),
     )
 
     g = dump(
