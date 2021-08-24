@@ -2,6 +2,7 @@ from os import name
 from parse import parse
 from torch.fx import graph
 from utils.dmir_pb2 import *
+from google.protobuf.json_format import MessageToJson
 from types import CodeType, FunctionType, ModuleType
 from typing import (
     Any,
@@ -18,23 +19,6 @@ from typing import (
 import torch
 import torch.fx as fx
 import numerical, sparse
-
-# # identifier strings of operators, compatible with ONNX naming
-# CASTTO = "CastTo"
-# ADD = "Add"
-# MUL = "Mul"
-# TRANSPOSE = "Transpose"
-# MATMUL = "MatMul"
-# CONV2D = "Conv"
-# AVGPOOL2D = "AveragePool"
-# MAXPOOL2D = "MaxPool"
-# BATCHNORM2D = "BatchNormalization"
-# LAYERNORM = "LayerNormalization"
-# DROPOUT = "Dropout"
-# SOFTMAX = "Softmax"
-# RELU = "Relu"
-# RELU6 = "Relu6"
-# TANH = "Tanh"
 
 
 class DMIRTracer(fx.Tracer):
@@ -87,7 +71,7 @@ def _torch_qualified_name(name: str) -> str:
 
 def _make_var_name(name: str) -> str:
     assert not name.isnumeric(), "numerical args not support as of now"
-    # TODO: treat numerical constant args as input
+    # TODO: treat numerical constant args as an input node
     return (name + "_").replace(".", "__")
 
 
@@ -207,6 +191,17 @@ def dump(
         subgraph=subgraph,
         metadata=metadata,
     )
+
+
+def save_dmir_to_file(model: Graph, filename: str, format="binary") -> None:
+    if format == "binary":
+        with open(filename, "wb") as f:
+            f.write(model.SerializeToString())
+    elif format == "json":
+        with open(filename, "w") as f:
+            f.write(MessageToJson(model))
+    else:
+        raise RuntimeError(f"unsupported DMIR file format: {format}")
 
 
 if __name__ == "__main__":
