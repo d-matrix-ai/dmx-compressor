@@ -1,7 +1,3 @@
-from os import name
-from parse import parse
-from torch._C import qscheme
-from torch.fx import graph
 from utils.dmir_pb2 import *
 from google.protobuf.json_format import MessageToJson
 from types import CodeType, FunctionType, ModuleType
