@@ -184,9 +184,14 @@ def _torch_qualified_name(name: str) -> str:
 
 
 def _make_var_name(name: str) -> str:
-    assert not name.isnumeric(), "numerical args not support as of now"
     # TODO: treat numerical constant args as an input node
-    return (name + "_").replace(".", "__")
+    if name.isnumeric():
+        return name
+    try:
+        _ = float(name)
+        return name
+    except ValueError:
+        return (name + "_").replace(".", "__")
 
 
 def _legal_op_type(opname: str) -> str:
@@ -235,6 +240,9 @@ def _corsair_specific_attributes(m: torch.nn.Module):
 
 
 def _tensor_meta_dict(meta):
+    if isinstance(meta, list):
+        assert len(meta)==1
+        meta = meta[0]
     return dict(
         shape=meta.shape,
         format=_legal_format(meta.dtype),
@@ -278,7 +286,7 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    value=[] if omit_value else _p.data.view(-1).numpy().tolist(),
+                    value=[] if omit_value else _p.data.contiguous().view(-1).numpy().tolist(),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
@@ -329,7 +337,7 @@ def dump(
                                     name="mask",
                                     value=[]
                                     if omit_value
-                                    else _m.mask.data.view(-1).numpy().tolist(),
+                                    else _m.mask.data.contiguous().view(-1).numpy().tolist(),
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             ),
@@ -337,7 +345,6 @@ def dump(
                                 Tensor(
                                     name="sparse",
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
-                                    ),
                                 ),
                             ),
                             subgraph=(
@@ -387,7 +394,6 @@ def dump(
                     Graph(
                         name=node.name,
                         op_type=_legal_op_type(traced._target_to_str(node.target)),
-                        metadata=_nn_module_meta(_m),
                     )
                 )
         else:
