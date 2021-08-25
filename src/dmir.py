@@ -336,9 +336,7 @@ def dump(
                             output=(
                                 Tensor(
                                     name="sparse",
-                                    shape=node.meta["tensor_meta"].shape,
-                                    format=_legal_format(
-                                        node.meta["tensor_meta"].dtype
+                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                                     ),
                                 ),
                             ),
