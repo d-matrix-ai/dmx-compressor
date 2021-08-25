@@ -117,6 +117,8 @@ Dockerfile
 
 # generated code
 dmir_pb2.py
+*.dmir
+*.dmir.json
 
 # experiment
 sandbox/
