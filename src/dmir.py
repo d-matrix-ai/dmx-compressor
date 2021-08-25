@@ -241,7 +241,7 @@ def _corsair_specific_attributes(m: torch.nn.Module):
 
 def _tensor_meta_dict(meta):
     if isinstance(meta, list):
-        assert len(meta)==1
+        assert len(meta) == 1
         meta = meta[0]
     return dict(
         shape=meta.shape,
@@ -286,7 +286,9 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    value=[] if omit_value else _p.data.contiguous().view(-1).numpy().tolist(),
+                    value=[]
+                    if omit_value
+                    else _p.data.contiguous().view(-1).numpy().tolist(),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
@@ -337,7 +339,10 @@ def dump(
                                     name="mask",
                                     value=[]
                                     if omit_value
-                                    else _m.mask.data.contiguous().view(-1).numpy().tolist(),
+                                    else _m.mask.data.contiguous()
+                                    .view(-1)
+                                    .numpy()
+                                    .tolist(),
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             ),
