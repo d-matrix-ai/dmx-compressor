@@ -20,6 +20,7 @@ import torch
 import torch.fx as fx
 import numerical, sparse, approximate
 
+__ALL__ = ["dump", "save_to_file"]
 
 FORMAT_DICT = {
     torch.float32: FLOAT32,
@@ -414,4 +415,3 @@ def save_to_file(model: Graph, filename: str, format="binary") -> None:
             f.write(MessageToJson(model))
     else:
         raise RuntimeError(f"unsupported DMIR file format: {format}")
-
