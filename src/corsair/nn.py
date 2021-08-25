@@ -127,12 +127,12 @@ class Linear(CorsairModule, torch.nn.Linear):
             _inputs = torch.split(_input, B, dim=-1)
             _weights = torch.split(_weight, B, dim=-1)
             _products = (
-                self.accum_cast(F.linear(_i, _w, None))
+                self.accum_cast(torch.matmul(_i, _w))
                 for _i, _w in zip(_inputs, _weights)
             )
             _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
         else:
-            _product = self.accum_cast(F.linear(_input, _weight, None))
+            _product = self.accum_cast(torch.matmul(_input, _weight))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_product, _bias)
@@ -342,4 +342,3 @@ class Tanh(CorsairModule, torch.nn.Tanh):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
-
