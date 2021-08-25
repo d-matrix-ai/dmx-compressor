@@ -35,7 +35,11 @@ message Tensor {
   repeated uint32 shape = 2;
   NumericalFormat format = 3;
   repeated float value = 4;
-  string device = 5; // place holder for HW model entities
+  bool is_quantized = 5;
+  string qscheme = 6;
+  float q_scale = 7;
+  int32 q_zero_point = 8;
+  string device = 9; // place holder for HW model entities
 }
 
 message Attribute {

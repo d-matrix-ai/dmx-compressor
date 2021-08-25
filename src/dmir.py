@@ -1,5 +1,6 @@
 from os import name
 from parse import parse
+from torch._C import qscheme
 from torch.fx import graph
 from utils.dmir_pb2 import *
 from google.protobuf.json_format import MessageToJson
@@ -237,6 +238,17 @@ def _corsair_specific_attributes(m: torch.nn.Module):
     return attr
 
 
+def _tensor_meta_dict(meta):
+    return dict(
+        shape=meta.shape,
+        format=_legal_format(meta.dtype),
+        is_quantized=meta.is_quantized,
+        qscheme=str(meta.is_quantized) if meta.is_quantized else "",
+        q_scale=meta.q_scale,
+        q_zero_point=meta.q_zero_point,
+    )
+
+
 def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
@@ -262,8 +274,7 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    shape=node.meta["tensor_meta"].shape,
-                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
         elif node.op == "get_attr":  # static inputs
@@ -271,25 +282,22 @@ def dump(
             input.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    shape=node.meta["tensor_meta"].shape,
-                    format=_legal_format(node.meta["tensor_meta"].dtype),
                     value=[] if omit_value else _p.data.view(-1).numpy().tolist(),
+                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
         elif node.op == "output":  # output
             output.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    shape=node.meta["tensor_meta"].shape,
-                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
             intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    shape=node.meta["tensor_meta"].shape,
-                    format=_legal_format(node.meta["tensor_meta"].dtype),
+                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
             if node.op == "call_module":
@@ -317,20 +325,16 @@ def dump(
                             input=(
                                 Tensor(
                                     name="dense",
-                                    shape=node.args[0].meta["tensor_meta"].shape,
-                                    format=_legal_format(
-                                        node.args[0].meta["tensor_meta"].dtype
-                                    ),  # this is a dynamic input
-                                ),
+                                    **_tensor_meta_dict(
+                                        node.args[0].meta["tensor_meta"]
+                                    ),
+                                ),  # this is a dynamic input
                                 Tensor(
                                     name="mask",
-                                    shape=node.meta["tensor_meta"].shape,
-                                    format=_legal_format(
-                                        node.meta["tensor_meta"].dtype
-                                    ),
                                     value=[]
                                     if omit_value
                                     else _m.mask.data.view(-1).numpy().tolist(),
+                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             ),
                             output=(
