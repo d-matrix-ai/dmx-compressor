@@ -7,9 +7,6 @@ from subprocess import check_call
 VERSION = "0.0.2.dev"
 
 DMIR_PROTO_DIR = os.path.join(os.getcwd(), "src/mltools/utils/")
-print("*****************************************************")
-print(DMIR_PROTO_DIR)
-print("*****************************************************")
 DMIR_PROTO_FILE = "dmir.proto"
 
 class PostDevelopCommand(develop):
@@ -17,6 +14,7 @@ class PostDevelopCommand(develop):
     def run(self):
         develop.run(self)
         # if os.path.exists(os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)):
+        print(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
         os.system(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
 
 class PostInstallCommand(install):
@@ -24,6 +22,7 @@ class PostInstallCommand(install):
     def run(self):
         install.run(self)
         # if os.path.exists(os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)):
+        print(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
         os.system(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
 
 setup(
