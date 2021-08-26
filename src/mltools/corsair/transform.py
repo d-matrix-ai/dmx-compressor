@@ -1,7 +1,7 @@
 import sys
 import torch
 from .nn import *
-from utils import load_config_file
+from mltools.utils import load_config_file
 
 
 class Model(torch.nn.Module):

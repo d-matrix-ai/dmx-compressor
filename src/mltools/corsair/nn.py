@@ -5,7 +5,7 @@ import sys
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
-from numerical import (
+from mltools.numerical import (
     Format,
     NumericalCastMixin,
     Same,
@@ -14,7 +14,7 @@ from numerical import (
     BlockFloatingPoint,
     CastTo,
 )
-from sparse import (
+from mltools.sparse import (
     Sparseness,
     Sparsifier,
     WeightSparseMixin,
@@ -24,7 +24,7 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from approximate import (
+from mltools.approximate import (
     ApproximationFunction,
     ApproximationMixin,
     NoApproximation,

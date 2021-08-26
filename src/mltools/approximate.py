@@ -2,7 +2,7 @@ from parse import parse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import functions
+from mltools import functions
 
 __ALL__ = [
     "ApproximationFunction",

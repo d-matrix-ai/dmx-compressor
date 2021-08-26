@@ -1,4 +1,4 @@
-from utils.dmir_pb2 import *
+from mltools.utils.dmir_pb2 import *
 from google.protobuf.json_format import MessageToJson
 from types import CodeType, FunctionType, ModuleType
 from typing import (
@@ -15,7 +15,7 @@ from typing import (
 )
 import torch
 import torch.fx as fx
-import numerical, sparse, approximate
+from mltools import numerical, sparse, approximate
 
 __ALL__ = ["dump", "save_to_file"]
 

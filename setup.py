@@ -5,7 +5,7 @@ from setuptools.command.install import install
 from subprocess import check_call
 
 
-DMIR_PROTO_DIR = "./src/utils/"
+DMIR_PROTO_DIR = "./src/mltools/utils/"
 DMIR_PROTO_FILE = "dmir.proto"
 
 class PostDevelopCommand(develop):
@@ -40,6 +40,7 @@ setup(
         "scipy",
         "sklearn",
         "qtorch>=0.3",
+        "tensorboard",
         "pyyaml",
         "tqdm",
         "parse",
