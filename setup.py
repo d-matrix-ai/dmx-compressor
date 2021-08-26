@@ -23,7 +23,7 @@ class PostInstallCommand(install):
             os.system(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
 
 setup(
-    name="compression",
+    name="ml-tools",
     version="0.0.2.dev",
     description="d-MATRiX ML tools",
     author="Xin Wang",
