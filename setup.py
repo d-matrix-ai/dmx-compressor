@@ -24,8 +24,8 @@ class PostInstallCommand(install):
 
 setup(
     name="compression",
-    version="0.0.1.dev",
-    description="d-MATRiX neural net compression",
+    version="0.0.2.dev",
+    description="d-MATRiX ML tools",
     author="Xin Wang",
     author_email="xwang@d-matrix.ai",
     license="MIT",
