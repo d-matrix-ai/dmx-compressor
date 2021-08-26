@@ -9,7 +9,7 @@ from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 __ALL__ = [
     "Format",
-    "BoundaryCastMixin",
+    "NumericalCastMixin",
     "Same",
     "FixedPoint",
     "FloatingPoint",
@@ -264,7 +264,7 @@ class CastTo(nn.Module):
         return f"format = {self.format.__repr__()}"
 
 
-class BoundaryCastMixin:
+class NumericalCastMixin:
     r"""
     Mixin for modules with boundary casting
     """

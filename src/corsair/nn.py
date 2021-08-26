@@ -7,7 +7,7 @@ from torch import Tensor, Size
 import torch.nn.functional as F
 from numerical import (
     Format,
-    BoundaryCastMixin,
+    NumericalCastMixin,
     Same,
     FixedPoint,
     FloatingPoint,
@@ -36,7 +36,7 @@ from approximate import (
 
 
 class CorsairModule(
-    ApproximationMixin, BoundaryCastMixin, WeightSparseMixin, torch.nn.Module
+    ApproximationMixin, NumericalCastMixin, WeightSparseMixin, torch.nn.Module
 ):
     r"""
     Reimplemented torch.nn modules for Corsair
