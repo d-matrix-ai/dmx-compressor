@@ -179,7 +179,7 @@ class ApproximationMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.approximator = Approximate()
+        self.approximator = Approximate() # if isinstance(self, CorsairModule) else None
         self.approximation_error = None
 
     def approx_forward(self, input, *args, **kwargs):

@@ -1,4 +1,3 @@
-from os import XATTR_SIZE_MAX
 from typing import Any
 from parse import parse
 import torch
@@ -276,8 +275,8 @@ class BoundaryCastMixin:
 
     def init_casts(self):
         # dynamic i/o casts
-        self.input_cast = CastTo()
-        self.output_cast = CastTo()
+        self.input_cast = CastTo() # if isinstance(self, CorsairModule) else None
+        self.output_cast = CastTo() # if isinstance(self, CorsairModule) else None
         # dynamic intermediate casts
         if isinstance(
             self,
@@ -295,10 +294,3 @@ class BoundaryCastMixin:
         pnames = [n for n, _ in self.named_parameters()]
         self.weight_cast = CastTo() if "weight" in pnames else None
         self.bias_cast = CastTo() if "bias" in pnames else None
-
-    # @staticmethod
-    # def apply(forward):
-    #     def wrapper(self, input, **kwargs):
-    #         return self.output_cast(forward(self, self.input_cast(input), **kwargs))
-
-    #     return wrapper

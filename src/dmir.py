@@ -210,7 +210,7 @@ def _nn_module_meta(m: torch.nn.Module) -> str:
     return str(m)
 
 
-def _corsair_specific_attributes(m: torch.nn.Module):
+def _corsair_specific_attributes(m: torch.nn.Module) -> List[Attribute]:
     attr = []
     if hasattr(m, "format"):
         attr.append(

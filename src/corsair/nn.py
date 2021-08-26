@@ -33,35 +33,17 @@ from approximate import (
     LayerNormApproximation,
     Approximate,
 )
-from utils import load_config_file
 
 
 class CorsairModule(
     ApproximationMixin, BoundaryCastMixin, WeightSparseMixin, torch.nn.Module
 ):
     r"""
-    Container equipped with corsair transform, extending torch.nn.Module
+    Reimplemented torch.nn modules for Corsair
     """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.dmir = None
-
-    def transform(self, config="configs/corsair.yaml"):
-        r"""
-        Model conversion for Corsair numerics/sparsity simulation/optimization
-        """
-        if isinstance(config, str):
-            config = load_config_file(config)
-
-        for n, m in self.named_modules():
-            for r in config["transformation_rules"]:
-                if (
-                    isinstance(m, getattr(sys.modules[__name__], r["instance"]))
-                    and all([_n in n for _n in r["name_includes"]])
-                    and all([not _n in n for _n in r["name_excludes"]])
-                ):
-                    m._transform(r["config"])
 
     def load_state_dict(
         self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False

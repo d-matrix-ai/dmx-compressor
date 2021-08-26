@@ -2,6 +2,7 @@ import torch
 from numerical import CastTo
 from sparse import Sparsify
 from approximate import Approximate
+from .transform import Model
 from .nn import *
 
 
