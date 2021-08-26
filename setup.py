@@ -30,7 +30,7 @@ setup(
     author_email="xwang@d-matrix.ai",
     license="MIT",
     packages=find_packages("src", exclude=("tests", "docs", "experiments", "sandbox")),
-    package_dir={"mltools": "src"},
+    package_dir={"": "src"},
     install_requires=(
         "torch>=1.9",
         "torchvision",
