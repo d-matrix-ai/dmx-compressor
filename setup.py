@@ -4,6 +4,7 @@ from setuptools.command.develop import develop
 from setuptools.command.install import install
 from subprocess import check_call
 
+VERSION = "0.0.2.dev"
 
 DMIR_PROTO_DIR = "./src/mltools/utils/"
 DMIR_PROTO_FILE = "dmir.proto"
@@ -24,7 +25,7 @@ class PostInstallCommand(install):
 
 setup(
     name="mltools",
-    version="0.0.2.dev",
+    version=VERSION,
     description="d-MATRiX ML tools",
     author="Xin Wang",
     author_email="xwang@d-matrix.ai",
