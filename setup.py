@@ -30,7 +30,6 @@ class InstallWrapper(install):
             )
         install.run(self)
 
-
 setup(
     name="mltools",
     version=VERSION,
