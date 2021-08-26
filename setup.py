@@ -7,6 +7,9 @@ from subprocess import check_call
 VERSION = "0.0.2.dev"
 
 DMIR_PROTO_DIR = os.path.join(os.getcwd(), "src/mltools/utils/")
+print("*****************************************************")
+print(DMIR_PROTO_DIR)
+print("*****************************************************")
 DMIR_PROTO_FILE = "dmir.proto"
 
 class PostDevelopCommand(develop):
