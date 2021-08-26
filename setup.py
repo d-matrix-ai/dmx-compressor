@@ -8,9 +8,6 @@ VERSION = "0.0.2.dev"
 
 DMIR_PROTO_DIR = os.path.join(os.path.dirname(__file__), "src/mltools/utils/")
 DMIR_PROTO_FILE = "dmir.proto"
-os.system(
-    f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}"
-)
 
 class DevelopWrapper(develop):
     """Pre-installation for development mode."""
