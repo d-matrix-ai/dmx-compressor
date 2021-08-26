@@ -9,19 +9,12 @@ VERSION = "0.0.2.dev"
 DMIR_PROTO_DIR = os.path.join(os.getcwd(), "src/mltools/utils/")
 DMIR_PROTO_FILE = "dmir.proto"
 
-class PreDevelopCommand(develop):
-    """Pre-installation for development mode."""
-    def run(self):
-        if os.path.exists(os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)):
-            os.system(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
-        develop.run(self)
-
-class PreInstallCommand(install):
+class PreCommand(_setup):
     """Pre-installation for installation mode."""
     def run(self):
         if os.path.exists(os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)):
             os.system(f"protoc -I={DMIR_PROTO_DIR} --python_out={DMIR_PROTO_DIR} {os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)}")
-        install.run(self)
+        _setup.run(self)
 
 setup(
     name="mltools",
@@ -51,7 +44,7 @@ setup(
     ),
     python_requires=">=3.6",
     cmdclass={
-        "develop": PreDevelopCommand,
-        "install": PreInstallCommand,
+        "develop": PreCommand,
+        "install": PreCommand,
     },
 )
