@@ -116,7 +116,6 @@ Dockerfile
 .vscode
 
 # generated code
-dmir_pb2.py
 *.dmir
 *.dmir.json
 
