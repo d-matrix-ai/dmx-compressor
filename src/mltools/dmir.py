@@ -258,6 +258,66 @@ def _tensor_meta_dict(meta):
     )
 
 
+def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="dense"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+            Tensor(
+                name=_make_var_name(node.name, suffix="mask"),
+                value=[]
+                if omit_value
+                else m.mask.data.contiguous().view(-1).numpy().tolist(),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),  # this is a static input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="sparse"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        subgraph=(
+            Graph(
+                name=f"{node.name}_mul",
+                op_type=_legal_op_type(node.graph._target_to_str(torch.mul)),
+            ),
+            Graph(
+                name=f"{node.name}_in",
+                op_type=_legal_op_type(node.graph._target_to_str(torch.nn.Identity)),
+            ),
+            Graph(
+                name=f"{node.name}_out",
+                op_type=_legal_op_type(node.graph._target_to_str(torch.nn.Identity)),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"{node.name}_mul",
+                argument=(
+                    _make_var_name(node.name, suffix="dense"),
+                    _make_var_name(node.name, suffix="mask"),
+                ),
+                result=(_make_var_name(node.name, suffix="sparse"),),
+            ),
+            Dependency(
+                operation=f"{node.name}_in",
+                argument=(f"::{input_names[0]}",),
+                result=(_make_var_name(node.name, suffix="dense"),),
+            ),
+            Dependency(
+                operation=f"{node.name}_out",
+                argument=(_make_var_name(node.name, suffix="sparse"),),
+                result=(f"::{output_names[0]}",),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
 def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
@@ -369,80 +429,44 @@ def dump(
                         )
                     )
                 elif isinstance(_m, sparse.Sparsify):
-                    subgraph.append(
-                        Graph(
-                            name=node.name,
-                            input=(
-                                Tensor(
-                                    name=_make_var_name(node.name, suffix="dense"),
-                                    **_tensor_meta_dict(
-                                        node.args[0].meta["tensor_meta"]
-                                    ),
-                                ),  # this is a dynamic input
-                                Tensor(
-                                    name=_make_var_name(node.name, suffix="mask"),
-                                    value=[]
-                                    if omit_value
-                                    else _m.mask.data.contiguous()
-                                    .view(-1)
-                                    .numpy()
-                                    .tolist(),
-                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
-                                ),  # this is a static input
-                            ),
-                            output=(
-                                Tensor(
-                                    name=_make_var_name(node.name, suffix="sparse"),
-                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
-                                ),
-                            ),
-                            subgraph=(
-                                Graph(
-                                    name=f"{node.name}_mul",
-                                    op_type=_legal_op_type(
-                                        traced._target_to_str(torch.mul)
-                                    ),
-                                ),
-                                Graph(
-                                    name=f"{node.name}_in",
-                                    op_type=_legal_op_type(
-                                        traced._target_to_str(torch.nn.Identity)
-                                    ),
-                                ),
-                                Graph(
-                                    name=f"{node.name}_out",
-                                    op_type=_legal_op_type(
-                                        traced._target_to_str(torch.nn.Identity)
-                                    ),
-                                ),
-                            ),
-                            dependency=(
-                                Dependency(
-                                    operation=f"{node.name}_mul",
-                                    argument=(
-                                        _make_var_name(node.name, suffix="dense"),
-                                        _make_var_name(node.name, suffix="mask"),
-                                    ),
-                                    result=(
-                                        _make_var_name(node.name, suffix="sparse"),
-                                    ),
-                                ),
-                                Dependency(
-                                    operation=f"{node.name}_in",
-                                    argument=(f"::{_input_names[0]}",),
-                                    result=(_make_var_name(node.name, suffix="dense"),),
-                                ),
-                                Dependency(
-                                    operation=f"{node.name}_out",
-                                    argument=(
-                                        _make_var_name(node.name, suffix="sparse"),
-                                    ),
-                                    result=(f"::{_output_names[0]}",),
-                                ),
-                            ),
-                            metadata=_nn_module_meta(_m),
+                    if flat:
+                        input.append(
+                            Tensor(
+                                name=_make_var_name(node.name, suffix="mask"),
+                                value=[]
+                                if omit_value
+                                else m.mask.data.contiguous().view(-1).numpy().tolist(),
+                                **_tensor_meta_dict(node.meta["tensor_meta"]),
+                            ),  # this is a static input
                         )
-                    )
+                        subgraph.append(
+                            Graph(
+                                name=f"{node.name}_mul",
+                                op_type=_legal_op_type(
+                                    traced._target_to_str(torch.mul)
+                                ),
+                            )
+                        )
+                        dependency.append(
+                            Dependency(
+                                operation=f"{node.name}_mul",
+                                argument=(
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="mask"),
+                                ),
+                                result=(_output_names[0],),
+                            ),
+                        )
+                    else:
+                        subgraph.append(
+                            _sparsifier_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
                 else:  # custom modules
                     subgraph.append(
                         dump(

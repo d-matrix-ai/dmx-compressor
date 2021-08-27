@@ -50,11 +50,11 @@ class Model(torch.nn.Module):
     def transform(self, config="configs/corsair.yaml"):
         r"""
         Transform with Corsair-specific numerics/sparsity/logics
-        NOTE: only staticly declared torch.nn.Module(s) are to be transformed
+        NOTE: only staticly declared CorsairModule(s) are to be transformed
         """
         if isinstance(config, str):
             config = load_config_file(config)
-
+            
         for n, m in self.body.named_modules():
             if isinstance(m, CorsairModule):
                 for r in config["transformation_rules"]:
