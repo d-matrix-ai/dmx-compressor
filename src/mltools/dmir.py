@@ -183,7 +183,7 @@ def _torch_qualified_name(name: str) -> str:
     return name.replace(".[", "[")
 
 
-def _make_var_name(name: str, prefix: str ="") -> str:
+def _make_var_name(name: str, prefix: str = "") -> str:
     # TODO: treat numerical constant args as an input node
     if name.isnumeric():
         return name
@@ -191,7 +191,7 @@ def _make_var_name(name: str, prefix: str ="") -> str:
         _ = float(name)
         return name
     except ValueError:
-        name = name if prefix=="" else f"{prefix}.{name}"
+        name = name if prefix == "" else f"{prefix}.{name}"
         return f"{name}_".replace(".", "__")
 
 
@@ -258,6 +258,8 @@ def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
     name: str = "",
+    input_names: Union[List[str], None] = None,
+    output_names: Union[List[str], None] = None,
     flat: bool = False,
     omit_value: bool = False,
     metadata: str = "",
@@ -282,6 +284,21 @@ def dump(
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
+            if input_names is not None:
+                _in = f"<<{input_names.pop(0)}"
+                subgraph.append(
+                    Graph(
+                        name=node.name,
+                        op_type=_legal_op_type(traced._target_to_str(torch.nn.Identity)),
+                    )
+                )
+                dependency.append(
+                    Dependency(
+                        operation=node.name,
+                        argument=(_in,),
+                        result=(_make_var_name(node.name),),
+                    )
+                )
         elif node.op == "get_attr":  # static inputs
             _p = eval(_torch_qualified_name(f"m.{node.target}"))
             input.append(
@@ -311,7 +328,7 @@ def dump(
                 Dependency(
                     operation=node.name,
                     argument=(_make_var_name(node.args[0].name),),
-                    result=(_make_var_name(node.name),),
+                    result=(_make_var_name(node.name) if output_names is None else f"<<{output_names.pop(0)}",),
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
@@ -323,11 +340,13 @@ def dump(
             )
             if node.op == "call_module":
                 _m = eval(_torch_qualified_name(f"m.{node.target}"))
+                _input_names = [_make_var_name(n.__str__()) for n in node.args]
+                _output_names = [_make_var_name(node.name)]
                 dependency.append(
                     Dependency(
                         operation=node.name,
-                        argument=(_make_var_name(n.__str__()) for n in node.args),
-                        result=(_make_var_name(node.name),),
+                        argument=_input_names,
+                        result=_output_names,
                         attribute=_corsair_specific_attributes(_m),
                     )
                 )
@@ -397,6 +416,8 @@ def dump(
                                 for arg in node.args
                             ],
                             name=node.name,
+                            input_names=_input_names,
+                            output_names=_output_names,
                             flat=flat,
                             omit_value=omit_value,
                             metadata=_nn_module_meta(_m),
