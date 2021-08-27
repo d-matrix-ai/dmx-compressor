@@ -40,9 +40,12 @@ class Model(torch.nn.Module):
         self.head = head
         self.tail = tail
 
-    def forward(self, input):
+    def forward(self, input, dmir_executor=None):
         # NOTE: only a single input is allowed
-        return self.tail(self.body(self.head(input)))
+        output = self.head(input)
+        output = self.body(output) if dmir_executor is None else dmir_executor(output)
+        output = self.tail(output)
+        return output
 
     def transform(self, config="configs/corsair.yaml"):
         r"""
@@ -62,9 +65,9 @@ class Model(torch.nn.Module):
                     ):
                         m._transform(r["config"])
 
-    def dmir_graph(self, input, **kwargs):
+    def dmir_graph(self, sample_input, **kwargs):
         return dmir.dump(
             self.body,
-            self.head(input),
+            self.head(sample_input),
             **kwargs,
         )
