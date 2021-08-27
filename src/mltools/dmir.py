@@ -191,8 +191,10 @@ def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
         _ = float(name)
         return name
     except ValueError:
-        if prefix != "": prefix = prefix + "_"
-        if suffix != "": suffix = "_" + suffix
+        if prefix != "":
+            prefix = prefix + "_"
+        if suffix != "":
+            suffix = "_" + suffix
         name = f"{prefix}{name}{suffix}"
         return f"{name}_".replace(".", "__")
 
@@ -417,8 +419,13 @@ def dump(
                             dependency=(
                                 Dependency(
                                     operation=f"{node.name}_mul",
-                                    argument=(_make_var_name(node.name, suffix="dense"), _make_var_name(node.name, suffix="mask")),
-                                    result=(_make_var_name(node.name, suffix="sparse"),),
+                                    argument=(
+                                        _make_var_name(node.name, suffix="dense"),
+                                        _make_var_name(node.name, suffix="mask"),
+                                    ),
+                                    result=(
+                                        _make_var_name(node.name, suffix="sparse"),
+                                    ),
                                 ),
                                 Dependency(
                                     operation=f"{node.name}_in",
@@ -427,7 +434,9 @@ def dump(
                                 ),
                                 Dependency(
                                     operation=f"{node.name}_out",
-                                    argument=(_make_var_name(node.name, suffix="sparse"),),
+                                    argument=(
+                                        _make_var_name(node.name, suffix="sparse"),
+                                    ),
                                     result=(f"::{_output_names[0]}",),
                                 ),
                             ),
