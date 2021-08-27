@@ -1,6 +1,7 @@
 import sys
 import torch
 from .nn import *
+from mltools import dmir
 from mltools.utils import load_config_file
 
 
@@ -20,9 +21,9 @@ class Model(torch.nn.Module):
         self.head = head
         self.tail = tail
 
-    def forward(self, x):
+    def forward(self, input):
         # NOTE: only a single input is allowed
-        return self.tail(self.body(self.head(x)))
+        return self.tail(self.body(self.head(input)))
 
     def transform(self, config="configs/corsair.yaml"):
         r"""
@@ -35,8 +36,15 @@ class Model(torch.nn.Module):
             if isinstance(m, CorsairModule):
                 for r in config["transformation_rules"]:
                     if (
-                        isinstance(m, eval(r['instance']))
+                        isinstance(m, eval(r["instance"]))
                         and all([_n in n for _n in r["name_includes"]])
                         and all([not _n in n for _n in r["name_excludes"]])
                     ):
                         m._transform(r["config"])
+
+    def dmir_graph(self, input, **kwargs):
+        return dmir.dump(
+            self.body,
+            self.head(input),
+            **kwargs,
+        )
