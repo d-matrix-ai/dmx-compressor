@@ -285,11 +285,13 @@ def dump(
                 )
             )
             if input_names is not None:
-                _in = f"<<{input_names.pop(0)}"
+                _in = f"::{input_names.pop(0)}"
                 subgraph.append(
                     Graph(
                         name=node.name,
-                        op_type=_legal_op_type(traced._target_to_str(torch.nn.Identity)),
+                        op_type=_legal_op_type(
+                            traced._target_to_str(torch.nn.Identity)
+                        ),
                     )
                 )
                 dependency.append(
@@ -328,7 +330,11 @@ def dump(
                 Dependency(
                     operation=node.name,
                     argument=(_make_var_name(node.args[0].name),),
-                    result=(_make_var_name(node.name) if output_names is None else f"<<{output_names.pop(0)}",),
+                    result=(
+                        _make_var_name(node.name)
+                        if output_names is None
+                        else f"::{output_names.pop(0)}",
+                    ),
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
