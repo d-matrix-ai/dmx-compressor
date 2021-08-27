@@ -27,7 +27,8 @@ class Model(torch.nn.Module):
 
     def transform(self, config="configs/corsair.yaml"):
         r"""
-        Transform with Corsair-sprcific numerics/sparsity/logics
+        Transform with Corsair-specific numerics/sparsity/logics
+        NOTE: only staticly declared torch.nn.Module(s) are to be transformed
         """
         if isinstance(config, str):
             config = load_config_file(config)

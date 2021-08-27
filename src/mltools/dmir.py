@@ -183,7 +183,7 @@ def _torch_qualified_name(name: str) -> str:
     return name.replace(".[", "[")
 
 
-def _make_var_name(name: str) -> str:
+def _make_var_name(name: str, prefix: str ="") -> str:
     # TODO: treat numerical constant args as an input node
     if name.isnumeric():
         return name
@@ -191,7 +191,8 @@ def _make_var_name(name: str) -> str:
         _ = float(name)
         return name
     except ValueError:
-        return (name + "_").replace(".", "__")
+        name = name if prefix=="" else f"{prefix}.{name}"
+        return f"{name}_".replace(".", "__")
 
 
 def _legal_op_type(opname: str) -> str:
@@ -256,7 +257,7 @@ def _tensor_meta_dict(meta):
 def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
-    name: str = "model",
+    name: str = "",
     flat: bool = False,
     omit_value: bool = False,
     metadata: str = "",
@@ -293,10 +294,24 @@ def dump(
                 )
             )
         elif node.op == "output":  # output
+            assert len(node.args) == 1
             output.append(
                 Tensor(
                     name=_make_var_name(node.name),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
+                )
+            )
+            subgraph.append(
+                Graph(
+                    name=node.name,
+                    op_type=_legal_op_type(traced._target_to_str(torch.nn.Identity)),
+                )
+            )
+            dependency.append(
+                Dependency(
+                    operation=node.name,
+                    argument=(_make_var_name(node.args[0].name),),
+                    result=(_make_var_name(node.name),),
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
@@ -330,13 +345,13 @@ def dump(
                             name=node.name,
                             input=(
                                 Tensor(
-                                    name="dense",
+                                    name=f"{node.name}_dense",
                                     **_tensor_meta_dict(
                                         node.args[0].meta["tensor_meta"]
                                     ),
                                 ),  # this is a dynamic input
                                 Tensor(
-                                    name="mask",
+                                    name=f"{node.name}_mask",
                                     value=[]
                                     if omit_value
                                     else _m.mask.data.contiguous()
@@ -348,13 +363,13 @@ def dump(
                             ),
                             output=(
                                 Tensor(
-                                    name="sparse",
+                                    name=f"{node.name}_sparse",
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),
                             ),
                             subgraph=(
                                 Graph(
-                                    name="mul",
+                                    name=f"{node.name}_mul",
                                     op_type=_legal_op_type(
                                         traced._target_to_str(torch.mul)
                                     ),
@@ -362,7 +377,7 @@ def dump(
                             ),
                             dependency=(
                                 Dependency(
-                                    operation="mul",
+                                    operation=f"{node.name}_mul",
                                     argument=("dense", "mask"),
                                     result=("sparse",),
                                 ),
