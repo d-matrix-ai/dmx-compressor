@@ -183,7 +183,7 @@ def _torch_qualified_name(name: str) -> str:
     return name.replace(".[", "[")
 
 
-def _make_var_name(name: str, prefix: str = "") -> str:
+def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
     # TODO: treat numerical constant args as an input node
     if name.isnumeric():
         return name
@@ -191,7 +191,9 @@ def _make_var_name(name: str, prefix: str = "") -> str:
         _ = float(name)
         return name
     except ValueError:
-        name = name if prefix == "" else f"{prefix}.{name}"
+        if prefix != "": prefix = prefix + "_"
+        if suffix != "": suffix = "_" + suffix
+        name = f"{prefix}{name}{suffix}"
         return f"{name}_".replace(".", "__")
 
 
@@ -370,13 +372,13 @@ def dump(
                             name=node.name,
                             input=(
                                 Tensor(
-                                    name=f"{node.name}_dense",
+                                    name=_make_var_name(node.name, suffix="dense"),
                                     **_tensor_meta_dict(
                                         node.args[0].meta["tensor_meta"]
                                     ),
                                 ),  # this is a dynamic input
                                 Tensor(
-                                    name=f"{node.name}_mask",
+                                    name=_make_var_name(node.name, suffix="mask"),
                                     value=[]
                                     if omit_value
                                     else _m.mask.data.contiguous()
@@ -388,7 +390,7 @@ def dump(
                             ),
                             output=(
                                 Tensor(
-                                    name=f"{node.name}_sparse",
+                                    name=_make_var_name(node.name, suffix="sparse"),
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),
                             ),
@@ -399,12 +401,34 @@ def dump(
                                         traced._target_to_str(torch.mul)
                                     ),
                                 ),
+                                Graph(
+                                    name=f"{node.name}_in",
+                                    op_type=_legal_op_type(
+                                        traced._target_to_str(torch.nn.Identity)
+                                    ),
+                                ),
+                                Graph(
+                                    name=f"{node.name}_out",
+                                    op_type=_legal_op_type(
+                                        traced._target_to_str(torch.nn.Identity)
+                                    ),
+                                ),
                             ),
                             dependency=(
                                 Dependency(
                                     operation=f"{node.name}_mul",
-                                    argument=("dense", "mask"),
-                                    result=("sparse",),
+                                    argument=(_make_var_name(node.name, suffix="dense"), _make_var_name(node.name, suffix="mask")),
+                                    result=(_make_var_name(node.name, suffix="sparse"),),
+                                ),
+                                Dependency(
+                                    operation=f"{node.name}_in",
+                                    argument=(f"::{_input_names[0]}",),
+                                    result=(_make_var_name(node.name, suffix="dense"),),
+                                ),
+                                Dependency(
+                                    operation=f"{node.name}_out",
+                                    argument=(_make_var_name(node.name, suffix="sparse"),),
+                                    result=(f"::{_output_names[0]}",),
                                 ),
                             ),
                             metadata=_nn_module_meta(_m),
