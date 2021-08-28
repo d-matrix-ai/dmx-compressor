@@ -1,5 +1,6 @@
 from mltools.utils.dmir_pb2 import *
-from google.protobuf.json_format import MessageToJson
+import json
+from google.protobuf.json_format import MessageToJson, Parse
 from types import CodeType, FunctionType, ModuleType
 from typing import (
     Any,
@@ -523,3 +524,7 @@ def save_to_file(model: Graph, filename: str, format="binary") -> None:
             f.write(MessageToJson(model))
     else:
         raise RuntimeError(f"unsupported DMIR file format: {format}")
+
+def load_from_file(filename: str, format="binary") -> Graph:
+    if format == "binary":
+        pass
