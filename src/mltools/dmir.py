@@ -523,8 +523,17 @@ def save_to_file(model: Graph, filename: str, format="binary") -> None:
         with open(filename, "w") as f:
             f.write(MessageToJson(model))
     else:
-        raise RuntimeError(f"unsupported DMIR file format: {format}")
+        raise ValueError(f"unsupported DMIR file format: {format}")
+
 
 def load_from_file(filename: str, format="binary") -> Graph:
     if format == "binary":
-        pass
+        graph = Graph()
+        with open(filename, "rb") as f:
+            graph.ParseFromString(f.read())
+    elif format == "json":
+        with open(filename, "r") as f:
+            graph = Parse(f.read(), Graph())
+    else:
+        raise ValueError(f"unsupported DMIR file format: {format}")
+    return graph
