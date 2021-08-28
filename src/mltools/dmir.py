@@ -18,7 +18,7 @@ import torch
 import torch.fx as fx
 from mltools import numerical, sparse, approximate
 
-__ALL__ = ["dump", "save_to_file"]
+__ALL__ = ["dump", "save_to_file", "load_from_file"]
 
 FORMAT_DICT = {
     torch.float32: FLOAT32,
