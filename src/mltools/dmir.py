@@ -430,44 +430,57 @@ def dump(
                         )
                     )
                 elif isinstance(_m, sparse.Sparsify):
-                    if flat:
-                        input.append(
-                            Tensor(
-                                name=_make_var_name(node.name, suffix="mask"),
-                                value=[]
-                                if omit_value
-                                else m.mask.data.contiguous().view(-1).numpy().tolist(),
-                                **_tensor_meta_dict(node.meta["tensor_meta"]),
-                            ),  # this is a static input
-                        )
+                    if isinstance(_m.sparseness, sparse.Dense):
                         subgraph.append(
                             Graph(
-                                name=f"{node.name}_mul",
+                                name=node.name,
                                 op_type=_legal_op_type(
-                                    traced._target_to_str(torch.mul)
+                                    node.graph._target_to_str(torch.nn.Identity)
                                 ),
                             )
-                        )
-                        dependency.append(
-                            Dependency(
-                                operation=f"{node.name}_mul",
-                                argument=(
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="mask"),
-                                ),
-                                result=(_output_names[0],),
-                            ),
                         )
                     else:
-                        subgraph.append(
-                            _sparsifier_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
+                        if flat:
+                            input.append(
+                                Tensor(
+                                    name=_make_var_name(node.name, suffix="mask"),
+                                    value=[]
+                                    if omit_value
+                                    else m.mask.data.contiguous()
+                                    .view(-1)
+                                    .numpy()
+                                    .tolist(),
+                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
+                                ),  # this is a static input
                             )
-                        )
+                            subgraph.append(
+                                Graph(
+                                    name=f"{node.name}_mul",
+                                    op_type=_legal_op_type(
+                                        traced._target_to_str(torch.mul)
+                                    ),
+                                )
+                            )
+                            dependency.append(
+                                Dependency(
+                                    operation=f"{node.name}_mul",
+                                    argument=(
+                                        _input_names[0],
+                                        _make_var_name(node.name, suffix="mask"),
+                                    ),
+                                    result=(_output_names[0],),
+                                ),
+                            )
+                        else:
+                            subgraph.append(
+                                _sparsifier_graph(
+                                    _m,
+                                    node,
+                                    _input_names,
+                                    _output_names,
+                                    omit_value=omit_value,
+                                )
+                            )
                 else:  # custom modules
                     subgraph.append(
                         dump(
