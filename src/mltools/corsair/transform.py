@@ -42,9 +42,9 @@ class Model(torch.nn.Module):
 
     def forward(self, input, dmir_executor=None):
         # NOTE: only a single input is allowed
-        output = self.head(input)
-        output = self.body(output) if dmir_executor is None else dmir_executor(output)
-        output = self.tail(output)
+        neck = self.head(input)
+        butt = self.body(neck) if dmir_executor is None else dmir_executor(neck)
+        output = self.tail(butt)
         return output
 
     def transform(self, config="configs/corsair.yaml"):
