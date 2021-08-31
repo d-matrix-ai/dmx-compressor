@@ -35,8 +35,18 @@ from mltools.approximate import (
 )
 
 
+class Module(torch.nn.Module):
+    r"""
+    Minor changes to nn.Module default behavior
+    """
+    def load_state_dict(
+        self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False
+    ):
+        return super().load_state_dict(state_dict, strict=strict)
+
+
 class CorsairModule(
-    ApproximationMixin, NumericalCastMixin, WeightSparseMixin, torch.nn.Module
+    ApproximationMixin, NumericalCastMixin, WeightSparseMixin, Module
 ):
     r"""
     Reimplemented torch.nn modules for Corsair
@@ -44,11 +54,6 @@ class CorsairModule(
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-    def load_state_dict(
-        self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False
-    ):
-        return super().load_state_dict(state_dict, strict=strict)
 
     def _transform(self, config):
         # numerics transformation

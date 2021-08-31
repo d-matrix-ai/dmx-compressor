@@ -18,7 +18,15 @@ import torch
 import torch.fx as fx
 from mltools import numerical, sparse, approximate
 
-__ALL__ = ["dump", "save_to_file", "load_from_file", "is_legal", "lower", "executor", "cpsim_executor"]
+__ALL__ = [
+    "dump",
+    "save_to_file",
+    "load_from_file",
+    "is_legal",
+    "lower",
+    "executor",
+    "cpsim_executor",
+]
 
 FORMAT_DICT = {
     torch.float32: FLOAT32,
@@ -578,4 +586,3 @@ def cpsim_executor(graph):
     # a python wrapper of CPSIM functional mode applied to DMIR-3 graph
     # TODO: implement this
     return None
-

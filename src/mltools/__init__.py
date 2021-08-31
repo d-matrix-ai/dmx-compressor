@@ -1,3 +1,4 @@
+import torch
 from . import (
     utils,
     numerical,
@@ -9,3 +10,4 @@ from . import (
     models,
     dmir,
 )
+torch.nn.Module = corsair.nn.Module
