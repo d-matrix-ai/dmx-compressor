@@ -165,12 +165,12 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             _inputs = torch.split(_input, B, dim=1)
             _weights = torch.split(_weight, B, dim=1)
             _convolutions = (
-                self.accum_cast(self._conv_forward(_i, _w))
+                self.accum_cast(self._conv_forward(_i, _w, None))
                 for _i, _w in zip(_inputs, _weights)
             )
             _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
         else:
-            _convolution = self.accum_cast(self._conv_forward(_input, _weight))
+            _convolution = self.accum_cast(self._conv_forward(_input, _weight, None))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
