@@ -550,3 +550,32 @@ def load_from_file(filename: str, format="binary") -> Graph:
     else:
         raise ValueError(f"unsupported DMIR file format: {format}")
     return graph
+
+
+def is_legal(graph, level=0):
+    # a checker on whether a DMIR graph meets requirements of a certain level
+    # TODO: implement this
+    return True
+
+
+def lower(graph, level=0):
+    # a python wrapper of stack transformation of lowering DMIR graph to a level
+    # TODO: implement this
+    lvl = 0
+    while lvl < level and not is_legal(graph, level=lvl):
+        graph = lower(graph, level=lvl)
+        lvl += 1
+    return graph
+
+
+def executor(graph, level=0):
+    # a python wrapper of DMIR C++ executor
+    # TODO: implement this
+    return None
+
+
+def cpsim_executor(graph):
+    # a python wrapper of CPSIM functional mode applied to DMIR-3 graph
+    # TODO: implement this
+    return None
+
