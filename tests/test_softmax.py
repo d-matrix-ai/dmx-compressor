@@ -2,7 +2,7 @@ from platform import python_branch
 import pytest
 import torch
 import torch.nn.functional as F
-import corsair
+from mltools import corsair
 
 
 @pytest.mark.parametrize(
