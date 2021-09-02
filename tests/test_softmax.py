@@ -1,4 +1,3 @@
-from platform import python_branch
 import pytest
 import torch
 import torch.nn.functional as F

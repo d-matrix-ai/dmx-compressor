@@ -15,7 +15,7 @@ from typing import (
     Union,
 )
 import torch
-import torch.fx as fx
+from torch import fx
 from mltools import numerical, sparse, approximate
 
 __ALL__ = [
