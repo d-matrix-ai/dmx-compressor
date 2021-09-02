@@ -193,7 +193,7 @@ def _torch_qualified_name(name: str) -> str:
 
 
 def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
-    # TODO: treat numerical constant args as an input node
+    # TODO: treat constant args as attributes
     if name.isnumeric() or name == "None":
         return name
     elif name.startswith("("):
