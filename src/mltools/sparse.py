@@ -258,15 +258,15 @@ class WeightSparseMixin:
         self.init_sparsifier()
 
     def init_sparsifier(self):
-        if (
-            type(self)
-            in (
+        if isinstance(
+            self,
+            (
                 nn.Linear,
                 nn.Bilinear,
                 nn.Embedding,
                 nn.EmbeddingBag,
-            )
-            or isinstance(self, nn.modules.conv._ConvNd)
+                nn.modules.conv._ConvNd,
+            ),
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
         else:
@@ -283,7 +283,3 @@ class WeightSparseMixin:
             if self.weight_sparsifier is None
             else self.weight_sparsifier(self.weight)
         )
-
-
-if __name__ == "__main__":
-    pass

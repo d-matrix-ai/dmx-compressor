@@ -84,8 +84,9 @@ class Linear(CorsairModule, torch.nn.Linear):
         in_features: int,
         out_features: int,
         bias: bool = True,
+        **kwargs,
     ) -> None:
-        super().__init__(in_features, out_features, bias=bias)
+        super().__init__(in_features, out_features, bias=bias, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.effective_weight)
