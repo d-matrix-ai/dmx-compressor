@@ -131,6 +131,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
         groups=1,
         bias=True,
         padding_mode="zeros",
+        **kwargs,
     ) -> None:
         super().__init__(
             in_channels,
@@ -142,6 +143,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             groups=groups,
             bias=bias,
             padding_mode=padding_mode,
+            **kwargs,
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
