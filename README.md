@@ -1,6 +1,6 @@
-# Neural net compression for Corsair deployment
+# ML tools
 
-This project hosts ***Machine Learning Team***'s R&D effort at d-MATRiX Corp.
+This project contains tools for deep neural net compression for Corsair deployment.
 
   - [Overview](#overview)
   - [Getting started](#getting-started)
@@ -38,28 +38,25 @@ Workloads compressed and optimized here are ***ML references***, to be converted
 Follow these steps to set up as a d-MATRiX internal developer (not for external customers).  
 
 1. Clone the repo.
-2. (*Recommended*) Start a new virtual environment with Python version 3.6 or higher.
+   ```sh
+   git clone git@git.d-matrix.ai:ml-team/mltools.git
+   cd mltools
+   ```
+2. (*Recommended*) Start a new virtual environment with Python version 3.6 or higher, _e.g._
+   ```sh
+   conda create -n mltls python=3.9
+   conda activate mltls
+   ```
 3. In the virtual environment set up the package and dependencies for development.
 
     ```sh
-    cd compression
     pip install -e .
     ```
-
 4. (*Recommended*) In the project root directory create a `.env` file for project-specific environmental variable settings such as common data and models directories.
-
     ```sh
     echo "DATA_PATH=/tools/d-matrix/ml/data" >> .env
     echo "MODEL_PATH=/tools/d-matrix/ml/models" >> .env
     ```
-
-5. Run the multi-layer perceptron on MNIST example.  
-
-    ```sh
-    python scripts/run_mnist.py
-    ```
-
-    It should complete without errors.
 
 ## API in a nutshell
 
@@ -68,18 +65,24 @@ Given a customer workload training/evaluation Python script, use the high-level 
 1. Import extended PyTorch that is Corsair-aware.  This is done by adding
 
     ```python
-    import corsair
+    corsair.aware()
     ```
 
-    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, i.e.
+    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, _i.e._
 
     - all valid PyTorch model definitions remain valid and
     - all PyTorch models remain functionally equivalent, in both forward and backward passes, to those in native PyTorch.
 
-2. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
+2. Wrap a DNN in a `corsair.Model` container, _e.g._
+   
+    ```python
+    model = corsair.Model(Net())
+    ```
+
+3. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
 
     ```python
-    model.transform('corsair_config.yaml')
+    model.transform("corsair_config.yaml")
     ```
 
     [This](configs/corsair_mnist_lenet.yaml) is an example Corsair configuration file.  
@@ -98,6 +101,7 @@ The following code blocks show a simplest example usage.
 import torch​
 ​
 
+
 data = data_loader()​
 model = some_network()​
 
@@ -110,8 +114,9 @@ results = evaluate(model, data)​
 
 ```python
 import torch​
-import corsair ​
-​
+from mltools import corsair ​
+​corsair.aware()
+
 data = data_loader()​
 model = some_network()​
 model.transform('corsair_config.yaml') ​
@@ -135,6 +140,7 @@ For more detailed information, go over the following documents on specific topic
 - Custom logic
 - Configurations for Corsair-specific transformation
 - List of supported modules and models
+- DMIR
 
 ### Examples
 
