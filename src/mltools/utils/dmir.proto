@@ -83,8 +83,8 @@ message Dependency {
 message Graph {
   string name = 1;
   string op_type = 2;
-  repeated Tensor input = 3;
-  repeated Tensor output = 4;
+  repeated Tensor input = 3; // required for built-ins 
+  repeated Tensor output = 4; // required for built-ins
   repeated Tensor intermediate = 5;
   repeated Graph subgraph = 6;
   repeated Dependency dependency = 7;
