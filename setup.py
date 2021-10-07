@@ -47,7 +47,7 @@ setup(
         "numpy",
         "scipy",
         "sklearn",
-        "qtorch>=0.3",
+        "qtorch @ git+ssh://git@git.d-matrix.ai/ml-team/qtorch.git",
         "tensorboard",
         "pyyaml",
         "tqdm",
