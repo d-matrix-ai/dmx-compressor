@@ -17,10 +17,10 @@ def test_castto_bfp16_1():
     x += 1.0
 
     _x = numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(x)
-    torch.allclose(_x, x, rtol=0., atol=2**-7)
+    assert torch.allclose(_x, x, rtol=0., atol=2**-7)
 
     x = -x
 
     _x = numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(x)
-    torch.allclose(_x, x, rtol=0., atol=2**-7)
+    assert torch.allclose(_x, x, rtol=0., atol=2**-7)
 
