@@ -12,7 +12,7 @@ torch.manual_seed(RANDOM_SEED)
 
 def test_castto_bfp16_1():
     n = 1000
-    x = torch.randn((1, n), dtype=torch.float32)
+    x = torch.randn((1, n), dtype=torch.float32).to(device)
     x *= 0.5 / x.abs().max()
     x += 1.0
 
