@@ -322,4 +322,3 @@ class Tanh(CorsairModule, torch.nn.Tanh):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
-
