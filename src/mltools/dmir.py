@@ -538,6 +538,16 @@ def dump(
     )
 
 
+def list_op_type(graph: Graph) -> List[str]:
+    lot = []
+    for sg in graph.subgraph:
+        if sg.op_type:
+            lot.append(sg.op_type)
+        elif sg.subgraph:
+            lot += list_op_type(sg)
+    return set(lot)
+
+
 def save_to_file(model: Graph, filename: str, format="binary") -> None:
     if format == "binary":
         with open(filename, "wb") as f:
