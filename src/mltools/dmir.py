@@ -358,7 +358,7 @@ def dump(
                 )
         elif node.op == "get_attr":  # static inputs
             _p = eval(_torch_qualified_name(f"m.{node.target}"))
-            input.append(
+            intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
                     value=[]
