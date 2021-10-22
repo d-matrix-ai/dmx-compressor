@@ -291,23 +291,9 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 **_tensor_meta_dict(node.meta["tensor_meta"]),
             ),
         ),
-        subgraph=(
-            Graph(
-                name=f"{node.name}_mul",
-                op_type=_legal_op_type(node.graph._target_to_str(torch.mul)),
-            ),
-            Graph(
-                name=f"{node.name}_in",
-                op_type=_legal_op_type(node.graph._target_to_str(torch.nn.Identity)),
-            ),
-            Graph(
-                name=f"{node.name}_out",
-                op_type=_legal_op_type(node.graph._target_to_str(torch.nn.Identity)),
-            ),
-        ),
         dependency=(
             Dependency(
-                operation=f"{node.name}_mul",
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.mul))}",
                 argument=(
                     _make_var_name(node.name, suffix="dense"),
                     _make_var_name(node.name, suffix="mask"),
@@ -315,12 +301,12 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 result=(_make_var_name(node.name, suffix="sparse"),),
             ),
             Dependency(
-                operation=f"{node.name}_in",
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(f"::{input_names[0]}",),
                 result=(_make_var_name(node.name, suffix="dense"),),
             ),
             Dependency(
-                operation=f"{node.name}_out",
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="sparse"),),
                 result=(f"::{output_names[0]}",),
             ),
@@ -361,17 +347,11 @@ def dump(
             )
             if input_names is not None:
                 _in = f"::{input_names.pop(0)}"
-                subgraph.append(
-                    Graph(
-                        name=node.name,
-                        op_type=_legal_op_type(
-                            traced._target_to_str(torch.nn.Identity)
-                        ),
-                    )
-                )
                 dependency.append(
                     Dependency(
-                        operation=node.name,
+                        operation=_legal_op_type(
+                            f"built-in:{traced._target_to_str(torch.nn.Identity)}"
+                        ),
                         argument=(_in,),
                         result=(_make_var_name(node.name),),
                     )
@@ -395,15 +375,11 @@ def dump(
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
-            subgraph.append(
-                Graph(
-                    name=node.name,
-                    op_type=_legal_op_type(traced._target_to_str(torch.nn.Identity)),
-                )
-            )
             dependency.append(
                 Dependency(
-                    operation=node.name,
+                    operation=_legal_op_type(
+                        f"built-in:{traced._target_to_str(torch.nn.Identity)}"
+                    ),
                     argument=(_make_var_name(node.args[0].name),),
                     result=(
                         _make_var_name(node.name)
@@ -441,13 +417,14 @@ def dump(
                     )
                 elif isinstance(_m, sparse.Sparsify):
                     if isinstance(_m.sparseness, sparse.Dense):
-                        subgraph.append(
-                            Graph(
-                                name=node.name,
-                                op_type=_legal_op_type(
-                                    node.graph._target_to_str(torch.nn.Identity)
+                        dependency.append(
+                            Dependency(
+                                operation=_legal_op_type(
+                                    f"built-in:{traced._target_to_str(torch.nn.Identity)}"
                                 ),
-                            )
+                                argument=(_input_names[0],),
+                                result=(_output_names[0],),
+                            ),
                         )
                     else:
                         if flat:
@@ -463,17 +440,11 @@ def dump(
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             )
-                            subgraph.append(
-                                Graph(
-                                    name=f"{node.name}_mul",
-                                    op_type=_legal_op_type(
-                                        traced._target_to_str(torch.mul)
-                                    ),
-                                )
-                            )
                             dependency.append(
                                 Dependency(
-                                    operation=f"{node.name}_mul",
+                                    operation=_legal_op_type(
+                                        f"built-in:{traced._target_to_str(torch.mul)}"
+                                    ),
                                     argument=(
                                         _input_names[0],
                                         _make_var_name(node.name, suffix="mask"),
@@ -513,15 +484,9 @@ def dump(
             else:  # built-in function or tensor method
                 dependency.append(
                     Dependency(
-                        operation=node.name,
+                        operation=f"built-in:{traced._target_to_str(node.target)}",
                         argument=(_make_var_name(n.__str__()) for n in node.args),
                         result=(_make_var_name(node.name),),
-                    )
-                )
-                subgraph.append(
-                    Graph(
-                        name=node.name,
-                        op_type=_legal_op_type(traced._target_to_str(node.target)),
                     )
                 )
         else:
@@ -538,13 +503,10 @@ def dump(
     )
 
 
-def list_op_type(graph: Graph) -> List[str]:
-    lot = []
+def list_ops(graph: Graph) -> List[str]:
+    lot = [dep.operation for dep in graph.dependency if dep.operation.startswith("built-in:")]
     for sg in graph.subgraph:
-        if sg.op_type:
-            lot.append(sg.op_type)
-        elif sg.subgraph:
-            lot += list_op_type(sg)
+        lot += list_ops(sg)
     return set(lot)
 
 
