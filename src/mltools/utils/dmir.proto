@@ -39,7 +39,8 @@ message Tensor {
   string qscheme = 6;
   float q_scale = 7;
   int32 q_zero_point = 8;
-  string device = 9; // place holder for HW model entities
+  string file = 9; // external disk file containing serialized values
+  string device = 15; // place holder for HW model entities
 }
 
 message Attribute {
