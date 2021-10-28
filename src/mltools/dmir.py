@@ -1,4 +1,5 @@
 from mltools.utils.dmir_pb2 import *
+import itertools
 import json
 from google.protobuf.json_format import MessageToJson, Parse
 from types import CodeType, FunctionType, ModuleType
@@ -16,7 +17,7 @@ from typing import (
 )
 import torch
 from torch import fx
-from mltools import numerical, sparse, approximate
+from mltools import numerical, sparse, approximate, corsair
 
 __ALL__ = [
     "dump",
@@ -194,7 +195,7 @@ def _torch_qualified_name(name: str) -> str:
 
 def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
     # TODO: treat constant args as attributes
-    if name.isnumeric() or name == "None":
+    if name.isnumeric() or name in ("None", "True", "False"):
         return name
     elif name.startswith("("):
         return name
@@ -485,7 +486,13 @@ def dump(
                 dependency.append(
                     Dependency(
                         operation=f"built-in:{traced._target_to_str(node.target)}",
-                        argument=(_make_var_name(n.__str__()) for n in node.args),
+                        argument=itertools.chain(
+                            (_make_var_name(n.__str__()) for n in node.args),
+                            (
+                                _make_var_name(v.__str__())
+                                for k, v in node.kwargs.items()
+                            ),
+                        ),
                         result=(_make_var_name(node.name),),
                     )
                 )
@@ -504,7 +511,11 @@ def dump(
 
 
 def list_ops(graph: Graph) -> List[str]:
-    lot = [dep.operation for dep in graph.dependency if dep.operation.startswith("built-in:")]
+    lot = [
+        dep.operation
+        for dep in graph.dependency
+        if dep.operation.startswith("built-in:")
+    ]
     for sg in graph.subgraph:
         lot += list_ops(sg)
     return set(lot)
