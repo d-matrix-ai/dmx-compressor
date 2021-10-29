@@ -259,8 +259,8 @@ def recip_sqrt_float16_quake3(xin):
     """
     assert xin.dtype == torch.float16, "input must be a float16 tensor"
     # initial guess
-    x0_int = 22974 - (xin.numpy().view(dtype=np.uint16) >> 1)
-    x0 = torch.from_numpy(x0_int.view(dtype=np.float16))
+    x0_int = 22974 - (xin.cpu().numpy().view(dtype=np.uint16) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float16)).to(xin.device)
     # one iteration of Newton-Ralphson
     xin2 = 0.5 * xin
     xin2 *= x0
