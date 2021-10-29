@@ -231,8 +231,10 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _weight = self.weight_cast(self.weight)
-        _bias = self.bias_cast(self.bias)
+        _weight = (
+            self.weight_cast(self.weight) if self.weight_cast is not None else None
+        )
+        _bias = self.bias_cast(self.bias) if self.bias_cast is not None else None
         _output = self.approx_forward(
             _input, self.normalized_shape, _weight, _bias, self.eps
         )

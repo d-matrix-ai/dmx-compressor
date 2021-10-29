@@ -277,16 +277,16 @@ def layer_norm_float16_quake3(
     This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
     In float16 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
     """
-    assert input.dtype == torch.float16, "input must be a float16 tensor"
+    input = input.half()
     input_shape = input.shape
-    _x = input.view(-1, *input_shape)
+    _x = input.view(-1, *normalized_shape)
     _xmean = torch.mean(_x, dim=0, keepdim=True)
     _xvar = torch.var(_x, dim=0, unbiased=False, keepdim=True)
     _x -= _xmean
     if weight is not None:
-        _x *= weight
+        _x *= weight.half()
     _x *= recip_sqrt_float16_quake3(_xvar + eps)
     if bias is not None:
-        _x += bias
+        _x += bias.half()
 
-    return _x.view(input_shape)
+    return _x.view(input_shape).float()
