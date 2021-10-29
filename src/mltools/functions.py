@@ -285,7 +285,7 @@ def layer_norm_float16_quake3(
     _x -= _xmean
     if weight is not None:
         _x *= weight.half()
-    _x *= recip_sqrt_float16_quake3(_xvar + eps)
+    _x *= recip_sqrt_float16_quake3(_xvar + max(np.finfo(np.float16).eps, eps))
     if bias is not None:
         _x += bias.half()
 
