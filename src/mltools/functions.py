@@ -252,7 +252,7 @@ def base2exp(x, nform, dim=-1):
     return ey, k
 
 
-def recip_sqrt_float16(xin):
+def recip_sqrt_float16_quake3(xin):
     r"""
     This function computes an approximate sqrt reciprocal in FP16
     using the Quake III Algorithm
@@ -268,3 +268,25 @@ def recip_sqrt_float16(xin):
     x1 = r1 * x0
 
     return x1
+
+
+def layer_norm_float16_quake3(
+    input, normalized_shape, weight=None, bias=None, eps=1e-5
+):
+    r"""
+    This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
+    In float16 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
+    """
+    assert input.dtype == torch.float16, "input must be a float16 tensor"
+    input_shape = input.shape
+    _x = input.view(-1, *input_shape)
+    _xmean = torch.mean(_x, dim=0, keepdim=True)
+    _xvar = torch.var(_x, dim=0, unbiased=False, keepdim=True)
+    _x -= _xmean
+    if weight is not None:
+        _x *= weight
+    _x *= recip_sqrt_float16_quake3(_xvar + eps)
+    if bias is not None:
+        _x += bias
+
+    return _x.view(input_shape)
