@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def poly2softmax(x, dim=-1, nform="float16", **kwargs):
@@ -249,3 +250,21 @@ def base2exp(x, nform, dim=-1):
     ey = two_pow_v.float()
     k = k.float()
     return ey, k
+
+
+def recip_sqrt_float16(xin):
+    r"""
+    This function computes an approximate sqrt reciprocal in FP16
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float16, "input must be a float16 tensor"
+    # initial guess
+    x0_int = 22974 - (xin.numpy().view(dtype=np.uint16) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float16))
+    # one iteration of Newton-Ralphson
+    xin2 = 0.5 * xin
+    xin2 *= x0
+    r1 = 1.5 - xin2 * x0
+    x1 = r1 * x0
+
+    return x1
