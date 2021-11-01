@@ -8,7 +8,7 @@ from mltools import corsair
     "bsz",
     (
         1,
-        16,
+        8,
     ),
 )
 @pytest.mark.parametrize(
@@ -30,7 +30,7 @@ from mltools import corsair
 )
 @pytest.mark.parametrize("algo", ("quake3",))
 @pytest.mark.parametrize("nform", ("float16", "float32"))
-@pytest.mark.parametrize("eps", (1e-5,))
+@pytest.mark.parametrize("eps", (1e-5, 1e-12))
 def test_layernorm(bsz, seq_len, embed_dim, algo, nform, eps):
     shape = (bsz, seq_len, embed_dim)
     normalized_shape = (embed_dim,)
