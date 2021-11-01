@@ -117,7 +117,7 @@ class LayerNormApproximation(ApproximationFunction):
         super().__init__()
         # check validity of configuration
         assert algorithm in ("quake3",), f"unsupported layer_norm algorithm {algorithm}"
-        assert nform in ("float16",), f"unsupported layer_norm numerical format {nform}"
+        assert nform in ("float16", "float32"), f"unsupported layer_norm numerical format {nform}"
 
         self.algorithm = algorithm
         self.nform = nform
