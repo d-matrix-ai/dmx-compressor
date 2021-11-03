@@ -117,14 +117,20 @@ class LayerNormApproximation(ApproximationFunction):
         super().__init__()
         # check validity of configuration
         assert algorithm in ("quake3",), f"unsupported layer_norm algorithm {algorithm}"
-        assert nform in ("float16", "float32"), f"unsupported layer_norm numerical format {nform}"
+        assert nform in (
+            "float16",
+            "float32",
+        ), f"unsupported layer_norm numerical format {nform}"
 
         self.algorithm = algorithm
         self.nform = nform
 
     def execute(self, *args, **kwargs):
         return eval(f"functions.layer_norm_{self.nform}_{self.algorithm}")(
-            *args, **dict(kwargs,)
+            *args,
+            **dict(
+                kwargs,
+            ),
         )
 
     @classmethod
@@ -147,23 +153,34 @@ class GELUApproximation(ApproximationFunction):
     This class specifies an approximation function for gelu nonlinearity.
     """
 
-    def __init__(self):
+    def __init__(self, algorithm="poly2", nform="float16"):
         super().__init__()
+        # check validity of configuration
+        assert algorithm in ("poly2",), f"unsupported layer_norm algorithm {algorithm}"
+        assert nform in ("float16",), f"unsupported layer_norm numerical format {nform}"
+
+        self.algorithm = algorithm
+        self.nform = nform
 
     def execute(self, *args, **kwargs):
-        # TODO: implement this
-        return None
+        return eval(f"functions.{self.algorithm}gelu")(
+            *args,
+            **dict(kwargs, nform=self.nform),
+        )
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        # TODO: implement this
-        return cls()
+        conf = parse("GELU({algorithm:w},{nform:w})", sh)
+        return cls(
+            algorithm=conf["algorithm"],
+            nform=conf["nform"],
+        )
 
     def __str__(self) -> str:
-        return f"GELU approximation function"
+        return f"GELU approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
 
     def __repr__(self) -> str:
-        return f"GELU"
+        return f"GELU({self.algorithm},{self.nform})"
 
 
 class Approximate(nn.Module):

@@ -330,3 +330,22 @@ def layer_norm_float32_quake3(
         _x = _x + bias.float()
 
     return _x.float()
+
+
+def poly2gelu(xin, nform="float16"):
+    r"""
+    This function computes a 2nd-order polynomial approximaiton to gelu()
+    """
+    a1, a2, b1, b2, recip_sqrt2 = -0.1444, 0.1444, -1.769, 1.769, 0.70711
+    if nform == "float16":
+        xin = xin.half()
+        x = xin * recip_sqrt2
+        x_clip = torch.minimum(x.abs(), torch.Tensor([b2]).half())
+        r = x_clip + b1
+        r = r * r
+        L = torch.where(x >= 0, a1 * r + 1.0, a2 * r)
+        y = xin * L
+    else:
+        raise RuntimeError("unsuported numerical format")
+
+    return y.float()
