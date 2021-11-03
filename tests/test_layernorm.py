@@ -74,8 +74,6 @@ def test_layernorm(bsz, seq_len, embed_dim, algo, nform, eps):
     y2.backward(torch.ones_like(x))
 
     assert y1.shape == y2.shape == y10.shape == y20.shape
-    assert torch.allclose(y1, y10, rtol=0.0, atol=3e-2)
-    assert torch.allclose(y2, y20, rtol=0.0, atol=3e-2)
     assert torch.allclose(
         ln1.approximation_error, torch.zeros_like(x), rtol=0.0, atol=3e-2
     )
