@@ -340,7 +340,7 @@ def poly2gelu(xin, nform="float16"):
     if nform == "float16":
         xin = xin.half()
         x = xin * recip_sqrt2
-        x_clip = torch.minimum(x.abs(), torch.Tensor([b2]).half())
+        x_clip = torch.minimum(x.abs(), torch.Tensor([b2]).half().to(xin.device))
         r = x_clip + b1
         r = r * r
         L = torch.where(x >= 0, a1 * r + 1.0, a2 * r)
