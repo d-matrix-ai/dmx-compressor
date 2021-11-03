@@ -89,7 +89,9 @@ class SoftmaxApproximation(ApproximationFunction):
         self.nform = nform
 
     def execute(self, *args, **kwargs):
-        return eval(f"functions.{self.algorithm}softmax")(*args, **dict(kwargs, nform=self.nform))
+        return eval(f"functions.{self.algorithm}softmax")(
+            *args, **dict(kwargs, nform=self.nform)
+        )
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -111,23 +113,33 @@ class LayerNormApproximation(ApproximationFunction):
     This class specifies an approximation function for layer normalization.
     """
 
-    def __init__(self):
+    def __init__(self, algorithm="quake3", nform="float16"):
         super().__init__()
+        # check validity of configuration
+        assert algorithm in ("quake3",), f"unsupported layer_norm algorithm {algorithm}"
+        assert nform in ("float16", "float32"), f"unsupported layer_norm numerical format {nform}"
+
+        self.algorithm = algorithm
+        self.nform = nform
 
     def execute(self, *args, **kwargs):
-        # TODO: implement this
-        return None
+        return eval(f"functions.layer_norm_{self.nform}_{self.algorithm}")(
+            *args, **dict(kwargs,)
+        )
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        # TODO: implement this
-        return cls()
+        conf = parse("LAYERNORM({algorithm:w},{nform:w})", sh)
+        return cls(
+            algorithm=conf["algorithm"],
+            nform=conf["nform"],
+        )
 
     def __str__(self) -> str:
-        return f"Layernorm approximation function"
+        return f"Layernorm approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
 
     def __repr__(self) -> str:
-        return f"LAYERNORM"
+        return f"LAYERNORM({self.algorithm},{self.nform})"
 
 
 class GELUApproximation(ApproximationFunction):
@@ -179,7 +191,9 @@ class ApproximationMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.approximator = Approximate() # if isinstance(self, CorsairModule) else None
+        self.approximator = (
+            Approximate()
+        )  # if isinstance(self, CorsairModule) else None
         self.approximation_error = None
 
     def approx_forward(self, input, *args, **kwargs):

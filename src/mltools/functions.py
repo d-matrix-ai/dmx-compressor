@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def poly2softmax(x, dim=-1, nform="float16", **kwargs):
@@ -249,3 +250,83 @@ def base2exp(x, nform, dim=-1):
     ey = two_pow_v.float()
     k = k.float()
     return ey, k
+
+
+def recip_sqrt_float16_quake3(xin):
+    r"""
+    This function computes an approximate sqrt reciprocal in FP16
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float16, "input must be a float16 tensor"
+    # initial guess
+    x0_int = 0x59BE - (xin.cpu().numpy().view(dtype=np.uint16) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float16)).to(xin.device)
+    # one iteration of Newton-Ralphson
+    xin2 = 0.5 * xin
+    xin2 *= x0
+    r1 = 1.5 - xin2 * x0
+    x1 = r1 * x0
+
+    return x1
+
+
+def recip_sqrt_float32_quake3(xin):
+    r"""
+    This function computes an approximate sqrt reciprocal in FP32
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float32, "input must be a float32 tensor"
+    # initial guess
+    x0_int = 0x5F3759DF - (xin.cpu().numpy().view(dtype=np.uint32) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float32)).to(xin.device)
+    # one iteration of Newton-Ralphson
+    xin2 = 0.5 * xin
+    xin2 *= x0
+    r1 = 1.5 - xin2 * x0
+    x1 = r1 * x0
+
+    return x1
+
+
+def layer_norm_float16_quake3(
+    input, normalized_shape, weight=None, bias=None, eps=1e-5
+):
+    r"""
+    This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
+    In float16 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
+    """
+    _x = input.half()
+    _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
+    _xvar = torch.var(
+        _x, dim=tuple(range(-len(normalized_shape), 0)), unbiased=False, keepdim=True
+    )
+    _x = _x - _xmean
+    if weight is not None:
+        _x = _x * weight.half()
+    _x = _x * recip_sqrt_float16_quake3(_xvar + max(np.finfo(np.float16).eps, eps))
+    if bias is not None:
+        _x = _x + bias.half()
+
+    return _x.float()
+
+
+def layer_norm_float32_quake3(
+    input, normalized_shape, weight=None, bias=None, eps=1e-5
+):
+    r"""
+    This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
+    In float32 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
+    """
+    _x = input.float()
+    _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
+    _xvar = torch.var(
+        _x, dim=tuple(range(-len(normalized_shape), 0)), unbiased=False, keepdim=True
+    )
+    _x = _x - _xmean
+    if weight is not None:
+        _x = _x * weight.float()
+    _x = _x * recip_sqrt_float32_quake3(_xvar + max(np.finfo(np.float32).eps, eps))
+    if bias is not None:
+        _x = _x + bias.float()
+
+    return _x.float()
