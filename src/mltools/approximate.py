@@ -126,11 +126,8 @@ class LayerNormApproximation(ApproximationFunction):
         self.nform = nform
 
     def execute(self, *args, **kwargs):
-        return eval(f"functions.layer_norm_{self.nform}_{self.algorithm}")(
-            *args,
-            **dict(
-                kwargs,
-            ),
+        return eval(f"functions.{self.algorithm}layer_norm")(
+            *args, **dict(kwargs, nform=self.nform)
         )
 
     @classmethod

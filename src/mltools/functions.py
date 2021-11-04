@@ -288,46 +288,48 @@ def recip_sqrt_float32_quake3(xin):
     return x1
 
 
-def layer_norm_float16_quake3(
-    input, normalized_shape, weight=None, bias=None, eps=1e-5
+def quake3layer_norm(
+    input, normalized_shape, weight=None, bias=None, eps=1e-5, nform="float16"
 ):
     r"""
-    This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
-    In float16 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
+    This is a custom implementation of torch.nn.functional.layer_norm() using the Quake III algorithm for reciprocal of squareroot computation.
     """
-    _x = input.half()
-    _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
-    _xvar = torch.var(
-        _x, dim=tuple(range(-len(normalized_shape), 0)), unbiased=False, keepdim=True
-    )
-    _x = _x - _xmean
-    if weight is not None:
-        _x = _x * weight.half()
-    _x = _x * recip_sqrt_float16_quake3(_xvar + max(np.finfo(np.float16).eps, eps))
-    if bias is not None:
-        _x = _x + bias.half()
-
-    return _x.float()
-
-
-def layer_norm_float32_quake3(
-    input, normalized_shape, weight=None, bias=None, eps=1e-5
-):
-    r"""
-    This is a custom implementation of layer normalization operation using the same interface as torch.nn.functional.layer_norm().
-    In float32 numerical format and using the Quake III algorithm for reciprocal of squareroot computation.
-    """
-    _x = input.float()
-    _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
-    _xvar = torch.var(
-        _x, dim=tuple(range(-len(normalized_shape), 0)), unbiased=False, keepdim=True
-    )
-    _x = _x - _xmean
-    if weight is not None:
-        _x = _x * weight.float()
-    _x = _x * recip_sqrt_float32_quake3(_xvar + max(np.finfo(np.float32).eps, eps))
-    if bias is not None:
-        _x = _x + bias.float()
+    if nform == "float16":
+        _x = input.half()
+        _xmean = torch.mean(
+            _x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True
+        )
+        _xvar = torch.var(
+            _x,
+            dim=tuple(range(-len(normalized_shape), 0)),
+            unbiased=False,
+            keepdim=True,
+        )
+        _x = _x - _xmean
+        if weight is not None:
+            _x = _x * weight.half()
+        _x = _x * recip_sqrt_float16_quake3(_xvar + max(np.finfo(np.float16).eps, eps))
+        if bias is not None:
+            _x = _x + bias.half()
+    elif nform == "float32":
+        _x = input.float()
+        _xmean = torch.mean(
+            _x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True
+        )
+        _xvar = torch.var(
+            _x,
+            dim=tuple(range(-len(normalized_shape), 0)),
+            unbiased=False,
+            keepdim=True,
+        )
+        _x = _x - _xmean
+        if weight is not None:
+            _x = _x * weight.float()
+        _x = _x * recip_sqrt_float32_quake3(_xvar + max(np.finfo(np.float32).eps, eps))
+        if bias is not None:
+            _x = _x + bias.float()
+    else:
+        raise RuntimeError("unsuported numerical format")
 
     return _x.float()
 
