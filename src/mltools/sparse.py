@@ -190,6 +190,7 @@ class Sparsifier(Function):
 
     @staticmethod
     def forward(ctx, x, score, sp, mode="STE"):
+        ctx.set_materialize_grads(False)
         ctx.mode = mode
         mask = sp.get_mask(score)
         ctx.save_for_backward(x, score, mask)
@@ -227,7 +228,7 @@ class Sparsify(nn.Module):
         self.mask = self.sparseness.get_mask(score_value)
 
     def forward(self, x):
-        assert x.shape == self.score.shape, "x and score have to be of the same shape"
+        # assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
                 ### TODO: need to figure out a better way of handling score setting
@@ -257,15 +258,15 @@ class WeightSparseMixin:
         self.init_sparsifier()
 
     def init_sparsifier(self):
-        if (
-            type(self)
-            in (
+        if isinstance(
+            self,
+            (
                 nn.Linear,
                 nn.Bilinear,
                 nn.Embedding,
                 nn.EmbeddingBag,
-            )
-            or isinstance(self, nn.modules.conv._ConvNd)
+                nn.modules.conv._ConvNd,
+            ),
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
         else:
@@ -282,7 +283,3 @@ class WeightSparseMixin:
             if self.weight_sparsifier is None
             else self.weight_sparsifier(self.weight)
         )
-
-
-if __name__ == "__main__":
-    pass

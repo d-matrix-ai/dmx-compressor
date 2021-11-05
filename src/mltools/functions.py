@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def poly2softmax(x, dim=-1, nform="float16", **kwargs):
@@ -249,3 +250,104 @@ def base2exp(x, nform, dim=-1):
     ey = two_pow_v.float()
     k = k.float()
     return ey, k
+
+
+def recip_sqrt_float16_quake3(xin):
+    r"""
+    This function computes an approximate sqrt reciprocal in FP16
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float16, "input must be a float16 tensor"
+    # initial guess
+    x0_int = 0x59BE - (xin.cpu().numpy().view(dtype=np.uint16) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float16)).to(xin.device)
+    # one iteration of Newton-Ralphson
+    xin2 = 0.5 * xin
+    xin2 *= x0
+    r1 = 1.5 - xin2 * x0
+    x1 = r1 * x0
+
+    return x1
+
+
+def recip_sqrt_float32_quake3(xin):
+    r"""
+    This function computes an approximate sqrt reciprocal in FP32
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float32, "input must be a float32 tensor"
+    # initial guess
+    x0_int = 0x5F3759DF - (xin.cpu().numpy().view(dtype=np.uint32) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float32)).to(xin.device)
+    # one iteration of Newton-Ralphson
+    xin2 = 0.5 * xin
+    xin2 *= x0
+    r1 = 1.5 - xin2 * x0
+    x1 = r1 * x0
+
+    return x1
+
+
+def quake3layer_norm(
+    input, normalized_shape, weight=None, bias=None, eps=1e-5, nform="float16"
+):
+    r"""
+    This is a custom implementation of torch.nn.functional.layer_norm() using the Quake III algorithm for reciprocal of squareroot computation.
+    """
+    if nform == "float16":
+        _x = input.half()
+        _xmean = torch.mean(
+            _x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True
+        )
+        _xvar = torch.var(
+            _x,
+            dim=tuple(range(-len(normalized_shape), 0)),
+            unbiased=False,
+            keepdim=True,
+        )
+        _x = _x - _xmean
+        if weight is not None:
+            _x = _x * weight.half()
+        _x = _x * recip_sqrt_float16_quake3(_xvar + max(np.finfo(np.float16).eps, eps))
+        if bias is not None:
+            _x = _x + bias.half()
+    elif nform == "float32":
+        _x = input.float()
+        _xmean = torch.mean(
+            _x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True
+        )
+        _xvar = torch.var(
+            _x,
+            dim=tuple(range(-len(normalized_shape), 0)),
+            unbiased=False,
+            keepdim=True,
+        )
+        _x = _x - _xmean
+        if weight is not None:
+            _x = _x * weight.float()
+        _x = _x * recip_sqrt_float32_quake3(_xvar + max(np.finfo(np.float32).eps, eps))
+        if bias is not None:
+            _x = _x + bias.float()
+    else:
+        raise RuntimeError("unsuported numerical format")
+
+    return _x.float()
+
+
+def poly2gelu(xin, nform="float16"):
+    r"""
+    This function computes a 2nd-order polynomial approximaiton to gelu()
+    """
+    a1, a2, b1, b2, recip_sqrt2 = -0.1444, 0.1444, -1.769, 1.769, 0.70711
+    if nform == "float16":
+        xin = xin.half()
+        x = xin * recip_sqrt2
+        x_clip = torch.minimum(x.abs(), torch.Tensor([b2]).half().to(xin.device))
+        r = x_clip + b1
+        r = r * r
+        L = torch.where(x >= 0, a1 * r + 1.0, a2 * r)
+        y = xin * L
+    else:
+        raise RuntimeError("unsuported numerical format")
+
+    return y.float()

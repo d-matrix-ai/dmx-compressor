@@ -18,15 +18,12 @@ class LeNet(nn.Module):
         )
         self.output_layer = nn.Linear(hidden_dims[-1], output_dim)
         self.act_func = nn.ReLU(inplace=True)
-        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = torch.flatten(x, start_dim=1, end_dim=-1)
-        x = self.act_func(self.input_layer(x))
-        x = self.dropout(x)
+        x = self.input_layer(x)
+        x = self.act_func(x)
         for layer in self.intermediate_layers:
             x = layer(x)
             x = self.act_func(x)
-            x = self.dropout(x)
         x = self.output_layer(x)
-        return F.log_softmax(x, dim=1)
+        return x 

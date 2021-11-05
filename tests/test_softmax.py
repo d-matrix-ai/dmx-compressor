@@ -1,8 +1,7 @@
-from platform import python_branch
 import pytest
 import torch
 import torch.nn.functional as F
-import corsair
+from mltools import corsair
 
 
 @pytest.mark.parametrize(
@@ -18,14 +17,10 @@ import corsair
         (8,),
         (128,),
         (384,),
-        (768,),
-        (1024,),
         (2048,),
         (8, 8,),
         (128, 128,),
         (384, 384,),
-        (768, 768,),
-        (1024, 1024,),
         (2048, 2048,),
     ),
 )

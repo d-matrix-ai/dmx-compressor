@@ -115,6 +115,10 @@ Dockerfile
 # editor
 .vscode
 
+# generated code
+*.dmir
+*.dmir.json
+
 # experiment
 sandbox/
 model_dir/

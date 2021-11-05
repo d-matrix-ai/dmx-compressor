@@ -5,17 +5,18 @@ import sys
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
-from numerical import (
+from mltools.numerical import (
     Format,
-    BoundaryCastMixin,
+    NumericalCastMixin,
     Same,
     FixedPoint,
     FloatingPoint,
     BlockFloatingPoint,
     CastTo,
 )
-from sparse import (
+from mltools.sparse import (
     Sparseness,
+    Sparsifier,
     WeightSparseMixin,
     Dense,
     TopK,
@@ -23,50 +24,26 @@ from sparse import (
     Bernoulli,
     Sparsify,
 )
-from approximate import (
+from mltools.approximate import (
     ApproximationFunction,
     ApproximationMixin,
     NoApproximation,
     SoftmaxApproximation,
     GELUApproximation,
     LayerNormApproximation,
-    Approximator,
+    Approximate,
 )
-from utils import load_config_file
-
-__ALL__ = ["nn", "CorsairModule"]
 
 
 class CorsairModule(
-    ApproximationMixin, BoundaryCastMixin, WeightSparseMixin, torch.nn.Module
+    ApproximationMixin, NumericalCastMixin, WeightSparseMixin, torch.nn.Module
 ):
     r"""
-    Container equipped with corsair transform, extending torch.nn.Module
+    Reimplemented torch.nn modules for Corsair
     """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-    def transform(self, config="configs/corsair.yaml"):
-        r"""
-        Model conversion for Corsair numerics/sparsity simulation/optimization
-        """
-        if isinstance(config, str):
-            config = load_config_file(config)
-
-        for n, m in self.named_modules():
-            for r in config["transformation_rules"]:
-                if (
-                    isinstance(m, getattr(sys.modules[__name__], r["instance"]))
-                    and all([_n in n for _n in r["name_includes"]])
-                    and all([not _n in n for _n in r["name_excludes"]])
-                ):
-                    m._transform(r["config"])
-
-    def load_state_dict(
-        self, state_dict: "OrderedDict[str, Tensor]", strict: bool = False
-    ):
-        return super().load_state_dict(state_dict, strict=strict)
 
     def _transform(self, config):
         # numerics transformation
@@ -94,6 +71,12 @@ class CorsairModule(
                 config["approximation_function"]
             )
 
+    def forward(self, input: Tensor) -> Tensor:
+        _input = self.input_cast(input)
+        _output = self._forward(_input)
+        output = self.output_cast(_output)
+        return output
+
 
 class Linear(CorsairModule, torch.nn.Linear):
     def __init__(
@@ -101,11 +84,11 @@ class Linear(CorsairModule, torch.nn.Linear):
         in_features: int,
         out_features: int,
         bias: bool = True,
+        **kwargs,
     ) -> None:
-        super().__init__(in_features, out_features, bias=bias)
+        super().__init__(in_features, out_features, bias=bias, **kwargs)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
@@ -122,19 +105,18 @@ class Linear(CorsairModule, torch.nn.Linear):
             _inputs = torch.split(_input, B, dim=-1)
             _weights = torch.split(_weight, B, dim=-1)
             _products = (
-                self.accum_cast(F.linear(_i, _w, None))
+                self.accum_cast(torch.matmul(_i, _w.t()))
                 for _i, _w in zip(_inputs, _weights)
             )
             _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
         else:
-            _product = self.accum_cast(F.linear(_input, _weight, None))
+            _product = self.accum_cast(torch.matmul(_input, _weight.t()))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_product, _bias)
         else:
             _output = _product
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class Conv2d(CorsairModule, torch.nn.Conv2d):
@@ -149,6 +131,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
         groups=1,
         bias=True,
         padding_mode="zeros",
+        **kwargs,
     ) -> None:
         super().__init__(
             in_channels,
@@ -160,10 +143,10 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             groups=groups,
             bias=bias,
             padding_mode=padding_mode,
+            **kwargs,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
@@ -180,30 +163,27 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             _inputs = torch.split(_input, B, dim=1)
             _weights = torch.split(_weight, B, dim=1)
             _convolutions = (
-                self.accum_cast(self._conv_forward(_i, _w))
+                self.accum_cast(self._conv_forward(_i, _w, None))
                 for _i, _w in zip(_inputs, _weights)
             )
             _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
         else:
-            _convolution = self.accum_cast(self._conv_forward(_input, _weight))
+            _convolution = self.accum_cast(self._conv_forward(_input, _weight, None))
         if self.bias is not None:
             _bias = self.bias_cast(self.bias)
             _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
         else:
             _output = _convolution
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
     def __init__(self, output_size) -> None:
         super().__init__(output_size)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
-        _output = self._forward(_input)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
@@ -225,22 +205,18 @@ class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
             ceil_mode=ceil_mode,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
-        _output = self._forward(_input)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class Softmax(CorsairModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output, dim=self.dim)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input, dim=self.dim)
+        return _output
 
 
 class LayerNorm(CorsairModule, torch.nn.LayerNorm):
@@ -254,13 +230,15 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
             normalized_shape, eps=eps, elementwise_affine=elementwise_affine
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
-        _weight = self.weight_cast(self.weight)
-        _bias = self.bias_cast(self.bias)
-        _output = F.layer_norm(_input, self.normalized_shape, _weight, _bias, self.eps)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _weight = (
+            self.weight_cast(self.weight) if self.weight_cast is not None else None
+        )
+        _bias = self.bias_cast(self.bias) if self.bias_cast is not None else None
+        _output = self.approx_forward(
+            _input, self.normalized_shape, _weight, _bias, self.eps
+        )
+        return _output
 
 
 class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
@@ -280,8 +258,7 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
             track_running_stats=track_running_stats,
         )
 
-    def forward(self, input: Tensor) -> Tensor:
-        _input = self.input_cast(input)
+    def _forward(self, _input: Tensor) -> Tensor:
         _weight = self.weight_cast(self.weight)
         _bias = self.bias_cast(self.bias)
         self._check_input_dim(_input)
@@ -312,68 +289,49 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
             exponential_average_factor,
             self.eps,
         )
-        output = self.output_cast(_output)
-        return output
+        return _output
 
 
 class Dropout(CorsairModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class ReLU(CorsairModule, torch.nn.ReLU):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class ReLU6(CorsairModule, torch.nn.ReLU6):
     def __init__(self, inplace: bool = False) -> None:
         super().__init__(inplace=inplace)
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
 class Tanh(CorsairModule, torch.nn.Tanh):
     def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, input: Tensor) -> Tensor:
-        _output = self.input_cast(input)
-        _output = self._forward(_output)
-        output = self.output_cast(_output)
-        return output
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
 
 
-# overload torch.nn modules
-nn = torch.nn
-nn.Module = CorsairModule
-nn.Linear = Linear
-nn.Conv2d = Conv2d
-nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
-nn.MaxPool2d = MaxPool2d
-nn.BatchNorm2d = BatchNorm2d
-nn.LayerNorm = LayerNorm
-nn.Dropout = Dropout
-nn.Softmax = Softmax
-nn.ReLU = ReLU
-nn.ReLU6 = ReLU6
-nn.Tanh = Tanh
+class GELU(CorsairModule, torch.nn.GELU):
+    def __init__(self) -> None:
+        super().__init__()
 
-if __name__ == "__main__":
-    pass
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output

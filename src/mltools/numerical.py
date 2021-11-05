@@ -9,7 +9,7 @@ from qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
 
 __ALL__ = [
     "Format",
-    "BoundaryCastMixin",
+    "NumericalCastMixin",
     "Same",
     "FixedPoint",
     "FloatingPoint",
@@ -234,6 +234,7 @@ class CastToFormat(Function):
 
     @staticmethod
     def forward(ctx, x, fmt):
+        ctx.set_materialize_grads(False)
         return fmt.cast(x)
 
     @staticmethod
@@ -263,7 +264,7 @@ class CastTo(nn.Module):
         return f"format = {self.format.__repr__()}"
 
 
-class BoundaryCastMixin:
+class NumericalCastMixin:
     r"""
     Mixin for modules with boundary casting
     """
@@ -274,17 +275,17 @@ class BoundaryCastMixin:
 
     def init_casts(self):
         # dynamic i/o casts
-        self.input_cast = CastTo()
-        self.output_cast = CastTo()
+        self.input_cast = CastTo() # if isinstance(self, CorsairModule) else None
+        self.output_cast = CastTo() # if isinstance(self, CorsairModule) else None
         # dynamic intermediate casts
-        if (
-            type(self)
-            in (
+        if isinstance(
+            self,
+            (
                 nn.Linear,
                 nn.Bilinear,
                 nn.EmbeddingBag,
-            )
-            or isinstance(self, nn.modules.conv._ConvNd)
+                nn.modules.conv._ConvNd,
+            ),
         ):
             self.accum_cast = CastTo()
         else:
@@ -293,7 +294,3 @@ class BoundaryCastMixin:
         pnames = [n for n, _ in self.named_parameters()]
         self.weight_cast = CastTo() if "weight" in pnames else None
         self.bias_cast = CastTo() if "bias" in pnames else None
-
-
-if __name__ == "__main__":
-    pass
