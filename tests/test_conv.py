@@ -49,7 +49,9 @@ def test_conv2d(
     corsair_module.weight.data = torch_module.weight.data
     if bias:
         corsair_module.bias.data = torch_module.bias.data
-    t_inp = torch.randn(batch_size, in_channels, *image_size).requires_grad_()
+    t_inp = (
+        torch.randn(batch_size, in_channels, *image_size, device=device).requires_grad_()
+    )
     c_inp = t_inp.clone().detach().requires_grad_()
     t_out = torch_module(t_inp)
     c_out = corsair_module(c_inp)
@@ -58,4 +60,3 @@ def test_conv2d(
     c_out.backward(g_out)
     assert torch.allclose(t_out.data, c_out.data, atol=1e-6)
     assert torch.allclose(t_inp.grad, c_inp.grad, atol=1e-6)
-
