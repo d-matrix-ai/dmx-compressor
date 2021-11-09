@@ -19,7 +19,7 @@ def test_linear(leading_dims, in_features, out_features, bias):
     corsair_module.weight.data = torch_module.weight.data
     if bias:
         corsair_module.bias.data = torch_module.bias.data
-    t_inp = torch.randn(*leading_dims, in_features).to(device).requires_grad_()
+    t_inp = torch.randn(*leading_dims, in_features, device=device).requires_grad_()
     c_inp = t_inp.clone().detach().requires_grad_()
     t_out = torch_module(t_inp)
     c_out = corsair_module(c_inp)

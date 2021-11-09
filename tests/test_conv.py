@@ -50,7 +50,7 @@ def test_conv2d(
     if bias:
         corsair_module.bias.data = torch_module.bias.data
     t_inp = (
-        torch.randn(batch_size, in_channels, *image_size).to(device).requires_grad_()
+        torch.randn(batch_size, in_channels, *image_size, device=device).requires_grad_()
     )
     c_inp = t_inp.clone().detach().requires_grad_()
     t_out = torch_module(t_inp)
