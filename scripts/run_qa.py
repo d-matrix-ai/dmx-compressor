@@ -24,7 +24,8 @@ from typing import Optional
 
 from datasets import load_dataset, load_metric
 
-import corsair
+from mltools import corsair
+corsair.aware()
 
 import transformers
 from trainer_qa import QuestionAnsweringTrainer
@@ -307,7 +308,9 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model.transform(config="configs/corsair_transformers.yaml")
+    _model = corsair.Model(model)
+    _model.transform(config="configs/corsair_transformers.yaml")
+    print(model)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):

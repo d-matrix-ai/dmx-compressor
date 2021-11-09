@@ -23,7 +23,9 @@ supported_sparseness_patterns:
 - &IMC_CONV_SPARSENESS_2_4      BTOPK{2:4,1}
 - &IMC_CONV_SPARSENESS_1_4      BTOPK{1:4,1}
 # list of Corsair supported integer approximation functions
-- &SIMD_SOFTMAX_ALGO            SOFTMAX(poly2,int)
+- &SIMD_SOFTMAX_FUNC            SOFTMAX(base2,float16)  # SOFTMAX(poly2,int)
+- &SIMD_LAYERNORM_FUNC          LAYERNORM(quake3,float16)
+- &SIMD_GELU_FUNC               GELU(poly2,float16)
 
 # layer configurations
 config_qkv: &config_qkv
@@ -46,7 +48,15 @@ config_do: &config_do
 config_sm: &config_sm
   input_format:                 *DUMMY_FORMAT
   output_format:                *DUMMY_FORMAT
-  # approximation_function:       *SIMD_SOFTMAX_ALGO
+  approximation_function:       *SIMD_SOFTMAX_FUNC
+config_ln: &config_ln
+  input_format:                 *DUMMY_FORMAT
+  output_format:                *DUMMY_FORMAT
+  approximation_function:       *SIMD_LAYERNORM_FUNC
+config_gelu: &config_gelu
+  input_format:                 *DUMMY_FORMAT
+  output_format:                *DUMMY_FORMAT
+  approximation_function:       *SIMD_GELU_FUNC
   
 # transformation rules, validated for bert, roberta, distilbert.
 transformation_rules:
@@ -102,6 +112,18 @@ transformation_rules:
   name_includes: []
   name_excludes: []
   config: *config_sm
+- rule: | 
+    layernorms
+  instance: LayerNorm
+  name_includes: []
+  name_excludes: ["embedding"]
+  config: *config_ln
+- rule: | 
+    gelus
+  instance: GELU
+  name_includes: []
+  name_excludes: []
+  config: *config_gelu
 # - rule: |
 #     query projection layers in self-attention
 #     for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
