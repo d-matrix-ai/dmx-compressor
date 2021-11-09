@@ -96,7 +96,8 @@ pb_wrap = lambda it: tqdm(it, leave=False, dynamic_ncols=True)
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
+
+    def __init__(self, name, fmt=":f"):
         self.name = name
         self.fmt = fmt
         self.reset()
@@ -114,8 +115,9 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
     def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
         return fmtstr.format(**self.__dict__)
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -133,11 +135,12 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+
 def validate(val_loader, model, criterion):
-    batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
+    batch_time = AverageMeter("Time", ":6.3f")
+    losses = AverageMeter("Loss", ":.4e")
+    top1 = AverageMeter("Acc@1", ":6.2f")
+    top5 = AverageMeter("Acc@5", ":6.2f")
 
     # switch to evaluate mode
     model.eval()
@@ -157,25 +160,27 @@ def validate(val_loader, model, criterion):
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
 
-                loader.set_postfix(
-                    loss="{:4.2f}".format(loss.item()))
+                loader.set_postfix(loss="{:4.2f}".format(loss.item()))
 
-        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-              .format(top1=top1, top5=top5))
+        print(
+            " * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}".format(top1=top1, top5=top5)
+        )
 
     return top1.avg, top5.avg
 
 
 def train(train_loader, model, criterion):
     optimizer = torch.optim.SGD(
-        model.parameters(), 
-        lr=args.lr, 
+        model.parameters(),
+        lr=args.lr,
         momentum=0.9,
         nesterov=True,
         weight_decay=1e-4,
     )
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs*len(train_loader))
-    for epoch in range(1, args.epochs+1):
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs * len(train_loader)
+    )
+    for epoch in range(1, args.epochs + 1):
         model.train()
         with pb_wrap(train_loader) as loader:
             loader.set_description(f"Epoch {epoch}")
@@ -186,30 +191,41 @@ def train(train_loader, model, criterion):
                 loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
-                loader.set_postfix(dict(
-                    lr=f"{scheduler.get_last_lr()[0] :.8f}",
-                    loss="\33[91m{:6.4f}\033[0m".format(loss),
-                ))
+                loader.set_postfix(
+                    dict(
+                        lr=f"{scheduler.get_last_lr()[0] :.8f}",
+                        loss="\33[91m{:6.4f}\033[0m".format(loss),
+                    )
+                )
                 scheduler.step()
-        top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
+        top1acc, top5acc = validate(
+            ds.val, model, torch.nn.CrossEntropyLoss().to(device)
+        )
     return model
+
 
 if __name__ == "__main__":
 
-    import corsair
-    from data import I1K
+    from mltools import corsair
+
+    corsair.aware()  # pytorch is now extended to be "corsair-aware"
+
+    from mltools.data import I1K
     import torchvision as tv
 
-    ds = I1K(data_dir=os.path.join(DATA_PATH, 'imagenet'))
+    ds = I1K(data_dir=os.path.join(DATA_PATH, "imagenet"))
 
     assert (
         args.model in MODEL_LIST
     ), f"unrecognized model {args.model}, supported models: \n{MODEL_LIST}"
 
-    model = eval("tv.models."+args.model)(pretrained=True).to(device)
-    model.transform(config=args.config)
+    model = corsair.Model(eval("tv.models." + args.model)(pretrained=True)).to(device)
     print(f"model: {args.model}; config: {args.config}")
+    print("Baseline:")
+    top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
+    model.transform(config=args.config)
+    print("Transformed:")
     top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
     model = train(ds.train, model, torch.nn.CrossEntropyLoss().to(device))
+    print("Retrained:")
     top1acc, top5acc = validate(ds.val, model, torch.nn.CrossEntropyLoss().to(device))
-    
