@@ -32,19 +32,15 @@ from mltools import corsair
     ),
 )
 @pytest.mark.parametrize(
-    "algo",
+    "algo,nform",
     (
-        "poly2",
-        "base2",
-    )
-)
-@pytest.mark.parametrize(
-    "nform",
-    (
-        "int", 
-        "float32", 
-        "float16", 
-        "bfloat16",
+        ("poly2", "int"),
+        ("poly2", "float32"),
+        ("poly2", "float16"),
+        ("poly2", "bfloat16"),
+        ("base2", "float16"),
+        ("base2", "bfloat16"),
+        ("base2quake3", "float16"),
     )
 )
 def test_softmax(bsz, shape, dim, algo, nform):
