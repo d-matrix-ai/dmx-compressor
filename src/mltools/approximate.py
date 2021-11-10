@@ -77,6 +77,7 @@ class SoftmaxApproximation(ApproximationFunction):
         assert algorithm in (
             "poly2",
             "base2",
+            "base2quake3",
         ), f"unsupported softmax algorithm {algorithm}"
         assert nform in (
             "int",
