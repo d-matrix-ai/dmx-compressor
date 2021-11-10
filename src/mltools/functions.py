@@ -252,6 +252,22 @@ def base2exp(x, nform, dim=-1):
     return ey, k
 
 
+def recip_float16_quake3(xin):
+    r"""
+    This function computes an approximate reciprocal in FP16
+    using the Quake III Algorithm
+    """
+    assert xin.dtype == torch.float16, "input must be a float16 tensor"
+    # initial guess
+    x0_int = 0x77A8 - (xin.cpu().numpy().view(dtype=np.uint16) >> 1)
+    x0 = torch.from_numpy(x0_int.view(dtype=np.float16)).to(xin.device)
+    # one iteration of Newton-Ralphson
+    r1 = 1.0 - xin * x0
+    x1 = x0 + r1 * x0
+
+    return x1
+
+
 def recip_sqrt_float16_quake3(xin):
     r"""
     This function computes an approximate sqrt reciprocal in FP16
