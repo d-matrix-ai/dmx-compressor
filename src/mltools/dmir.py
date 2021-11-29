@@ -377,6 +377,18 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                     _make_var_name(node.name, suffix="bias"),
                 ),
                 result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=FLOAT,
+                        name="momentum",
+                        float_value=m.momentum,
+                    ),
+                    Attribute(
+                        kind=FLOAT,
+                        name="eps",
+                        float_value=m.eps,
+                    ),
+                ),
             ),
             Dependency(
                 operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
@@ -548,9 +560,9 @@ def dump(
                                 name=_make_var_name(node.name, suffix="rmean"),
                                 value=[]
                                 if omit_value
-                                else m.running_mean.data.contiguous().view(-1).numpy().tolist(),
-                                shape=m.running_mean.shape,
-                                format=_legal_format(m.running_mean.dtype),
+                                else _m.running_mean.data.contiguous().view(-1).numpy().tolist(),
+                                shape=_m.running_mean.shape,
+                                format=_legal_format(_m.running_mean.dtype),
                             ),  # this is a static input
                         )
                         intermediate.append(
@@ -558,9 +570,9 @@ def dump(
                                 name=_make_var_name(node.name, suffix="rvar"),
                                 value=[]
                                 if omit_value
-                                else m.running_var.data.contiguous().view(-1).numpy().tolist(),
-                                shape=m.running_var.shape,
-                                format=_legal_format(m.running_var.dtype),
+                                else _m.running_var.data.contiguous().view(-1).numpy().tolist(),
+                                shape=_m.running_var.shape,
+                                format=_legal_format(_m.running_var.dtype),
                             ),  # this is a static input
                         )
                         intermediate.append(
@@ -568,9 +580,9 @@ def dump(
                                 name=_make_var_name(node.name, suffix="weight"),
                                 value=[]
                                 if omit_value
-                                else m.weight.data.contiguous().view(-1).numpy().tolist(),
-                                shape=m.weight.shape,
-                                format=_legal_format(m.weight.dtype),
+                                else _m.weight.data.contiguous().view(-1).numpy().tolist(),
+                                shape=_m.weight.shape,
+                                format=_legal_format(_m.weight.dtype),
                             ),  # this is a static input
                         )
                         intermediate.append(
@@ -578,9 +590,9 @@ def dump(
                                 name=_make_var_name(node.name, suffix="bias"),
                                 value=[]
                                 if omit_value
-                                else m.bias.data.contiguous().view(-1).numpy().tolist(),
-                                shape=m.bias.shape,
-                                format=_legal_format(m.bias.dtype),
+                                else _m.bias.data.contiguous().view(-1).numpy().tolist(),
+                                shape=_m.bias.shape,
+                                format=_legal_format(_m.bias.dtype),
                             ),  # this is a static input
                         )
                         dependency.append(
@@ -594,6 +606,18 @@ def dump(
                                     _make_var_name(node.name, suffix="bias"),
                                 ),
                                 result=(_output_names[0],),
+                                attribute=(
+                                    Attribute(
+                                        kind=FLOAT,
+                                        name="momentum",
+                                        float_value=_m.momentum,
+                                    ),
+                                    Attribute(
+                                        kind=FLOAT,
+                                        name="eps",
+                                        float_value=_m.eps,
+                                    ),
+                                ),
                             ),
                         )
                     else:
