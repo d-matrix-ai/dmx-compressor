@@ -160,6 +160,7 @@ class DMIRTracer(fx.Tracer):
             (
                 numerical.CastTo,
                 sparse.Sparsify,
+                torch.nn.modules.batchnorm._BatchNorm,
             ),
         )
         if self.flat:
@@ -270,6 +271,10 @@ def _tensor_meta_dict(meta):
     )
 
 
+def _make_value_for_dumping(x: Tensor):
+    return x.data.contiguous().view(-1).numpy().tolist()
+
+
 def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
     return Graph(
         name=node.name,
@@ -282,7 +287,7 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 name=_make_var_name(node.name, suffix="mask"),
                 value=[]
                 if omit_value
-                else m.mask.data.contiguous().view(-1).numpy().tolist(),
+                else _make_value_for_dumping(m.mask),
                 **_tensor_meta_dict(node.meta["tensor_meta"]),
             ),  # this is a static input
         ),
@@ -309,6 +314,94 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
             Dependency(
                 operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="sparse"),),
+                result=(f"::{output_names[0]}",),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
+def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        intermediate=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="running_mean"),
+                value=[]
+                if omit_value
+                else _make_value_for_dumping(m.running_mean),
+                shape=m.running_mean.shape,
+                format=_legal_format(m.running_mean.dtype),
+            ),  # this is a static input
+            Tensor(
+                name=_make_var_name(node.name, suffix="running_var"),
+                value=[]
+                if omit_value
+                else _make_value_for_dumping(m.running_var),
+                shape=m.running_var.shape,
+                format=_legal_format(m.running_var.dtype),
+            ),  # this is a static input
+            Tensor(
+                name=_make_var_name(node.name, suffix="weight"),
+                value=[]
+                if omit_value
+                else _make_value_for_dumping(m.weight),
+                shape=m.weight.shape,
+                format=_legal_format(m.weight.dtype),
+            ),  # this is a static input
+            Tensor(
+                name=_make_var_name(node.name, suffix="bias"),
+                value=[]
+                if omit_value
+                else _make_value_for_dumping(m.bias),
+                shape=m.bias.shape,
+                format=_legal_format(m.bias.dtype),
+            ),  # this is a static input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
+                argument=(
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="running_mean"),
+                    _make_var_name(node.name, suffix="running_var"),
+                    _make_var_name(node.name, suffix="weight"),
+                    _make_var_name(node.name, suffix="bias"),
+                ),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=FLOAT,
+                        name="momentum",
+                        float_value=m.momentum,
+                    ),
+                    Attribute(
+                        kind=FLOAT,
+                        name="eps",
+                        float_value=m.eps,
+                    ),
+                ),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(f"::{input_names[0]}",),
+                result=(_make_var_name(node.name, suffix="input"),),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(_make_var_name(node.name, suffix="output"),),
                 result=(f"::{output_names[0]}",),
             ),
         ),
@@ -364,7 +457,7 @@ def dump(
                     name=_make_var_name(node.name),
                     value=[]
                     if omit_value
-                    else _p.data.contiguous().view(-1).numpy().tolist(),
+                    else _make_value_for_dumping(_p),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
@@ -429,7 +522,7 @@ def dump(
                         )
                     else:
                         if flat:
-                            input.append(
+                            intermediate.append(
                                 Tensor(
                                     name=_make_var_name(node.name, suffix="mask"),
                                     value=[]
@@ -463,6 +556,96 @@ def dump(
                                     omit_value=omit_value,
                                 )
                             )
+                elif isinstance(_m, torch.nn.modules.batchnorm._BatchNorm):
+                    # manually add a batch_norm op
+                    if flat:
+                        intermediate.append(
+                            Tensor(
+                                name=_make_var_name(node.name, suffix="running_mean"),
+                                value=[]
+                                if omit_value
+                                else _m.running_mean.data.contiguous()
+                                .view(-1)
+                                .numpy()
+                                .tolist(),
+                                shape=_m.running_mean.shape,
+                                format=_legal_format(_m.running_mean.dtype),
+                            ),  # this is a static input
+                        )
+                        intermediate.append(
+                            Tensor(
+                                name=_make_var_name(node.name, suffix="running_var"),
+                                value=[]
+                                if omit_value
+                                else _m.running_var.data.contiguous()
+                                .view(-1)
+                                .numpy()
+                                .tolist(),
+                                shape=_m.running_var.shape,
+                                format=_legal_format(_m.running_var.dtype),
+                            ),  # this is a static input
+                        )
+                        intermediate.append(
+                            Tensor(
+                                name=_make_var_name(node.name, suffix="weight"),
+                                value=[]
+                                if omit_value
+                                else _m.weight.data.contiguous()
+                                .view(-1)
+                                .numpy()
+                                .tolist(),
+                                shape=_m.weight.shape,
+                                format=_legal_format(_m.weight.dtype),
+                            ),  # this is a static input
+                        )
+                        intermediate.append(
+                            Tensor(
+                                name=_make_var_name(node.name, suffix="bias"),
+                                value=[]
+                                if omit_value
+                                else _m.bias.data.contiguous()
+                                .view(-1)
+                                .numpy()
+                                .tolist(),
+                                shape=_m.bias.shape,
+                                format=_legal_format(_m.bias.dtype),
+                            ),  # this is a static input
+                        )
+                        dependency.append(
+                            Dependency(
+                                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
+                                argument=(
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="running_mean"),
+                                    _make_var_name(node.name, suffix="running_var"),
+                                    _make_var_name(node.name, suffix="weight"),
+                                    _make_var_name(node.name, suffix="bias"),
+                                ),
+                                result=(_output_names[0],),
+                                attribute=(
+                                    Attribute(
+                                        kind=FLOAT,
+                                        name="momentum",
+                                        float_value=_m.momentum,
+                                    ),
+                                    Attribute(
+                                        kind=FLOAT,
+                                        name="eps",
+                                        float_value=_m.eps,
+                                    ),
+                                ),
+                            ),
+                        )
+                    else:
+                        subgraph.append(
+                            _batch_norm_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
                 else:  # custom modules
                     subgraph.append(
                         dump(
