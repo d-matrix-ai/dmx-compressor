@@ -328,7 +328,7 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         ),
         intermediate=(
             Tensor(
-                name=_make_var_name(node.name, suffix="rmean"),
+                name=_make_var_name(node.name, suffix="running_mean"),
                 value=[]
                 if omit_value
                 else m.running_mean.data.contiguous().view(-1).numpy().tolist(),
@@ -336,7 +336,7 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                 format=_legal_format(m.running_mean.dtype),
             ),  # this is a static input
             Tensor(
-                name=_make_var_name(node.name, suffix="rvar"),
+                name=_make_var_name(node.name, suffix="running_var"),
                 value=[]
                 if omit_value
                 else m.running_var.data.contiguous().view(-1).numpy().tolist(),
@@ -371,8 +371,8 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                 operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
                 argument=(
                     _make_var_name(node.name, suffix="input"),
-                    _make_var_name(node.name, suffix="rmean"),
-                    _make_var_name(node.name, suffix="rvar"),
+                    _make_var_name(node.name, suffix="running_mean"),
+                    _make_var_name(node.name, suffix="running_var"),
                     _make_var_name(node.name, suffix="weight"),
                     _make_var_name(node.name, suffix="bias"),
                 ),
@@ -557,7 +557,7 @@ def dump(
                     if flat:
                         intermediate.append(
                             Tensor(
-                                name=_make_var_name(node.name, suffix="rmean"),
+                                name=_make_var_name(node.name, suffix="running_mean"),
                                 value=[]
                                 if omit_value
                                 else _m.running_mean.data.contiguous().view(-1).numpy().tolist(),
@@ -567,7 +567,7 @@ def dump(
                         )
                         intermediate.append(
                             Tensor(
-                                name=_make_var_name(node.name, suffix="rvar"),
+                                name=_make_var_name(node.name, suffix="running_var"),
                                 value=[]
                                 if omit_value
                                 else _m.running_var.data.contiguous().view(-1).numpy().tolist(),
@@ -600,8 +600,8 @@ def dump(
                                 operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
                                 argument=(
                                     _input_names[0],
-                                    _make_var_name(node.name, suffix="rmean"),
-                                    _make_var_name(node.name, suffix="rvar"),
+                                    _make_var_name(node.name, suffix="running_mean"),
+                                    _make_var_name(node.name, suffix="running_var"),
                                     _make_var_name(node.name, suffix="weight"),
                                     _make_var_name(node.name, suffix="bias"),
                                 ),
