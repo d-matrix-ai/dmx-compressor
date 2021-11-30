@@ -4,7 +4,7 @@ from setuptools.command.develop import develop
 from setuptools.command.install import install
 from subprocess import check_call
 
-VERSION = "0.0.2"
+VERSION = "0.0.3.dev"
 
 DMIR_PROTO_DIR = os.path.join(os.path.dirname(__file__), "src/mltools/utils/")
 DMIR_PROTO_FILE = "dmir.proto"
