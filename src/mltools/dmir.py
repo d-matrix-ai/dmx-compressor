@@ -271,8 +271,8 @@ def _tensor_meta_dict(meta):
     )
 
 
-def _make_value_for_dumping(x: Tensor):
-    return x.data.contiguous().view(-1).numpy().tolist()
+def _make_value_for_dumping(x: Optional[Tensor]):
+    return x.data.contiguous().view(-1).numpy().tolist() if x is not None else x
 
 
 def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
@@ -283,11 +283,11 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 name=_make_var_name(node.name, suffix="dense"),
                 **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
             ),  # this is a dynamic input
+        ),
+        intermediate=(
             Tensor(
                 name=_make_var_name(node.name, suffix="mask"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.mask),
+                value=[] if omit_value else _make_value_for_dumping(m.mask),
                 **_tensor_meta_dict(node.meta["tensor_meta"]),
             ),  # this is a static input
         ),
@@ -333,33 +333,25 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         intermediate=(
             Tensor(
                 name=_make_var_name(node.name, suffix="running_mean"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.running_mean),
+                value=[] if omit_value else _make_value_for_dumping(m.running_mean),
                 shape=m.running_mean.shape,
                 format=_legal_format(m.running_mean.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="running_var"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.running_var),
+                value=[] if omit_value else _make_value_for_dumping(m.running_var),
                 shape=m.running_var.shape,
                 format=_legal_format(m.running_var.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="weight"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.weight),
+                value=[] if omit_value else _make_value_for_dumping(m.weight),
                 shape=m.weight.shape,
                 format=_legal_format(m.weight.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="bias"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.bias),
+                value=[] if omit_value else _make_value_for_dumping(m.bias),
                 shape=m.bias.shape,
                 format=_legal_format(m.bias.dtype),
             ),  # this is a static input
@@ -455,9 +447,7 @@ def dump(
             intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    value=[]
-                    if omit_value
-                    else _make_value_for_dumping(_p),
+                    value=[] if omit_value else _make_value_for_dumping(_p),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
@@ -527,10 +517,7 @@ def dump(
                                     name=_make_var_name(node.name, suffix="mask"),
                                     value=[]
                                     if omit_value
-                                    else m.mask.data.contiguous()
-                                    .view(-1)
-                                    .numpy()
-                                    .tolist(),
+                                    else _make_value_for_dumping(m.mask),
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             )
@@ -564,10 +551,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="running_mean"),
                                 value=[]
                                 if omit_value
-                                else _m.running_mean.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.running_mean),
                                 shape=_m.running_mean.shape,
                                 format=_legal_format(_m.running_mean.dtype),
                             ),  # this is a static input
@@ -577,10 +561,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="running_var"),
                                 value=[]
                                 if omit_value
-                                else _m.running_var.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.running_var),
                                 shape=_m.running_var.shape,
                                 format=_legal_format(_m.running_var.dtype),
                             ),  # this is a static input
@@ -590,10 +571,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="weight"),
                                 value=[]
                                 if omit_value
-                                else _m.weight.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.weight),
                                 shape=_m.weight.shape,
                                 format=_legal_format(_m.weight.dtype),
                             ),  # this is a static input
@@ -603,10 +581,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="bias"),
                                 value=[]
                                 if omit_value
-                                else _m.bias.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.bias),
                                 shape=_m.bias.shape,
                                 format=_legal_format(_m.bias.dtype),
                             ),  # this is a static input
