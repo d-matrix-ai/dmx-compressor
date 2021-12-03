@@ -162,6 +162,7 @@ class DMIRTracer(fx.Tracer):
                 sparse.Sparsify,
                 torch.nn.modules.batchnorm._BatchNorm,
                 torch.nn.modules.conv._ConvNd,
+                torch.nn.modules.pooling._MaxPoolNd,
             ),
         )
         if self.flat:
@@ -504,6 +505,93 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
     )
 
 
+def _max_pool_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"built-in:max_pool",
+                argument=(_make_var_name(node.name, suffix="input"),),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="kernel_size",
+                        integer_values=m.kernel_size,
+                    )
+                    if isinstance(m.kernel_size, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="kernel_size",
+                        integer_value=m.kernel_size,
+                    ),
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="stride",
+                        integer_values=m.stride,
+                    )
+                    if isinstance(m.stride, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="stride",
+                        integer_value=m.stride,
+                    ),
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="padding",
+                        integer_values=m.padding,
+                    )
+                    if isinstance(m.padding, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="padding",
+                        integer_value=m.padding,
+                    ),
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="dilation",
+                        integer_values=m.dilation,
+                    )
+                    if isinstance(m.dilation, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="dilation",
+                        integer_value=m.dilation,
+                    ),
+                    Attribute(
+                        kind=Attribute.INT,
+                        name="ceil_mode",
+                        integer_value=int(m.ceil_mode),
+                    ),
+                ),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(f"::{input_names[0]}",),
+                result=(_make_var_name(node.name, suffix="input"),),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(_make_var_name(node.name, suffix="output"),),
+                result=(f"::{output_names[0]}",),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
 def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
@@ -753,7 +841,9 @@ def dump(
                                 argument=(
                                     _input_names[0],
                                     _make_var_name(node.name, suffix="weight"),
-                                ) if _bias is None else (
+                                )
+                                if _bias is None
+                                else (
                                     _input_names[0],
                                     _make_var_name(node.name, suffix="weight"),
                                     _make_var_name(node.name, suffix="bias"),
@@ -804,6 +894,76 @@ def dump(
                     else:
                         subgraph.append(
                             _conv_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
+                elif isinstance(_m, torch.nn.modules.pooling._MaxPoolNd):
+                    if flat:
+                        dependency.append(
+                            Dependency(
+                                operation=f"built-in:max_pool",
+                                argument=(_input_names[0],),
+                                result=(_output_names[0],),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="kernel_size",
+                                        integer_values=_m.kernel_size,
+                                    )
+                                    if isinstance(_m.kernel_size, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="kernel_size",
+                                        integer_value=_m.kernel_size,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="stride",
+                                        integer_values=_m.stride,
+                                    )
+                                    if isinstance(_m.stride, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="stride",
+                                        integer_value=_m.stride,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="padding",
+                                        integer_values=_m.padding,
+                                    )
+                                    if isinstance(_m.padding, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="padding",
+                                        integer_value=_m.padding,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="dilation",
+                                        integer_values=_m.dilation,
+                                    )
+                                    if isinstance(_m.dilation, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="dilation",
+                                        integer_value=_m.dilation,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="ceil_mode",
+                                        integer_value=int(_m.ceil_mode),
+                                    ),
+                                ),
+                            )
+                        )
+                    else:
+                        subgraph.append(
+                            _max_pool_graph(
                                 _m,
                                 node,
                                 _input_names,
