@@ -161,6 +161,7 @@ class DMIRTracer(fx.Tracer):
                 numerical.CastTo,
                 sparse.Sparsify,
                 torch.nn.modules.batchnorm._BatchNorm,
+                torch.nn.modules.conv._ConvNd,
             ),
         )
         if self.flat:
@@ -271,8 +272,8 @@ def _tensor_meta_dict(meta):
     )
 
 
-def _make_value_for_dumping(x: Tensor):
-    return x.data.contiguous().view(-1).numpy().tolist()
+def _make_value_for_dumping(x: Optional[Tensor]):
+    return x.data.contiguous().view(-1).numpy().tolist() if x is not None else x
 
 
 def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
@@ -283,11 +284,11 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 name=_make_var_name(node.name, suffix="dense"),
                 **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
             ),  # this is a dynamic input
+        ),
+        intermediate=(
             Tensor(
                 name=_make_var_name(node.name, suffix="mask"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.mask),
+                value=[] if omit_value else _make_value_for_dumping(m.mask),
                 **_tensor_meta_dict(node.meta["tensor_meta"]),
             ),  # this is a static input
         ),
@@ -333,33 +334,25 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         intermediate=(
             Tensor(
                 name=_make_var_name(node.name, suffix="running_mean"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.running_mean),
+                value=[] if omit_value else _make_value_for_dumping(m.running_mean),
                 shape=m.running_mean.shape,
                 format=_legal_format(m.running_mean.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="running_var"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.running_var),
+                value=[] if omit_value else _make_value_for_dumping(m.running_var),
                 shape=m.running_var.shape,
                 format=_legal_format(m.running_var.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="weight"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.weight),
+                value=[] if omit_value else _make_value_for_dumping(m.weight),
                 shape=m.weight.shape,
                 format=_legal_format(m.weight.dtype),
             ),  # this is a static input
             Tensor(
                 name=_make_var_name(node.name, suffix="bias"),
-                value=[]
-                if omit_value
-                else _make_value_for_dumping(m.bias),
+                value=[] if omit_value else _make_value_for_dumping(m.bias),
                 shape=m.bias.shape,
                 format=_legal_format(m.bias.dtype),
             ),  # this is a static input
@@ -383,14 +376,116 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                 result=(_make_var_name(node.name, suffix="output"),),
                 attribute=(
                     Attribute(
-                        kind=FLOAT,
+                        kind=Attribute.FLOAT,
                         name="momentum",
                         float_value=m.momentum,
                     ),
                     Attribute(
-                        kind=FLOAT,
+                        kind=Attribute.FLOAT,
                         name="eps",
                         float_value=m.eps,
+                    ),
+                ),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(f"::{input_names[0]}",),
+                result=(_make_var_name(node.name, suffix="input"),),
+            ),
+            Dependency(
+                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(_make_var_name(node.name, suffix="output"),),
+                result=(f"::{output_names[0]}",),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
+def _conv_graph(m, node, input_names, output_names, omit_value=False):
+    _weight = Tensor(
+        name=_make_var_name(node.name, suffix="weight"),
+        value=[] if omit_value else _make_value_for_dumping(m.weight),
+        shape=m.weight.shape,
+        format=_legal_format(m.weight.dtype),
+    )  # this is a static input
+    _bias = (
+        Tensor(
+            name=_make_var_name(node.name, suffix="bias"),
+            value=[] if omit_value else _make_value_for_dumping(m.bias),
+            shape=m.bias.shape,
+            format=_legal_format(m.bias.dtype),
+        )
+        if m.bias is not None
+        else None
+    )  # this is a static input
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        intermediate=(_weight,) if _bias is None else (_weight, _bias),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"built-in:conv",
+                argument=(
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="weight"),
+                )
+                if _bias is None
+                else (
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="weight"),
+                    _make_var_name(node.name, suffix="bias"),
+                ),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="stride",
+                        integer_values=m.stride,
+                    )
+                    if isinstance(m.stride, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="stride",
+                        integer_value=m.stride,
+                    ),
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="padding",
+                        integer_values=m.padding,
+                    )
+                    if isinstance(m.padding, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="padding",
+                        integer_value=m.padding,
+                    ),
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="dilation",
+                        integer_values=m.dilation,
+                    )
+                    if isinstance(m.dilation, tuple)
+                    else Attribute(
+                        kind=Attribute.INT,
+                        name="dilation",
+                        integer_value=m.dilation,
+                    ),
+                    Attribute(
+                        kind=Attribute.INT,
+                        name="groups",
+                        integer_value=m.groups,
                     ),
                 ),
             ),
@@ -455,9 +550,7 @@ def dump(
             intermediate.append(
                 Tensor(
                     name=_make_var_name(node.name),
-                    value=[]
-                    if omit_value
-                    else _make_value_for_dumping(_p),
+                    value=[] if omit_value else _make_value_for_dumping(_p),
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
@@ -527,10 +620,7 @@ def dump(
                                     name=_make_var_name(node.name, suffix="mask"),
                                     value=[]
                                     if omit_value
-                                    else m.mask.data.contiguous()
-                                    .view(-1)
-                                    .numpy()
-                                    .tolist(),
+                                    else _make_value_for_dumping(m.mask),
                                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                                 ),  # this is a static input
                             )
@@ -564,10 +654,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="running_mean"),
                                 value=[]
                                 if omit_value
-                                else _m.running_mean.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.running_mean),
                                 shape=_m.running_mean.shape,
                                 format=_legal_format(_m.running_mean.dtype),
                             ),  # this is a static input
@@ -577,10 +664,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="running_var"),
                                 value=[]
                                 if omit_value
-                                else _m.running_var.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.running_var),
                                 shape=_m.running_var.shape,
                                 format=_legal_format(_m.running_var.dtype),
                             ),  # this is a static input
@@ -590,10 +674,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="weight"),
                                 value=[]
                                 if omit_value
-                                else _m.weight.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.weight),
                                 shape=_m.weight.shape,
                                 format=_legal_format(_m.weight.dtype),
                             ),  # this is a static input
@@ -603,10 +684,7 @@ def dump(
                                 name=_make_var_name(node.name, suffix="bias"),
                                 value=[]
                                 if omit_value
-                                else _m.bias.data.contiguous()
-                                .view(-1)
-                                .numpy()
-                                .tolist(),
+                                else _make_value_for_dumping(_m.bias),
                                 shape=_m.bias.shape,
                                 format=_legal_format(_m.bias.dtype),
                             ),  # this is a static input
@@ -624,12 +702,12 @@ def dump(
                                 result=(_output_names[0],),
                                 attribute=(
                                     Attribute(
-                                        kind=FLOAT,
+                                        kind=Attribute.FLOAT,
                                         name="momentum",
                                         float_value=_m.momentum,
                                     ),
                                     Attribute(
-                                        kind=FLOAT,
+                                        kind=Attribute.FLOAT,
                                         name="eps",
                                         float_value=_m.eps,
                                     ),
@@ -639,6 +717,93 @@ def dump(
                     else:
                         subgraph.append(
                             _batch_norm_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
+                elif isinstance(_m, torch.nn.modules.conv._ConvNd):
+                    _weight = Tensor(
+                        name=_make_var_name(node.name, suffix="weight"),
+                        value=[] if omit_value else _make_value_for_dumping(_m.weight),
+                        shape=_m.weight.shape,
+                        format=_legal_format(_m.weight.dtype),
+                    )  # this is a static input
+                    _bias = (
+                        Tensor(
+                            name=_make_var_name(node.name, suffix="bias"),
+                            value=[]
+                            if omit_value
+                            else _make_value_for_dumping(_m.bias),
+                            shape=_m.bias.shape,
+                            format=_legal_format(_m.bias.dtype),
+                        )
+                        if _m.bias is not None
+                        else None
+                    )  # this is a static input
+                    if flat:
+                        intermediate.append(_weight)
+                        if _bias is not None:
+                            intermediate.append(_bias)
+                        dependency.append(
+                            Dependency(
+                                operation=f"built-in:conv",
+                                argument=(
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="weight"),
+                                ) if _bias is None else (
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="weight"),
+                                    _make_var_name(node.name, suffix="bias"),
+                                ),
+                                result=(_output_names[0],),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="stride",
+                                        integer_values=_m.stride,
+                                    )
+                                    if isinstance(_m.stride, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="stride",
+                                        integer_value=_m.stride,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="padding",
+                                        integer_values=_m.padding,
+                                    )
+                                    if isinstance(_m.padding, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="padding",
+                                        integer_value=_m.padding,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="dilation",
+                                        integer_values=_m.dilation,
+                                    )
+                                    if isinstance(_m.dilation, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="dilation",
+                                        integer_value=_m.dilation,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="groups",
+                                        integer_value=_m.groups,
+                                    ),
+                                ),
+                            ),
+                        )
+                    else:
+                        subgraph.append(
+                            _conv_graph(
                                 _m,
                                 node,
                                 _input_names,
