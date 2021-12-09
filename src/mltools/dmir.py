@@ -301,7 +301,7 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
         ),
         dependency=(
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.mul))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.mul))}",
                 argument=(
                     _make_var_name(node.name, suffix="dense"),
                     _make_var_name(node.name, suffix="mask"),
@@ -309,12 +309,12 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 result=(_make_var_name(node.name, suffix="sparse"),),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(f"::{input_names[0]}",),
                 result=(_make_var_name(node.name, suffix="dense"),),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="sparse"),),
                 result=(f"::{output_names[0]}",),
             ),
@@ -366,7 +366,7 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         ),
         dependency=(
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
                 argument=(
                     _make_var_name(node.name, suffix="input"),
                     _make_var_name(node.name, suffix="running_mean"),
@@ -389,12 +389,12 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                 ),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(f"::{input_names[0]}",),
                 result=(_make_var_name(node.name, suffix="input"),),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="output"),),
                 result=(f"::{output_names[0]}",),
             ),
@@ -437,7 +437,7 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
         ),
         dependency=(
             Dependency(
-                operation=f"built-in:conv",
+                operation=f"conv",
                 argument=(
                     _make_var_name(node.name, suffix="input"),
                     _make_var_name(node.name, suffix="weight"),
@@ -491,12 +491,12 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
                 ),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(f"::{input_names[0]}",),
                 result=(_make_var_name(node.name, suffix="input"),),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="output"),),
                 result=(f"::{output_names[0]}",),
             ),
@@ -522,7 +522,7 @@ def _max_pool_graph(m, node, input_names, output_names, omit_value=False):
         ),
         dependency=(
             Dependency(
-                operation=f"built-in:max_pool",
+                operation=f"max_pool",
                 argument=(_make_var_name(node.name, suffix="input"),),
                 result=(_make_var_name(node.name, suffix="output"),),
                 attribute=(
@@ -578,12 +578,12 @@ def _max_pool_graph(m, node, input_names, output_names, omit_value=False):
                 ),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(f"::{input_names[0]}",),
                 result=(_make_var_name(node.name, suffix="input"),),
             ),
             Dependency(
-                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
                 argument=(_make_var_name(node.name, suffix="output"),),
                 result=(f"::{output_names[0]}",),
             ),
@@ -627,7 +627,7 @@ def dump(
                 dependency.append(
                     Dependency(
                         operation=_legal_op_type(
-                            f"built-in:{traced._target_to_str(torch.nn.Identity)}"
+                            f"{traced._target_to_str(torch.nn.Identity)}"
                         ),
                         argument=(_in,),
                         result=(_make_var_name(node.name),),
@@ -653,9 +653,18 @@ def dump(
             dependency.append(
                 Dependency(
                     operation=_legal_op_type(
-                        f"built-in:{traced._target_to_str(torch.nn.Identity)}"
+                        f"{traced._target_to_str(torch.nn.Identity)}"
                     ),
                     argument=(_make_var_name(node.args[0].name),),
+                    result=(_make_var_name(node.name),),
+                )
+            )
+            dependency.append(
+                Dependency(
+                    operation=_legal_op_type(
+                        f"{traced._target_to_str(torch.nn.Identity)}"
+                    ),
+                    argument=(_make_var_name(node.name),),
                     result=(
                         _make_var_name(node.name)
                         if output_names is None
@@ -695,7 +704,7 @@ def dump(
                         dependency.append(
                             Dependency(
                                 operation=_legal_op_type(
-                                    f"built-in:{traced._target_to_str(torch.nn.Identity)}"
+                                    f"{traced._target_to_str(torch.nn.Identity)}"
                                 ),
                                 argument=(_input_names[0],),
                                 result=(_output_names[0],),
@@ -715,7 +724,7 @@ def dump(
                             dependency.append(
                                 Dependency(
                                     operation=_legal_op_type(
-                                        f"built-in:{traced._target_to_str(torch.mul)}"
+                                        f"{traced._target_to_str(torch.mul)}"
                                     ),
                                     argument=(
                                         _input_names[0],
@@ -779,7 +788,7 @@ def dump(
                         )
                         dependency.append(
                             Dependency(
-                                operation=f"built-in:{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
+                                operation=f"{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
                                 argument=(
                                     _input_names[0],
                                     _make_var_name(node.name, suffix="running_mean"),
@@ -837,7 +846,7 @@ def dump(
                             intermediate.append(_bias)
                         dependency.append(
                             Dependency(
-                                operation=f"built-in:conv",
+                                operation=f"conv",
                                 argument=(
                                     _input_names[0],
                                     _make_var_name(node.name, suffix="weight"),
@@ -905,7 +914,7 @@ def dump(
                     if flat:
                         dependency.append(
                             Dependency(
-                                operation=f"built-in:max_pool",
+                                operation=f"max_pool",
                                 argument=(_input_names[0],),
                                 result=(_output_names[0],),
                                 attribute=(
@@ -993,7 +1002,7 @@ def dump(
             else:  # built-in function or tensor method
                 dependency.append(
                     Dependency(
-                        operation=f"built-in:{traced._target_to_str(node.target)}",
+                        operation=f"{traced._target_to_str(node.target)}",
                         argument=itertools.chain(
                             (_make_var_name(n.__str__()) for n in node.args),
                             (
@@ -1019,11 +1028,7 @@ def dump(
 
 
 def list_ops(graph: Graph) -> List[str]:
-    lot = [
-        dep.operation
-        for dep in graph.dependency
-        if dep.operation.startswith("built-in:")
-    ]
+    lot = [dep.operation for dep in graph.dependency]
     for sg in graph.subgraph:
         lot += list_ops(sg)
     return set(lot)
