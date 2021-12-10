@@ -163,6 +163,7 @@ class DMIRTracer(fx.Tracer):
                 torch.nn.modules.batchnorm._BatchNorm,
                 torch.nn.modules.conv._ConvNd,
                 torch.nn.modules.pooling._MaxPoolNd,
+                torch.nn.modules.ReLU,
             ),
         )
         if self.flat:
@@ -502,6 +503,48 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
             ),
         ),
         metadata=_nn_module_meta(m),
+    )
+
+
+def _relu_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name = node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"relu",
+                argument=(_make_var_name(node.name, suffix="input"),),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=Attribute.INT,
+                        name="inplace",
+                        integer_value=int(m.inplace),
+                    ),
+                ),
+            ),
+            Dependency(
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(f"::{input_names[0]}",),
+                result=(_make_var_name(node.name, suffix="input"),),
+            ),
+            Dependency(
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
+                argument=(_make_var_name(node.name, suffix="output"),),
+                result=(f"::{output_names[0]}",),
+            ),
+        ),
     )
 
 
@@ -980,6 +1023,32 @@ def dump(
                                 omit_value=omit_value,
                             )
                         )
+                elif isinstance(_m, torch.nn.modules.ReLU):
+                    if flat:
+                        dependency.append(
+                            Dependency(
+                                operation=f"{_legal_op_type(node.graph._target_to_str(torch.relu))}",
+                                argument=(_input_names[0],),
+                                result=(_output_names[0],),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="inplace",
+                                        integer_value=int(_m.inplace),
+                                    ),
+                                ),
+                            ),
+                        )
+                    else:
+                        subgraph.append(
+                            _relu_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
                 else:  # custom modules
                     subgraph.append(
                         dump(
@@ -1028,10 +1097,7 @@ def dump(
 
 
 def list_ops(graph: Graph) -> List[str]:
-    lot = [
-        dep.operation
-        for dep in graph.dependency
-    ]
+    lot = [dep.operation for dep in graph.dependency]
     for sg in graph.subgraph:
         lot += list_ops(sg)
     return set(lot)
