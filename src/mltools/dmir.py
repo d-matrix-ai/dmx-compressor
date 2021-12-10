@@ -1028,7 +1028,10 @@ def dump(
 
 
 def list_ops(graph: Graph) -> List[str]:
-    lot = [dep.operation for dep in graph.dependency]
+    lot = [
+        dep.operation
+        for dep in graph.dependency
+    ]
     for sg in graph.subgraph:
         lot += list_ops(sg)
     return set(lot)
