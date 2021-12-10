@@ -656,6 +656,15 @@ def dump(
                         f"{traced._target_to_str(torch.nn.Identity)}"
                     ),
                     argument=(_make_var_name(node.args[0].name),),
+                    result=(_make_var_name(node.name),),
+                )
+            )
+            dependency.append(
+                Dependency(
+                    operation=_legal_op_type(
+                        f"{traced._target_to_str(torch.nn.Identity)}"
+                    ),
+                    argument=(_make_var_name(node.name),),
                     result=(
                         _make_var_name(node.name)
                         if output_names is None
