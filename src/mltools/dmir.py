@@ -1003,6 +1003,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _batch_norm_graph(
                                 _m,
@@ -1092,6 +1100,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _conv_graph(
                                 _m,
@@ -1162,6 +1178,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _max_pool_graph(
                                 _m,
@@ -1237,6 +1261,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _avg_pool_graph(
                                 _m,
@@ -1269,6 +1301,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _adaptive_avg_pool_graph(
                                 _m,
@@ -1295,6 +1335,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _relu_graph(
                                 _m,
@@ -1305,6 +1353,14 @@ def dump(
                             )
                         )
                 else:  # custom modules
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
                     subgraph.append(
                         dump(
                             _m,
