@@ -845,19 +845,16 @@ def dump(
                     result=(_make_var_name(node.name),),
                 )
             )
-            dependency.append(
-                Dependency(
-                    operation=_legal_op_type(
-                        f"{traced._target_to_str(torch.nn.Identity)}"
-                    ),
-                    argument=(_make_var_name(node.name),),
-                    result=(
-                        _make_var_name(node.name)
-                        if output_names is None
-                        else f"::{output_names.pop(0)}",
-                    ),
+            if output_names is not None:
+                dependency.append(
+                    Dependency(
+                        operation=_legal_op_type(
+                            f"{traced._target_to_str(torch.nn.Identity)}"
+                        ),
+                        argument=(_make_var_name(node.name),),
+                        result=(f"::{output_names.pop(0)}",),
+                    )
                 )
-            )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
             intermediate.append(
                 Tensor(
@@ -1006,6 +1003,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _batch_norm_graph(
                                 _m,
@@ -1095,6 +1100,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _conv_graph(
                                 _m,
@@ -1165,6 +1178,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _max_pool_graph(
                                 _m,
@@ -1240,6 +1261,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _avg_pool_graph(
                                 _m,
@@ -1272,6 +1301,14 @@ def dump(
                             )
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _adaptive_avg_pool_graph(
                                 _m,
@@ -1298,6 +1335,14 @@ def dump(
                             ),
                         )
                     else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
                         subgraph.append(
                             _relu_graph(
                                 _m,
@@ -1308,6 +1353,14 @@ def dump(
                             )
                         )
                 else:  # custom modules
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
                     subgraph.append(
                         dump(
                             _m,
