@@ -119,6 +119,7 @@ from mltools import corsair ​
 
 data = data_loader()​
 model = some_network()​
+model = corsair.Model(model)
 model.transform('corsair_config.yaml') ​
 
 results = evaluate(model, data)​
