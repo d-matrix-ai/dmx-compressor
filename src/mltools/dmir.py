@@ -1380,19 +1380,49 @@ def dump(
                         )
                     )
             else:  # built-in function or tensor method
-                dependency.append(
-                    Dependency(
-                        operation=f"{traced._target_to_str(node.target)}",
-                        argument=itertools.chain(
-                            (_make_var_name(n.__str__()) for n in node.args),
-                            (
-                                _make_var_name(v.__str__())
-                                for k, v in node.kwargs.items()
+                if node.target==torch.flatten:
+                    start_dim = node.args[1] if len(node.args) > 1 else 0
+                    end_dim = node.args[2] if len(node.args) > 2 else -1
+                    node.args = (node.args[0],)
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=itertools.chain(
+                                (_make_var_name(n.__str__()) for n in node.args),
+                                (
+                                    _make_var_name(v.__str__())
+                                    for k, v in node.kwargs.items()
+                                ),
                             ),
-                        ),
-                        result=(_make_var_name(node.name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="start_dim",
+                                    integer_value=start_dim,
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="end_dim",
+                                    integer_value=end_dim,
+                                ),
+                            )
+                        )
                     )
-                )
+                else:
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=itertools.chain(
+                                (_make_var_name(n.__str__()) for n in node.args),
+                                (
+                                    _make_var_name(v.__str__())
+                                    for k, v in node.kwargs.items()
+                                ),
+                            ),
+                            result=(_make_var_name(node.name),),
+                        )
+                    )
         else:
             raise RuntimeError(f"illegal FXIR node opcode {node.op}")
 
