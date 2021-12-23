@@ -311,16 +311,6 @@ def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
                 ),
                 result=(_make_var_name(node.name, suffix="sparse"),),
             ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="dense"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="sparse"),),
-                result=(f"::{output_names[0]}",),
-            ),
         ),
         metadata=_nn_module_meta(m),
     )
@@ -390,16 +380,6 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                         float_value=m.eps,
                     ),
                 ),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -493,16 +473,6 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
                     ),
                 ),
             ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
-            ),
         ),
         metadata=_nn_module_meta(m),
     )
@@ -535,16 +505,6 @@ def _relu_graph(m, node, input_names, output_names, omit_value=False):
                         integer_value=int(m.inplace),
                     ),
                 ),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
             ),
         ),
     )
@@ -621,16 +581,6 @@ def _max_pool_graph(m, node, input_names, output_names, omit_value=False):
                         integer_value=int(m.ceil_mode),
                     ),
                 ),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -714,16 +664,6 @@ def _avg_pool_graph(m, node, input_names, output_names, omit_value=False):
                     ),
                 ),
             ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
-            ),
         ),
         metadata=_nn_module_meta(m),
     )
@@ -763,16 +703,6 @@ def _adaptive_avg_pool_graph(m, node, input_names, output_names, omit_value=Fals
                     ),
                 ),
             ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(f"::{input_names[0]}",),
-                result=(_make_var_name(node.name, suffix="input"),),
-            ),
-            Dependency(
-                operation=f"{_legal_op_type(node.graph._target_to_str(torch.nn.Identity))}",
-                argument=(_make_var_name(node.name, suffix="output"),),
-                result=(f"::{output_names[0]}",),
-            ),
         ),
         metadata=_nn_module_meta(m),
     )
@@ -808,17 +738,6 @@ def dump(
                     **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
             )
-            if input_names is not None:
-                _in = f"::{input_names.pop(0)}"
-                dependency.append(
-                    Dependency(
-                        operation=_legal_op_type(
-                            f"{traced._target_to_str(torch.nn.Identity)}"
-                        ),
-                        argument=(_in,),
-                        result=(_make_var_name(node.name),),
-                    )
-                )
         elif node.op == "get_attr":  # static inputs
             _p = eval(_torch_qualified_name(f"m.{node.target}"))
             intermediate.append(
@@ -845,16 +764,6 @@ def dump(
                     result=(_make_var_name(node.name),),
                 )
             )
-            if output_names is not None:
-                dependency.append(
-                    Dependency(
-                        operation=_legal_op_type(
-                            f"{traced._target_to_str(torch.nn.Identity)}"
-                        ),
-                        argument=(_make_var_name(node.name),),
-                        result=(f"::{output_names.pop(0)}",),
-                    )
-                )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
             intermediate.append(
                 Tensor(
