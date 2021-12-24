@@ -374,3 +374,38 @@ def poly2gelu(xin, nform="float16"):
         raise RuntimeError("unsuported numerical format")
 
     return y.float()
+
+
+def svd_lowrank_approximate_tensor(x, rank=6):
+    r"""
+    This function computes a low-rank approximaiton of an input tensor on the last 2 dimensions
+    """
+    m, n = x.shape[-2:]
+    u, s, v = torch.svd_lowrank(x, q=min(rank, m, n))
+    return u @ s.diag_embed() @ v.transpose(-1, -2)
+
+
+def svd_lowrank_linear(input, weight, bias=None, rank=6):
+    r"""
+    This function is an approximated version of torch.nn.functional.linear()
+    """
+    weight = svd_lowrank_approximate_tensor(weight, rank=rank)
+    return torch.nn.functional.linear(input, weight, bias)
+
+
+def svd_lowrank_conv2d(
+    input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, rank=6
+):
+    r"""
+    This function is an approximated version of torch.nn.functional.conv2d()
+    """
+    weight = svd_lowrank_approximate_tensor(weight, rank=rank)
+    return torch.nn.functional.conv2d(
+        input,
+        weight,
+        bias=bias,
+        stride=stride,
+        padding=padding,
+        dilation=dilation,
+        groups=groups,
+    )

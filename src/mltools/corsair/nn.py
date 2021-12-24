@@ -32,6 +32,7 @@ from mltools.approximate import (
     GELUApproximation,
     LayerNormApproximation,
     Approximate,
+    LowRankWeight,
 )
 
 
@@ -89,6 +90,8 @@ class Linear(CorsairModule, torch.nn.Linear):
         super().__init__(in_features, out_features, bias=bias, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
+        if isinstance(self.approximator.function, LowRankWeight):
+            self.weight.data = self.approximator(self.weight.data)
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
@@ -147,6 +150,8 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
+        if isinstance(self.approximator.function, LowRankWeight):
+            self.weight.data = self.approximator(self.weight.data)
         _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
