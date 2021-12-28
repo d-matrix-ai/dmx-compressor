@@ -381,8 +381,18 @@ def svd_lowrank_approximate_tensor(x, rank=6):
     This function computes a low-rank approximaiton of an input tensor on the last 2 dimensions
     """
     m, n = x.shape[-2:]
-    u, s, v = torch.svd_lowrank(x, q=min(rank, m, n))
-    return u @ s.diag_embed() @ v.transpose(-1, -2)
+    rank = min(rank, m, n)
+    
+    _x = x.reshape(-1, m, n).numpy()
+    for i in range(len(_x)):
+        u, s, vh = np.linalg.svd(_x[i])
+        s[rank:] = 0.0
+        _x[i] = u @ np.diag(s) @ vh
+    return x
+
+    # u, s, v = torch.svd_lowrank(x, q=rank)
+    # return u @ s.diag_embed() @ v.transpose(-1, -2)
+
 
 
 def svd_lowrank_linear(input, weight, bias=None, rank=6):
