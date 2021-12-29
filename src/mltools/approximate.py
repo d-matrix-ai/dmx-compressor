@@ -40,6 +40,8 @@ class ApproximationFunction:
             return GELUApproximation.from_shorthand(sh)
         elif sh.startswith("LAYERNORM"):
             return LayerNormApproximation.from_shorthand(sh)
+        elif sh.startswith("LOWRANK_WEIGHT"):
+            return LowRankWeight.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized approximation function shorthand: {sh}")
 
@@ -107,6 +109,33 @@ class SoftmaxApproximation(ApproximationFunction):
 
     def __repr__(self) -> str:
         return f"SOFTMAX({self.algorithm},{self.nform})"
+
+
+class LowRankWeight(ApproximationFunction):
+    def __init__(self, algorithm="svd", rank=6):
+        super().__init__()
+        assert algorithm in ("svd",), f"unsupported low_rank algorithm {algorithm}"
+        self.algorithm = algorithm
+        self.rank = rank
+
+    def execute(self, *args, **kwargs):
+        return eval(f"functions.{self.algorithm}_lowrank_approximate_tensor")(
+            *args, **dict(kwargs, rank=self.rank)
+        )
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse("LOWRANK_WEIGHT({algorithm:w},{rank:d})", sh)
+        return cls(
+            algorithm=conf["algorithm"],
+            rank=conf["rank"],
+        )
+
+    def __str__(self) -> str:
+        return f"Low-rank weight approximation: algorithm = {self.algorithm}, rank = {self.rank}"
+
+    def __repr__(self) -> str:
+        return f"LOWRANK_WEIGHT({self.algorithm},{self.rank})"
 
 
 class LayerNormApproximation(ApproximationFunction):
@@ -213,7 +242,13 @@ class ApproximationMixin:
 
     def approx_forward(self, input, *args, **kwargs):
         _output = super().forward(input)
-        if not isinstance(self.approximator.function, NoApproximation):
+        if not isinstance(
+            self.approximator.function,
+            (
+                NoApproximation,
+                LowRankWeight,
+            ),
+        ):
             with torch.no_grad():
                 _approx = self.approximator(input, *args, **kwargs)
                 self.approximation_error = _approx - _output.data
