@@ -382,7 +382,7 @@ def svd_lowrank_approximate_tensor(x, rank=6):
     """
     m, n = x.shape[-2:]
     rank = min(rank, m, n)
-    
+
     _x = x.reshape(-1, m, n).numpy()
     for i in range(len(_x)):
         u, s, vh = np.linalg.svd(_x[i])
@@ -392,7 +392,6 @@ def svd_lowrank_approximate_tensor(x, rank=6):
 
     # u, s, v = torch.svd_lowrank(x, q=rank)
     # return u @ s.diag_embed() @ v.transpose(-1, -2)
-
 
 
 def svd_lowrank_linear(input, weight, bias=None, rank=6):

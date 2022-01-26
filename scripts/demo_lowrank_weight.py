@@ -28,4 +28,4 @@ for rank in (512, 256, 128, 64, 32, 16, 8):
         dict(approximation_function=f"LOWRANK_WEIGHT(svd,{rank})")
     )
     sample_output1 = model(sample_input)
-    print(f"Rank = {rank}: Frobenious norm of output error divided by Frobenious norm of original output = {torch.norm(sample_output1 - sample_output0) / torch.norm(sample_output0)}")
+    print(f"Rank = {rank}: Frobenius norm of output error divided by Frobenius norm of original output = {torch.norm(sample_output1 - sample_output0) / torch.norm(sample_output0)}")
