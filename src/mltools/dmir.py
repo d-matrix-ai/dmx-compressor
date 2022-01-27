@@ -1400,6 +1400,21 @@ def dump(
                             ),
                         ),
                     )
+                elif node.target==torch.unsqueeze or node.target=="unsqueeze":
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="dim",
+                                    integer_value=node.args[1],
+                                ),
+                            )
+                        )
+                    )
                 else:
                     dependency.append(
                         Dependency(
