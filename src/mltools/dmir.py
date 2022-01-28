@@ -403,77 +403,81 @@ def _conv_graph(m, node, input_names, output_names, omit_value=False):
         if m.bias is not None
         else None
     )  # this is a static input
+    _input = [
+        Tensor(
+            name=_make_var_name(node.name, suffix="input"),
+            **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+        ),  # this is a dynamic input
+    ]
+    _intermediate = [_weight] if _bias is None else [_weight, _bias]
+    _output = [
+        Tensor(
+            name=_make_var_name(node.name, suffix="output"),
+            **_tensor_meta_dict(node.meta["tensor_meta"]),
+        ),
+    ]
+    _dependency = [
+        Dependency(
+            operation=f"conv",
+            argument=(
+                _make_var_name(node.name, suffix="input"),
+                _make_var_name(node.name, suffix="weight"),
+            )
+            if _bias is None
+            else (
+                _make_var_name(node.name, suffix="input"),
+                _make_var_name(node.name, suffix="weight"),
+                _make_var_name(node.name, suffix="bias"),
+            ),
+            result=(_make_var_name(node.name, suffix="output"),),
+            attribute=(
+                Attribute(
+                    kind=Attribute.INTS,
+                    name="stride",
+                    integer_values=m.stride,
+                )
+                if isinstance(m.stride, tuple)
+                else Attribute(
+                    kind=Attribute.INT,
+                    name="stride",
+                    integer_value=m.stride,
+                ),
+                Attribute(
+                    kind=Attribute.INTS,
+                    name="padding",
+                    integer_values=m.padding,
+                )
+                if isinstance(m.padding, tuple)
+                else Attribute(
+                    kind=Attribute.INT,
+                    name="padding",
+                    integer_value=m.padding,
+                ),
+                Attribute(
+                    kind=Attribute.INTS,
+                    name="dilation",
+                    integer_values=m.dilation,
+                )
+                if isinstance(m.dilation, tuple)
+                else Attribute(
+                    kind=Attribute.INT,
+                    name="dilation",
+                    integer_value=m.dilation,
+                ),
+                Attribute(
+                    kind=Attribute.INT,
+                    name="groups",
+                    integer_value=m.groups,
+                ),
+            ),
+        ),
+    ]
     return Graph(
         name=node.name,
-        input=(
-            Tensor(
-                name=_make_var_name(node.name, suffix="input"),
-                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
-            ),  # this is a dynamic input
-        ),
-        intermediate=(_weight,) if _bias is None else (_weight, _bias),
-        output=(
-            Tensor(
-                name=_make_var_name(node.name, suffix="output"),
-                **_tensor_meta_dict(node.meta["tensor_meta"]),
-            ),
-        ),
-        dependency=(
-            Dependency(
-                operation=f"conv",
-                argument=(
-                    _make_var_name(node.name, suffix="input"),
-                    _make_var_name(node.name, suffix="weight"),
-                )
-                if _bias is None
-                else (
-                    _make_var_name(node.name, suffix="input"),
-                    _make_var_name(node.name, suffix="weight"),
-                    _make_var_name(node.name, suffix="bias"),
-                ),
-                result=(_make_var_name(node.name, suffix="output"),),
-                attribute=(
-                    Attribute(
-                        kind=Attribute.INTS,
-                        name="stride",
-                        integer_values=m.stride,
-                    )
-                    if isinstance(m.stride, tuple)
-                    else Attribute(
-                        kind=Attribute.INT,
-                        name="stride",
-                        integer_value=m.stride,
-                    ),
-                    Attribute(
-                        kind=Attribute.INTS,
-                        name="padding",
-                        integer_values=m.padding,
-                    )
-                    if isinstance(m.padding, tuple)
-                    else Attribute(
-                        kind=Attribute.INT,
-                        name="padding",
-                        integer_value=m.padding,
-                    ),
-                    Attribute(
-                        kind=Attribute.INTS,
-                        name="dilation",
-                        integer_values=m.dilation,
-                    )
-                    if isinstance(m.dilation, tuple)
-                    else Attribute(
-                        kind=Attribute.INT,
-                        name="dilation",
-                        integer_value=m.dilation,
-                    ),
-                    Attribute(
-                        kind=Attribute.INT,
-                        name="groups",
-                        integer_value=m.groups,
-                    ),
-                ),
-            ),
-        ),
+        input=_input,
+        intermediate=_intermediate,
+        output=_output,
+        dependency=_dependency,
         metadata=_nn_module_meta(m),
     )
 
@@ -1017,15 +1021,35 @@ def dump(
                                 attribute=_corsair_specific_attributes(_m),
                             )
                         )
-                        subgraph.append(
-                            _conv_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
+                        if isinstance(_m, corsair.nn.Conv2d):
+                            subgraph.append(
+                                dump(
+                                    _m,
+                                    *[
+                                        torch.randn(
+                                            arg.meta["tensor_meta"].shape,
+                                            dtype=arg.meta["tensor_meta"].dtype,
+                                        )
+                                        for arg in node.args
+                                    ],
+                                    name=node.name,
+                                    input_names=_input_names,
+                                    output_names=_output_names,
+                                    flat=flat,
+                                    omit_value=omit_value,
+                                    metadata=_nn_module_meta(_m),
+                                )
                             )
-                        )
+                        else: 
+                            subgraph.append(
+                                _conv_graph(
+                                    _m,
+                                    node,
+                                    _input_names,
+                                    _output_names,
+                                    omit_value=omit_value,
+                                )
+                            )
                 elif isinstance(_m, torch.nn.modules.pooling._MaxPoolNd):
                     if flat:
                         dependency.append(
@@ -1314,6 +1338,79 @@ def dump(
                                     kind=Attribute.INT,
                                     name="end_dim",
                                     integer_value=end_dim,
+                                ),
+                            )
+                        )
+                    )
+                elif node.target==torch.nn.functional.conv2d:
+                    _input, _weight, _bias, _stride, _padding, _dilation, _groups = node.args
+                    dependency.append(
+                        Dependency(
+                            operation=f"conv",
+                            argument=(
+                                _make_var_name(_input.name),
+                                _make_var_name(_weight.name),
+                            )
+                            if _bias is None
+                            else (
+                                _make_var_name(_input.name),
+                                _make_var_name(_weight.name),
+                                _make_var_name(_bias.name),
+                            ),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="stride",
+                                    integer_values=_stride,
+                                )
+                                if isinstance(_stride, tuple)
+                                else Attribute(
+                                    kind=Attribute.INT,
+                                    name="stride",
+                                    integer_value=_stride,
+                                ),
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="padding",
+                                    integer_values=_padding,
+                                )
+                                if isinstance(_padding, tuple)
+                                else Attribute(
+                                    kind=Attribute.INT,
+                                    name="padding",
+                                    integer_value=_padding,
+                                ),
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="dilation",
+                                    integer_values=_dilation,
+                                )
+                                if isinstance(_dilation, tuple)
+                                else Attribute(
+                                    kind=Attribute.INT,
+                                    name="dilation",
+                                    integer_value=_dilation,
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="groups",
+                                    integer_value=_groups,
+                                ),
+                            ),
+                        ),
+                    )
+                elif node.target==torch.unsqueeze or node.target=="unsqueeze":
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="dim",
+                                    integer_value=node.args[1],
                                 ),
                             )
                         )
