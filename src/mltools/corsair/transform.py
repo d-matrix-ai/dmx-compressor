@@ -1,7 +1,7 @@
 import sys
 import torch
 from .nn import *
-from mltools import dmir, corsair
+from mltools import dmir
 from mltools.utils import load_config_file
 
 
@@ -55,13 +55,13 @@ class Model(torch.nn.Module):
         """
         if isinstance(config, str):
             config = load_config_file(config)
-            
+
         for n, m in self.body.named_modules():
             if isinstance(m, CorsairModule):
                 for r in config["transformation_rules"]:
                     if (
                         isinstance(m, eval(r["instance"]))
-                        and all([_n in n for _n in r["name_includes"]])
+                        and any([_n in n for _n in r["name_includes"]])
                         and all([not _n in n for _n in r["name_excludes"]])
                     ):
                         m._transform(r["config"])
@@ -70,5 +70,13 @@ class Model(torch.nn.Module):
         return dmir.dump(
             self.body,
             self.head(sample_input),
+            **kwargs,
+        )
+
+    def fx_graph(self, sample_input, **kwargs):
+        return dmir.parse_fx(
+            self.body,
+            self.head(sample_input),
+            graph_dict=dict(),
             **kwargs,
         )

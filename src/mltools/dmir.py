@@ -1,4 +1,6 @@
 from mltools.utils.dmir_pb2 import *
+
+# from mltools.utils.graph_to_csv import graph_to_csv
 import itertools
 import json
 from google.protobuf.json_format import MessageToJson, Parse
@@ -166,6 +168,7 @@ class DMIRTracer(fx.Tracer):
                 torch.nn.modules.pooling._AdaptiveAvgPoolNd,
                 torch.nn.modules.pooling._AvgPoolNd,
                 torch.nn.modules.ReLU,
+                torch.nn.modules.Linear,
             ),
         )
         if self.flat:
@@ -175,8 +178,7 @@ class DMIRTracer(fx.Tracer):
                 is_leaf
                 or m.__module__.startswith("torch.nn")
                 or m.__module__.startswith("corsair.nn")
-                and not isinstance(m, torch.nn.Sequential)
-            )
+            ) and not isinstance(m, torch.nn.Sequential)
 
     def call_module(
         self,
@@ -199,7 +201,9 @@ def _torch_qualified_name(name: str) -> str:
     return name.replace(".[", "[")
 
 
-def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
+def _make_var_name(
+    name: str, prefix: str = "", suffix: str = "", end: str = "_"
+) -> str:
     # TODO: treat constant args as attributes
     if name.isnumeric() or name in ("None", "True", "False"):
         return name
@@ -214,7 +218,7 @@ def _make_var_name(name: str, prefix: str = "", suffix: str = "") -> str:
         if suffix != "":
             suffix = "_" + suffix
         name = f"{prefix}{name}{suffix}"
-        return f"{name}_".replace(".", "__")
+        return f"{name}{end}".replace(".", "__")
 
 
 def _legal_op_type(opname: str) -> str:
@@ -712,6 +716,141 @@ def _adaptive_avg_pool_graph(m, node, input_names, output_names, omit_value=Fals
     )
 
 
+def _list_to_int(x):
+    return [x if isinstance(x, int) else x[0]][0]
+
+
+def parse_fx(
+    m: torch.nn.Module,
+    *sample_input: torch.Tensor,
+    graph_dict: dict = None,
+):
+    tracer = DMIRTracer()
+    gm = fx.GraphModule(root=m, graph=tracer.trace(m))
+    ShapeProp(gm).propagate(*sample_input)
+    traced = gm.graph
+
+    for node in traced.nodes:
+        op_name = node.name
+        input_format, output_format, input_shape, output_shape = None, None, None, None
+        weight_format, weight_shape, weight_sparsity = None, None, None
+        padding, stride, kernel_size = None, None, None
+
+        _input_names = [_make_var_name(n.__str__(), end="") for n in node.args]
+        _output_names = [_make_var_name(node.name, end="")]
+
+        if node.op == "placeholder":  # dynamic inputs
+            op_name = "input"
+
+        elif node.op == "output":
+            op_name = "output"
+
+        elif node.op == "get_attr":  # static inputs
+            pass  # .T (transpose) op applied in the forward call can be processed here
+
+        elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
+
+            if node.op == "call_module":
+                _m = eval(_torch_qualified_name(f"m.{node.target}"))
+                if isinstance(_m, torch.nn.modules.conv._ConvNd) or isinstance(
+                    _m, torch.nn.modules.linear.Linear
+                ):
+                    if isinstance(_m, torch.nn.modules.conv._ConvNd):
+                        op_name = "conv"
+                        padding = _list_to_int(_m.padding)
+                        stride = _list_to_int(_m.stride)
+                        kernel_size = _list_to_int(_m.kernel_size)
+                    elif isinstance(_m, torch.nn.modules.linear.Linear):
+                        op_name = "linear"
+
+                    weight_shape = list(_m.weight.shape)
+
+                    if isinstance(_m.weight_cast.format, numerical.BlockFloatingPoint):
+                        if _m.weight_cast.format.precision == 4:
+                            weight_format = "BFP12"
+                        elif _m.weight_cast.format.precision == 8:
+                            weight_format = "BFP16"
+                    else:
+                        weight_format = "FP16"
+
+                    if isinstance(_m.input_cast.format, numerical.BlockFloatingPoint):
+                        if _m.input_cast.format.precision == 4:
+                            input_format = "BFP12"
+                        elif _m.input_cast.format.precision == 8:
+                            input_format = "BFP16"
+                    else:
+                        input_format = "FP16"
+
+                    if isinstance(_m.weight_sparsifier.sparseness, sparse.Dense):
+                        weight_sparsity = "dense"
+                    else:
+                        weight_sparsity = "sparse"
+
+                elif isinstance(_m, torch.nn.modules.pooling._MaxPoolNd):
+                    op_name = "max_pool"
+                    padding = _list_to_int(_m.padding)
+                    stride = _list_to_int(_m.stride)
+                    kernel_size = _list_to_int(_m.kernel_size)
+                elif isinstance(_m, torch.nn.modules.pooling._AvgPoolNd):
+                    op_name = "avg_pool"
+                    padding = _list_to_int(_m.padding)
+                    stride = _list_to_int(_m.stride)
+                    kernel_size = _list_to_int(_m.kernel_size)
+                elif isinstance(_m, torch.nn.modules.pooling._AdaptiveAvgPoolNd):
+                    op_name = "global_avg_pool"
+                elif isinstance(_m, torch.nn.modules.ReLU):
+                    op_name = "relu"
+                elif isinstance(_m, torch.nn.modules.batchnorm._BatchNorm):
+                    op_name = "batchnorm"
+
+                else:  # custom modules
+                    subgraph_sample_input = [
+                        torch.randn(
+                            arg.meta["tensor_meta"].shape,
+                            dtype=arg.meta["tensor_meta"].dtype,
+                        )
+                        for arg in node.args
+                    ]
+                    parse_fx(
+                        _m,
+                        *subgraph_sample_input,
+                        graph_dict=graph_dict,
+                    )
+            else:  # built-in function or tensor method
+                op_name = f"{traced._target_to_str(node.target)}"
+                if op_name == "matmul":
+                    weight_shape = list(node.args[1].meta["tensor_meta"].shape)
+                    weight_format = "FP16"
+
+        else:
+            raise RuntimeError(f"illegal FXIR node opcode {node.op}")
+
+        if node.args != ():
+            input_shape = list(node.args[0].meta["tensor_meta"].shape)
+            output_shape = list(node.meta["tensor_meta"].shape)
+            if input_format is None:
+                input_format = "FP16"
+            if output_format is None:
+                output_format = "FP16"
+
+        graph_dict[node.name] = {
+            "op": op_name,
+            "input_name": _input_names,
+            "input_shape": input_shape,
+            "input_format": input_format,
+            "param_shape": weight_shape,
+            "param_format": weight_format,
+            "param_sparsity": weight_sparsity,
+            "output_name": _output_names,
+            "output_shape": output_shape,
+            "output_format": output_format,
+            "padding": padding,
+            "stride": stride,
+            "kernel_size": kernel_size,
+        }
+    return graph_dict
+
+
 def dump(
     m: torch.nn.Module,
     *sample_input: torch.Tensor,
@@ -933,6 +1072,7 @@ def dump(
                                 omit_value=omit_value,
                             )
                         )
+
                 elif isinstance(_m, torch.nn.modules.conv._ConvNd):
                     _weight = Tensor(
                         name=_make_var_name(node.name, suffix="weight"),
@@ -1040,7 +1180,7 @@ def dump(
                                     metadata=_nn_module_meta(_m),
                                 )
                             )
-                        else: 
+                        else:
                             subgraph.append(
                                 _conv_graph(
                                     _m,
@@ -1313,7 +1453,7 @@ def dump(
                         )
                     )
             else:  # built-in function or tensor method
-                if node.target==torch.flatten:
+                if node.target == torch.flatten:
                     start_dim = node.args[1] if len(node.args) > 1 else 0
                     end_dim = node.args[2] if len(node.args) > 2 else -1
                     node.args = (node.args[0],)
@@ -1339,11 +1479,19 @@ def dump(
                                     name="end_dim",
                                     integer_value=end_dim,
                                 ),
-                            )
+                            ),
                         )
                     )
-                elif node.target==torch.nn.functional.conv2d:
-                    _input, _weight, _bias, _stride, _padding, _dilation, _groups = node.args
+                elif node.target == torch.nn.functional.conv2d:
+                    (
+                        _input,
+                        _weight,
+                        _bias,
+                        _stride,
+                        _padding,
+                        _dilation,
+                        _groups,
+                    ) = node.args
                     dependency.append(
                         Dependency(
                             operation=f"conv",
@@ -1400,7 +1548,7 @@ def dump(
                             ),
                         ),
                     )
-                elif node.target==torch.unsqueeze or node.target=="unsqueeze":
+                elif node.target == torch.unsqueeze or node.target == "unsqueeze":
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
@@ -1412,7 +1560,7 @@ def dump(
                                     name="dim",
                                     integer_value=node.args[1],
                                 ),
-                            )
+                            ),
                         )
                     )
                 else:
