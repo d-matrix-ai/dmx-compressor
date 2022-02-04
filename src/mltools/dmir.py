@@ -389,7 +389,59 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         metadata=_nn_module_meta(m),
     )
 
-
+def _linear_graph(m, node, input_names, output_names, omit_value=False):
+    _weight = Tensor(
+        name=_make_var_name(node.name, suffix="weight"),
+        value=[] if omit_value else _make_value_for_dumping(m.weight),
+        shape=m.weight.shape,
+        format=_legal_format(m.weight.dtype),
+    )  # this is a static input
+    _bias = (
+        Tensor(
+            name=_make_var_name(node.name, suffix="bias"),
+            value=[] if omit_value else _make_value_for_dumping(m.bias),
+            shape=m.bias.shape,
+            format=_legal_format(m.bias.dtype),
+        )
+        if m.bias is not None
+        else None
+    )  # this is a static input
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        intermediate=(_weight,) if _bias is None else (_weight, _bias),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"conv",
+                argument=(
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="weight"),
+                )
+                if _bias is None
+                else (
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="weight"),
+                    _make_var_name(node.name, suffix="bias"),
+                ),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                ),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+    
 def _conv_graph(m, node, input_names, output_names, omit_value=False):
     _weight = Tensor(
         name=_make_var_name(node.name, suffix="weight"),
@@ -1072,7 +1124,85 @@ def dump(
                                 omit_value=omit_value,
                             )
                         )
-
+                elif isinstance(_m, torch.nn.modules.Linear):
+                    _weight = Tensor(
+                        name=_make_var_name(node.name, suffix="weight"),
+                        value=[] if omit_value else _make_value_for_dumping(_m.weight),
+                        shape=_m.weight.shape,
+                        format=_legal_format(_m.weight.dtype),
+                    )  # this is a static input
+                    _bias = (
+                        Tensor(
+                            name=_make_var_name(node.name, suffix="bias"),
+                            value=[]
+                            if omit_value
+                            else _make_value_for_dumping(_m.bias),
+                            shape=_m.bias.shape,
+                            format=_legal_format(_m.bias.dtype),
+                        )
+                        if _m.bias is not None
+                        else None
+                    )  # this is a static input
+                    if flat:
+                        intermediate.append(_weight)
+                        if _bias is not None:
+                            intermediate.append(_bias)
+                        dependency.append(
+                            Dependency(
+                                operation=f"conv",
+                                argument=(
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="weight"),
+                                )
+                                if _bias is None
+                                else (
+                                    _input_names[0],
+                                    _make_var_name(node.name, suffix="weight"),
+                                    _make_var_name(node.name, suffix="bias"),
+                                ),
+                                result=(_output_names[0],),
+                                attribute=(
+                                ),
+                            ),
+                        )
+                    else:
+                        dependency.append(
+                            Dependency(
+                                operation=node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
+                        if isinstance(_m, corsair.nn.Linear):
+                            subgraph.append(
+                                dump(
+                                    _m,
+                                    *[
+                                        torch.randn(
+                                            arg.meta["tensor_meta"].shape,
+                                            dtype=arg.meta["tensor_meta"].dtype,
+                                        )
+                                        for arg in node.args
+                                    ],
+                                    name=node.name,
+                                    input_names=_input_names,
+                                    output_names=_output_names,
+                                    flat=flat,
+                                    omit_value=omit_value,
+                                    metadata=_nn_module_meta(_m),
+                                )
+                            )
+                        else:
+                            subgraph.append(
+                                _linear_graph(
+                                    _m,
+                                    node,
+                                    _input_names,
+                                    _output_names,
+                                    omit_value=omit_value,
+                                )
+                            )
                 elif isinstance(_m, torch.nn.modules.conv._ConvNd):
                     _weight = Tensor(
                         name=_make_var_name(node.name, suffix="weight"),
