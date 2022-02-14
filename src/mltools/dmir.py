@@ -423,7 +423,7 @@ def _linear_graph(m, node, input_names, output_names, omit_value=False):
         ),
         dependency=(
             Dependency(
-                operation=f"conv",
+                operation=f"linear",
                 argument=(
                     _make_var_name(node.name, suffix="input"),
                     _make_var_name(node.name, suffix="weight"),
@@ -1149,7 +1149,7 @@ def dump(
                             intermediate.append(_bias)
                         dependency.append(
                             Dependency(
-                                operation=f"conv",
+                                operation=f"linear",
                                 argument=(
                                     _input_names[0],
                                     _make_var_name(node.name, suffix="weight"),
