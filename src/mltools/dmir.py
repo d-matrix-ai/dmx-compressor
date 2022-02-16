@@ -19,6 +19,8 @@ from typing import (
 )
 import torch
 from torch import fx
+import transformers.utils.fx as fx_hf
+import transformers
 from mltools import numerical, sparse, approximate, corsair
 
 __ALL__ = [
@@ -270,12 +272,27 @@ def _tensor_meta_dict(meta):
     if isinstance(meta, list):
         assert len(meta) == 1
         meta = meta[0]
-    return dict(
-        shape=meta.shape,
-        format=_legal_format(meta.dtype),
-        is_quantized=meta.is_quantized,
-        qscheme=str(meta.is_quantized) if meta.is_quantized else "",
-        q_scale=meta.q_scale,
+    if isinstance(meta, fx.immutable_collections.immutable_dict):
+        meta = meta['start_logits']
+
+    if isinstance(meta, tuple) and len(meta) == 2:
+        meta = meta[0]
+        return dict(
+            shape=meta.shape,
+            format=_legal_format(meta.dtype),
+            is_quantized=meta.is_quantized,
+            qscheme=str(meta.is_quantized) if meta.is_quantized else "",
+            q_scale=meta.q_scale,
+            q_zero_point=meta.q_zero_point,
+        )
+
+    else:
+        return dict(
+            shape=meta.shape,
+            format=_legal_format(meta.dtype),
+            is_quantized=meta.is_quantized,
+            qscheme=str(meta.is_quantized) if meta.is_quantized else "",
+            q_scale=meta.q_scale,
         q_zero_point=meta.q_zero_point,
     )
 
@@ -905,7 +922,7 @@ def parse_fx(
 
 def dump(
     m: torch.nn.Module,
-    *sample_input: torch.Tensor,
+    *sample_input: torch.Tensor, # TODO type check for HF input
     name: str = "",
     input_names: Optional[List[str]] = None,
     output_names: Optional[List[str]] = None,
@@ -915,10 +932,23 @@ def dump(
 ) -> Graph:
 
     tracer = DMIRTracer(flat=flat)
-    gm = fx.GraphModule(root=m, graph=tracer.trace(m))
-    ShapeProp(gm).propagate(*sample_input)
-    traced = gm.graph
 
+    if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
+        gm = fx_hf.symbolic_trace(
+            m,
+            input_names=["input_ids", "attention_mask", "token_type_ids"],
+            batch_size=sample_input[0]["input_ids"].shape[0], #TODO work for non input-id tensors
+            sequence_length=384)
+
+        sample_input = sample_input[0]
+        ShapeProp(gm).propagate([sample_input["input_ids"], sample_input["attention_mask"], sample_input["token_type_ids"]])
+
+    else:
+        graph = tracer.trace(m)
+        gm = fx.GraphModule(root=m, graph=graph)
+        ShapeProp(gm).propagate(*sample_input)
+
+    traced = gm.graph
     input = []
     output = []
     intermediate = []
@@ -955,7 +985,7 @@ def dump(
                     operation=_legal_op_type(
                         f"{traced._target_to_str(torch.nn.Identity)}"
                     ),
-                    argument=(_make_var_name(node.args[0].name),),
+                    argument=(_make_var_name(node.args[0]['start_logits'].name if isinstance(node.args[0], fx.immutable_collections.immutable_dict) else node.args[0].name),),
                     result=(_make_var_name(node.name),),
                 )
             )
@@ -1568,7 +1598,7 @@ def dump(
                         dump(
                             _m,
                             *[
-                                torch.randn(
+                                torch.zeros(
                                     arg.meta["tensor_meta"].shape,
                                     dtype=arg.meta["tensor_meta"].dtype,
                                 )
