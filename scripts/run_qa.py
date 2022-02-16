@@ -25,7 +25,7 @@ from typing import Optional
 from datasets import load_dataset, load_metric
 
 from mltools import corsair
-corsair.aware()
+# corsair.aware()
 
 import transformers
 from trainer_qa import QuestionAnsweringTrainer
@@ -213,6 +213,14 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    fp16_ds_config = {
+        "fp16": {
+            "enabled": "false",
+        }
+    }
+
+    # training_args["deepspeed"] = fp16_ds_config
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if (
@@ -308,8 +316,8 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    _model = corsair.Model(model)
-    _model.transform(config="configs/corsair_transformers.yaml")
+    # model = corsair.Model(model)
+    # model.transform(config="configs/corsair_transformers.yaml")
     print(model)
 
     # Tokenizer check: this script requires a fast tokenizer.
@@ -557,18 +565,19 @@ def main():
 
     # Evaluation
     results = {}
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        results = trainer.evaluate()
+    # if training_args.do_eval:
+    #     logger.info("*** Evaluate ***")
+    #     results = trainer.evaluate()
 
-        output_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_eval_file, "w") as writer:
-                logger.info("***** Eval results *****")
-                for key, value in sorted(results.items()):
-                    logger.info(f"  {key} = {value}")
-                    writer.write(f"{key} = {value}\n")
+    #     output_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
+    #     if trainer.is_world_process_zero():
+    #         with open(output_eval_file, "w") as writer:
+    #             logger.info("***** Eval results *****")
+    #             for key, value in sorted(results.items()):
+    #                 logger.info(f"  {key} = {value}")
+    #                 writer.write(f"{key} = {value}\n")
 
+    trainer.dump_dmir()
     return results
 
 

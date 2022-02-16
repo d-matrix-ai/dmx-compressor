@@ -18,18 +18,38 @@ A subclass of `Trainer` specific to Question-Answering tasks
 
 from transformers import Trainer, is_torch_tpu_available
 from transformers.trainer_utils import PredictionOutput
+import torch
 
+from mlreferences import bert_large as ref
+import transformers.utils.fx as fx_hf
+from mltools import *
 
 if is_torch_tpu_available():
     import torch_xla.core.xla_model as xm
     import torch_xla.debug.metrics as met
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class QuestionAnsweringTrainer(Trainer):
     def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
+
+    def dump_dmir(self):
+
+        eval_dataset = self.eval_dataset
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        sample_input = next(iter(eval_dataloader))
+        sample_input = self._prepare_inputs(sample_input)
+
+        model = self.model
+        m = corsair.Model(model)
+        m.transform(ref.corsair_config_file)
+        graph = m.dmir_graph(sample_input, omit_value=True)
+        dmir.save_to_file(graph, "./bert_large_dump.json", format="json")
+
 
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
