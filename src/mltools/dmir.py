@@ -298,7 +298,7 @@ def _tensor_meta_dict(meta):
 
 
 def _make_value_for_dumping(x: Optional[Tensor]):
-    return x.data.contiguous().view(-1).numpy().tolist() if x is not None else x
+    return x.data.contiguous().view(-1).cpu().numpy().tolist() if x is not None else x
 
 
 def _sparsifier_graph(m, node, input_names, output_names, omit_value=False):
@@ -1212,6 +1212,7 @@ def dump(
                                         torch.randn(
                                             arg.meta["tensor_meta"].shape,
                                             dtype=arg.meta["tensor_meta"].dtype,
+                                            device=_m.weight.device,
                                         )
                                         for arg in node.args
                                     ],
@@ -1329,6 +1330,7 @@ def dump(
                                         torch.randn(
                                             arg.meta["tensor_meta"].shape,
                                             dtype=arg.meta["tensor_meta"].dtype,
+                                            device=_m.weight.device,
                                         )
                                         for arg in node.args
                                     ],
