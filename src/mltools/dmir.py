@@ -941,7 +941,7 @@ def dump(
             sequence_length=384)
 
         sample_input = sample_input[0]
-        ShapeProp(gm).propagate([sample_input["input_ids"], sample_input["attention_mask"], sample_input["token_type_ids"]])
+        ShapeProp(gm).propagate(sample_input["input_ids"], sample_input["attention_mask"], sample_input["token_type_ids"])
 
     else:
         graph = tracer.trace(m)
