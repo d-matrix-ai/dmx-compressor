@@ -2,7 +2,8 @@ import sys
 import torch
 from .nn import *
 from mltools import dmir
-from mltools.utils import load_config_file
+from mltools.utils import load_config_file, graph_utils
+from sol import sol_sim, corsair_hw
 
 
 def aware():
@@ -80,3 +81,8 @@ class Model(torch.nn.Module):
             graph_dict=dict(),
             **kwargs,
         )
+
+    def sol_analyze(self, sample_input, corsair_hw=corsair_hw.Slice(), **kwargs):
+        graph = self.fx_graph(sample_input)
+        pruned_graph = graph_utils.prune_graph(graph)
+        return sol_sim.analyze(pruned_graph, **kwargs)
