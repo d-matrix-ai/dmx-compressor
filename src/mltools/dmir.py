@@ -273,7 +273,7 @@ def _tensor_meta_dict(meta):
         assert len(meta) == 1
         meta = meta[0]
     if isinstance(meta, fx.immutable_collections.immutable_dict):
-        meta = meta['start_logits']
+        meta = meta["start_logits"]
 
     if isinstance(meta, tuple) and len(meta) == 2:
         meta = meta[0]
@@ -293,8 +293,8 @@ def _tensor_meta_dict(meta):
             is_quantized=meta.is_quantized,
             qscheme=str(meta.is_quantized) if meta.is_quantized else "",
             q_scale=meta.q_scale,
-        q_zero_point=meta.q_zero_point,
-    )
+            q_zero_point=meta.q_zero_point,
+        )
 
 
 def _make_value_for_dumping(x: Optional[Tensor]):
@@ -406,6 +406,7 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
         metadata=_nn_module_meta(m),
     )
 
+
 def _linear_graph(m, node, input_names, output_names, omit_value=False):
     _weight = Tensor(
         name=_make_var_name(node.name, suffix="weight"),
@@ -452,13 +453,13 @@ def _linear_graph(m, node, input_names, output_names, omit_value=False):
                     _make_var_name(node.name, suffix="bias"),
                 ),
                 result=(_make_var_name(node.name, suffix="output"),),
-                attribute=(
-                ),
+                attribute=(),
             ),
         ),
         metadata=_nn_module_meta(m),
     )
-    
+
+
 def _conv_graph(m, node, input_names, output_names, omit_value=False):
     _weight = Tensor(
         name=_make_var_name(node.name, suffix="weight"),
@@ -922,7 +923,7 @@ def parse_fx(
 
 def dump(
     m: torch.nn.Module,
-    *sample_input: torch.Tensor, # TODO type check for HF input
+    *sample_input: torch.Tensor,  # TODO type check for HF input
     name: str = "",
     input_names: Optional[List[str]] = None,
     output_names: Optional[List[str]] = None,
@@ -937,11 +938,18 @@ def dump(
         gm = fx_hf.symbolic_trace(
             m,
             input_names=["input_ids", "attention_mask", "token_type_ids"],
-            batch_size=sample_input[0]["input_ids"].shape[0], #TODO work for non input-id tensors
-            sequence_length=384)
+            batch_size=sample_input[0]["input_ids"].shape[
+                0
+            ],  # TODO work for non input-id tensors
+            sequence_length=384,
+        )
 
         sample_input = sample_input[0]
-        ShapeProp(gm).propagate(sample_input["input_ids"], sample_input["attention_mask"], sample_input["token_type_ids"])
+        ShapeProp(gm).propagate(
+            sample_input["input_ids"],
+            sample_input["attention_mask"],
+            sample_input["token_type_ids"],
+        )
 
     else:
         graph = tracer.trace(m)
@@ -985,7 +993,15 @@ def dump(
                     operation=_legal_op_type(
                         f"{traced._target_to_str(torch.nn.Identity)}"
                     ),
-                    argument=(_make_var_name(node.args[0]['start_logits'].name if isinstance(node.args[0], fx.immutable_collections.immutable_dict) else node.args[0].name),),
+                    argument=(
+                        _make_var_name(
+                            node.args[0]["start_logits"].name
+                            if isinstance(
+                                node.args[0], fx.immutable_collections.immutable_dict
+                            )
+                            else node.args[0].name
+                        ),
+                    ),
                     result=(_make_var_name(node.name),),
                 )
             )
@@ -1191,8 +1207,7 @@ def dump(
                                     _make_var_name(node.name, suffix="bias"),
                                 ),
                                 result=(_output_names[0],),
-                                attribute=(
-                                ),
+                                attribute=(),
                             ),
                         )
                     else:
@@ -1710,7 +1725,13 @@ def dump(
                             ),
                         ),
                     )
-                elif node.target == torch.unsqueeze or node.target == "unsqueeze":
+                elif (
+                    node.target == torch.unsqueeze
+                    or node.target == "unsqueeze"
+                    or node.target == torch.squeeze
+                    or node.target == "squeeze"
+                ):
+                    dim = node.args[1] if len(node.args) > 1 else None
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
@@ -1720,7 +1741,45 @@ def dump(
                                 Attribute(
                                     kind=Attribute.INT,
                                     name="dim",
-                                    integer_value=node.args[1],
+                                    integer_value=dim,
+                                ),
+                            )
+                            if dim is not None
+                            else (),
+                        )
+                    )
+                elif (
+                    node.target == "view"
+                    or node.target == torch.reshape
+                    or node.target == "reshape"
+                ):
+                    shape = node.args[1:]
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="shape",
+                                    integer_values=shape,
+                                ),
+                            ),
+                        )
+                    )
+                elif node.target == "permute" or node.target == torch.permute:
+                    dims = node.args[1:]
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="dim",
+                                    integer_values=dims,
                                 ),
                             ),
                         )
