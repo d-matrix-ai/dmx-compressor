@@ -1768,6 +1768,27 @@ def dump(
                             ),
                         )
                     )
+                elif node.target == "transpose" or node.target == torch.transpose:
+                    dim0, dim1 = node.args[1], node.args[2]
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="dim0",
+                                    integer_value=dim0,
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="dim1",
+                                    integer_value=dim1,
+                                ),
+                            ),
+                        )
+                    )
                 elif node.target == "permute" or node.target == torch.permute:
                     dims = node.args[1:]
                     dependency.append(
@@ -1851,6 +1872,34 @@ def dump(
                             argument=(_make_var_name(node.args[0].name),_make_var_name(node.args[1].name),),
                             result=(_make_var_name(node.name),),
                             attribute=attrs,
+                        )
+                    )
+                elif (
+                    node.target == "dropout"
+                    or node.target == torch.nn.functional.dropout
+                ):
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.FLOAT,
+                                    name="p",
+                                    float_value=node.kwargs["p"],
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="training",
+                                    integer_value=int(node.kwargs["training"]),
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="inplace",
+                                    integer_value=int(node.kwargs["inplace"]),
+                                ),
+                            ),
                         )
                     )
                 else:
