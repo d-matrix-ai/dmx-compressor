@@ -1825,6 +1825,56 @@ def dump(
                         )
                     )
                 elif (
+                    node.target == "embedding"
+                    or node.target == torch.nn.functional.embedding
+                ):
+                    attrs = []
+                    if node.args[2] is not None:
+                        attrs.append(
+                            Attribute(
+                                kind=Attribute.INT,
+                                name="padding_idx",
+                                integer_value=node.args[2],
+                            )
+                        )
+                    if node.args[3] is not None:
+                        attrs.append(
+                            Attribute(
+                                kind=Attribute.FLOAT,
+                                name="max_norm",
+                                float_value=node.args[3],
+                            )
+                        )
+                    attrs.append(
+                        Attribute(
+                            kind=Attribute.FLOAT,
+                            name="norm_type",
+                            float_value=node.args[4],
+                        )
+                    )
+                    attrs.append(
+                        Attribute(
+                            kind=Attribute.INT,
+                            name="scale_grad_by_freq",
+                            integer_value=int(node.args[5]),
+                        )
+                    )
+                    attrs.append(
+                        Attribute(
+                            kind=Attribute.INT,
+                            name="sparse",
+                            integer_value=int(node.args[6]),
+                        )
+                    )
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),_make_var_name(node.args[1].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=attrs,
+                        )
+                    )
+                elif (
                     node.target == "dropout"
                     or node.target == torch.nn.functional.dropout
                 ):
