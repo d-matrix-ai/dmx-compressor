@@ -1803,6 +1803,34 @@ def dump(
                             ),
                         )
                     )
+                elif (
+                    node.target == "dropout"
+                    or node.target == torch.nn.functional.dropout
+                ):
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.FLOAT,
+                                    name="p",
+                                    float_value=node.kwargs["p"],
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="training",
+                                    integer_value=int(node.kwargs["training"]),
+                                ),
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="inplace",
+                                    integer_value=int(node.kwargs["inplace"]),
+                                ),
+                            ),
+                        )
+                    )
                 else:
                     dependency.append(
                         Dependency(
