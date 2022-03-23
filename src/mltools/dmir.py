@@ -1784,6 +1784,25 @@ def dump(
                             ),
                         )
                     )
+                elif (
+                    node.target == "softmax"
+                    or node.target == torch.nn.functional.softmax
+                ):
+                    dim = node.args[1] if len(node.args) > 1 else -1
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name),),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="dim",
+                                    integer_value=-1 if dim is None else dim,
+                                ),
+                            ),
+                        )
+                    )
                 else:
                     dependency.append(
                         Dependency(
