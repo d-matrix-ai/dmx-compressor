@@ -1825,6 +1825,29 @@ def dump(
                         )
                     )
                 elif (
+                    node.target == "layer_norm"
+                    or node.target == torch.nn.functional.layer_norm
+                ):
+                    dependency.append(
+                        Dependency(
+                            operation=f"{traced._target_to_str(node.target)}",
+                            argument=(_make_var_name(node.args[0].name), _make_var_name(node.kwargs["weight"].name), _make_var_name(node.kwargs["bias"].name)),
+                            result=(_make_var_name(node.name),),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.INTS,
+                                    name="normalized_shape",
+                                    integer_values=node.args[1],
+                                ),
+                                Attribute(
+                                    kind=Attribute.FLOAT,
+                                    name="eps",
+                                    float_value=node.kwargs["eps"],
+                                ),
+                            ),
+                        )
+                    )
+                elif (
                     node.target == "embedding"
                     or node.target == torch.nn.functional.embedding
                 ):
