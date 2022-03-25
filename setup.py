@@ -39,8 +39,8 @@ setup(
     packages=find_packages("src", exclude=("tests", "docs", "experiments", "sandbox")),
     package_dir={"": "src"},
     install_requires=(
-        "torch==1.9.0",
-        "torchvision",
+        "torch==1.9.1",
+        "torchvision==0.10.1",
         "transformers @ git+ssh://git@git.d-matrix.ai/ml-team/transformers.git@dm-refactor",
         "datasets",
         "numpy",
