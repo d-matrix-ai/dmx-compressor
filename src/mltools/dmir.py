@@ -142,6 +142,9 @@ class ShapeProp(fx.Interpreter):
         if found_tensor:
             n.meta["tensor_meta"] = meta
 
+        elif isinstance(result, torch.Size):
+            n.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
+
         n.meta["type"] = type(result)
         return result
 
@@ -1002,9 +1005,7 @@ def dump(
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
-            if not (
-                "size" in node.name or "getitem" in node.name or "add" in node.name
-            ):
+            if not ("getitem" in node.name or "add" in node.name):
                 intermediate.append(
                     Tensor(
                         name=_make_var_name(node.name),
