@@ -938,10 +938,6 @@ def dump(
         gm = fx_hf.symbolic_trace(
             m,
             input_names=["input_ids", "attention_mask", "token_type_ids"],
-            batch_size=sample_input[0]["input_ids"].shape[
-                0
-            ],  # TODO work for non input-id tensors
-            sequence_length=384,
         )
 
         sample_input = sample_input[0]
@@ -1006,12 +1002,15 @@ def dump(
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
-            intermediate.append(
-                Tensor(
-                    name=_make_var_name(node.name),
-                    **_tensor_meta_dict(node.meta["tensor_meta"]),
+            if not (
+                "size" in node.name or "getitem" in node.name or "add" in node.name
+            ):
+                intermediate.append(
+                    Tensor(
+                        name=_make_var_name(node.name),
+                        **_tensor_meta_dict(node.meta["tensor_meta"]),
+                    )
                 )
-            )
             if node.op == "call_module":
                 _m = eval(_torch_qualified_name(f"m.{node.target}"))
                 _input_names = [_make_var_name(n.__str__()) for n in node.args]
@@ -1831,7 +1830,11 @@ def dump(
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name), _make_var_name(node.kwargs["weight"].name), _make_var_name(node.kwargs["bias"].name)),
+                            argument=(
+                                _make_var_name(node.args[0].name),
+                                _make_var_name(node.kwargs["weight"].name),
+                                _make_var_name(node.kwargs["bias"].name),
+                            ),
                             result=(_make_var_name(node.name),),
                             attribute=(
                                 Attribute(
@@ -1892,7 +1895,10 @@ def dump(
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),_make_var_name(node.args[1].name),),
+                            argument=(
+                                _make_var_name(node.args[0].name),
+                                _make_var_name(node.args[1].name),
+                            ),
                             result=(_make_var_name(node.name),),
                             attribute=attrs,
                         )
