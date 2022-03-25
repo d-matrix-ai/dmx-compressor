@@ -1010,13 +1010,12 @@ def dump(
                 )
             )
         elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
-            if not ("getitem" in node.name or "add" in node.name):
-                intermediate.append(
-                    Tensor(
-                        name=_make_var_name(node.name),
-                        **_tensor_meta_dict(node.meta["tensor_meta"]),
-                    )
+            intermediate.append(
+                Tensor(
+                    name=_make_var_name(node.name),
+                    **_tensor_meta_dict(node.meta["tensor_meta"]),
                 )
+            )
             if node.op == "call_module":
                 _m = eval(_torch_qualified_name(f"m.{node.target}"))
                 _input_names = [_make_var_name(n.__str__()) for n in node.args]
