@@ -881,6 +881,7 @@ def parse_fx(
                         torch.randn(
                             arg.meta["tensor_meta"].shape,
                             dtype=arg.meta["tensor_meta"].dtype,
+                            device="cuda",
                         )
                         for arg in node.args
                     ]
@@ -940,6 +941,8 @@ def dump(
     if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
         gm = fx_hf.symbolic_trace(
             m,
+            batch_size=8,
+            sequence_length=384,
             input_names=["input_ids", "attention_mask", "token_type_ids"],
         )
 
@@ -951,6 +954,8 @@ def dump(
         )
 
     else:
+        # if isinstance(m, torch.nn.modules.sparse.Embedding):
+        # sample_input = sample_input[0].to("cuda")
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
@@ -1618,6 +1623,7 @@ def dump(
                                 torch.zeros(
                                     arg.meta["tensor_meta"].shape,
                                     dtype=arg.meta["tensor_meta"].dtype,
+                                    device="cuda",
                                 )
                                 for arg in node.args
                             ],
