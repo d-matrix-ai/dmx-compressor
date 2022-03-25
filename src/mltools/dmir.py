@@ -955,8 +955,6 @@ def dump(
         device = sample_input["input_ids"].device
 
     else:
-        # if isinstance(m, torch.nn.modules.sparse.Embedding):
-        # sample_input = sample_input[0].to("cuda")
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
