@@ -881,7 +881,7 @@ def parse_fx(
                         torch.randn(
                             arg.meta["tensor_meta"].shape,
                             dtype=arg.meta["tensor_meta"].dtype,
-                            device=sample_input[0].device,
+                            device=device,
                         )
                         for arg in node.args
                     ]
@@ -952,6 +952,7 @@ def dump(
             sample_input["attention_mask"],
             sample_input["token_type_ids"],
         )
+        device = sample_input["input_ids"].device
 
     else:
         # if isinstance(m, torch.nn.modules.sparse.Embedding):
@@ -1622,7 +1623,7 @@ def dump(
                                 torch.zeros(
                                     arg.meta["tensor_meta"].shape,
                                     dtype=arg.meta["tensor_meta"].dtype,
-                                    device=sample_input[0].device,
+                                    device=device,
                                 )
                                 for arg in node.args
                             ],
