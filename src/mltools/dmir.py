@@ -881,7 +881,7 @@ def parse_fx(
                         torch.randn(
                             arg.meta["tensor_meta"].shape,
                             dtype=arg.meta["tensor_meta"].dtype,
-                            device="cuda",
+                            device=sample_input[0].device,
                         )
                         for arg in node.args
                     ]
@@ -941,7 +941,7 @@ def dump(
     if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
         gm = fx_hf.symbolic_trace(
             m,
-            batch_size=8,
+            batch_size=1,
             sequence_length=384,
             input_names=["input_ids", "attention_mask", "token_type_ids"],
         )
@@ -1623,7 +1623,7 @@ def dump(
                                 torch.zeros(
                                     arg.meta["tensor_meta"].shape,
                                     dtype=arg.meta["tensor_meta"].dtype,
-                                    device="cuda",
+                                    device=sample_input[0].device,
                                 )
                                 for arg in node.args
                             ],
