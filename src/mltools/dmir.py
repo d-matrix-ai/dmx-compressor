@@ -1028,13 +1028,6 @@ def dump(
                             attribute=_corsair_specific_attributes(_m),
                         )
                     )
-                    subgraph.append(
-                        Graph(
-                            name=node.name,
-                            op_type=_legal_op_type("cast_to"),
-                            metadata=_nn_module_meta(_m),
-                        )
-                    )
                 elif isinstance(_m, sparse.Sparsify):
                     dependency.append(
                         Dependency(
