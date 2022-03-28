@@ -142,6 +142,9 @@ class ShapeProp(fx.Interpreter):
         if found_tensor:
             n.meta["tensor_meta"] = meta
 
+        elif isinstance(result, torch.Size):
+            n.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
+
         n.meta["type"] = type(result)
         return result
 
@@ -878,6 +881,7 @@ def parse_fx(
                         torch.randn(
                             arg.meta["tensor_meta"].shape,
                             dtype=arg.meta["tensor_meta"].dtype,
+                            device=device,
                         )
                         for arg in node.args
                     ]
@@ -937,11 +941,9 @@ def dump(
     if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
         gm = fx_hf.symbolic_trace(
             m,
-            input_names=["input_ids", "attention_mask", "token_type_ids"],
-            batch_size=sample_input[0]["input_ids"].shape[
-                0
-            ],  # TODO work for non input-id tensors
+            batch_size=1,
             sequence_length=384,
+            input_names=["input_ids", "attention_mask", "token_type_ids"],
         )
 
         sample_input = sample_input[0]
@@ -950,6 +952,7 @@ def dump(
             sample_input["attention_mask"],
             sample_input["token_type_ids"],
         )
+        device = sample_input["input_ids"].device
 
     else:
         graph = tracer.trace(m)
@@ -1618,6 +1621,7 @@ def dump(
                                 torch.zeros(
                                     arg.meta["tensor_meta"].shape,
                                     dtype=arg.meta["tensor_meta"].dtype,
+                                    device=device,
                                 )
                                 for arg in node.args
                             ],
@@ -1831,7 +1835,11 @@ def dump(
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name), _make_var_name(node.kwargs["weight"].name), _make_var_name(node.kwargs["bias"].name)),
+                            argument=(
+                                _make_var_name(node.args[0].name),
+                                _make_var_name(node.kwargs["weight"].name),
+                                _make_var_name(node.kwargs["bias"].name),
+                            ),
                             result=(_make_var_name(node.name),),
                             attribute=(
                                 Attribute(
@@ -1892,7 +1900,10 @@ def dump(
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),_make_var_name(node.args[1].name),),
+                            argument=(
+                                _make_var_name(node.args[0].name),
+                                _make_var_name(node.args[1].name),
+                            ),
                             result=(_make_var_name(node.name),),
                             attribute=attrs,
                         )
