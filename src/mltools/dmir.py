@@ -1627,6 +1627,34 @@ def dump(
                         )
                     )
             else:  # built-in function or tensor method
+                if any(
+                    map(lambda x: isinstance(x, float), node.args)
+                ) and "truediv" in str(node):
+                    dependency.append(
+                        Dependency(
+                            operation="const",
+                            result=(
+                                _make_var_name(node.name.replace("truediv", "const")),
+                            ),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.FLOAT,
+                                    name="value",
+                                    float_value=node.args[1],
+                                ),
+                            ),
+                        )
+                    )
+                    intermediate.append(
+                        Tensor(
+                            name=_make_var_name(node.name.replace("truediv", "const")),
+                            value=_make_value_for_dumping(torch.tensor(node.args[1])),
+                            shape=(),
+                            format=_legal_format(torch.float32),
+                            qscheme="",
+                        ),
+                    )
+                    node.args = (node.args[0], node.name.replace("truediv", "const"))
                 if node.target == torch.flatten:
                     start_dim = node.args[1] if len(node.args) > 1 else 0
                     end_dim = node.args[2] if len(node.args) > 2 else -1
