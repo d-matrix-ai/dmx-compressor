@@ -1,3 +1,4 @@
+from numpy import true_divide
 from mltools.utils.dmir_pb2 import *
 
 # from mltools.utils.graph_to_csv import graph_to_csv
@@ -120,6 +121,59 @@ def extract_tensor_metadata(result: torch.Tensor) -> TensorMetadata:
     )
 
 
+class MyProp:
+    def __init__(self, mod):
+        self.mod = mod
+        self.graph = mod.graph
+        self.modules = dict(self.mod.named_modules())
+
+    def propagate(self, *args):
+        args_iter = iter(args)
+        env: Dict[str, Node] = {}
+
+        def load_arg(a):
+            return torch.fx.graph.map_arg(a, lambda n: env[n.name])
+
+        def fetch_attr(target: str):
+            target_atoms = target.split(".")
+            attr_itr = self.mod
+            for i, atom in enumerate(target_atoms):
+                if not hasattr(attr_itr, atom):
+                    raise RuntimeError(
+                        f"Node referenced nonexistant target {'.'.join(target_atoms[:i])}"
+                    )
+                attr_itr = getattr(attr_itr, atom)
+            return attr_itr
+
+        print("tracing")
+        for node in self.graph.nodes:
+            result = None
+            if node.op == "placeholder":
+                result = next(args_iter)
+            if node.op == "get_attr":
+                result = fetch_attr(node.target)
+            elif node.op == "call_function":
+                result = node.target(*load_arg(node.args), **load_arg(node.kwargs))
+            elif node.op == "call_method":
+                self_obj, *args = load_arg(node.args)
+                kwargs = load_arg(node.kwargs)
+                result = getattr(self_obj, node.target)(*args, **kwargs)
+            # elif node.op == "call_module":
+
+            #     if node.target
+            #     result = self.modules[node.target](
+            #         *load_arg(node.args), **load_arg(node.kwargs)
+            #     )
+
+            if isinstance(result, float):
+                breakpoint()
+
+            if not (Result):
+                env[node.name] = result
+
+        return load_arg(self.graph.result)
+
+
 class ShapeProp(fx.Interpreter):
     r"""
     Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
@@ -129,6 +183,7 @@ class ShapeProp(fx.Interpreter):
         result = super().run_node(n)
 
         found_tensor = False
+        found_float = False
 
         def extract_tensor_meta(obj):
             if isinstance(obj, torch.Tensor):
@@ -138,7 +193,16 @@ class ShapeProp(fx.Interpreter):
             else:
                 return obj
 
+        def insert_const(obj):
+            if isinstance(obj, float):
+                nonlocal found_float
+                found_float = True
+                return obj
+            else:
+                return obj
+
         meta = fx.node.map_aggregate(result, extract_tensor_meta)
+        # out = fx.node.map_aggregate(result, insert_const)
         if found_tensor:
             n.meta["tensor_meta"] = meta
 
@@ -878,7 +942,7 @@ def parse_fx(
 
                 else:  # custom modules
                     subgraph_sample_input = [
-                        torch.randn(
+                        torch.zeros(
                             arg.meta["tensor_meta"].shape,
                             dtype=arg.meta["tensor_meta"].dtype,
                             device=device,
@@ -941,16 +1005,17 @@ def dump(
     if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
         gm = fx_hf.symbolic_trace(
             m,
-            batch_size=1,
+            input_names=["input_ids"],
+            batch_size=sample_input[0]["input_ids"].shape[
+                0
+            ],  # TODO work for non input-id tensors
             sequence_length=384,
-            input_names=["input_ids", "attention_mask", "token_type_ids"],
         )
 
         sample_input = sample_input[0]
+        # MyProp(gm).propagate(*sample_input)
         ShapeProp(gm).propagate(
             sample_input["input_ids"],
-            sample_input["attention_mask"],
-            sample_input["token_type_ids"],
         )
         device = sample_input["input_ids"].device
 
@@ -1026,13 +1091,6 @@ def dump(
                             argument=_input_names,
                             result=_output_names,
                             attribute=_corsair_specific_attributes(_m),
-                        )
-                    )
-                    subgraph.append(
-                        Graph(
-                            name=node.name,
-                            op_type=_legal_op_type("cast_to"),
-                            metadata=_nn_module_meta(_m),
                         )
                     )
                 elif isinstance(_m, sparse.Sparsify):
@@ -1634,6 +1692,34 @@ def dump(
                         )
                     )
             else:  # built-in function or tensor method
+                if any(
+                    map(lambda x: isinstance(x, float), node.args)
+                ) and "truediv" in str(node):
+                    dependency.append(
+                        Dependency(
+                            operation="const",
+                            result=(
+                                _make_var_name(node.name.replace("truediv", "const")),
+                            ),
+                            attribute=(
+                                Attribute(
+                                    kind=Attribute.FLOAT,
+                                    name="value",
+                                    float_value=node.args[1],
+                                ),
+                            ),
+                        )
+                    )
+                    intermediate.append(
+                        Tensor(
+                            name=_make_var_name(node.name.replace("truediv", "const")),
+                            value=_make_value_for_dumping(torch.tensor(node.args[1])),
+                            shape=(),
+                            format=_legal_format(torch.float32),
+                            qscheme="",
+                        ),
+                    )
+                    node.args = (node.args[0], node.name.replace("truediv", "const"))
                 if node.target == torch.flatten:
                     start_dim = node.args[1] if len(node.args) > 1 else 0
                     end_dim = node.args[2] if len(node.args) > 2 else -1
