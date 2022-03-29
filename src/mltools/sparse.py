@@ -219,21 +219,19 @@ class Sparsify(nn.Module):
         self.backward_mode = backward_mode
         self.dump_to = dump_to
         self.mask = torch.ones(tensor_shape)
+        self.score_func = None  # torch.abs
 
-    def set_score(self, score_value):
-        assert (
-            score_value.shape == self.score.shape
-        ), "setting score has to be in the same shape as the weight"
-        self.score.data = score_value
-        self.mask = self.sparseness.get_mask(score_value)
+    def set_score(self, x):
+        if self.score_func is not None:
+            with torch.no_grad():
+                score_value = self.score_func(x)
+                self.score.data = score_value
+                self.mask = self.sparseness.get_mask(score_value)
 
     def forward(self, x):
-        # assert x.shape == self.score.shape, "x and score have to be of the same shape"
         if not isinstance(self.sparseness, Dense):
             if self.training:
-                ### TODO: need to figure out a better way of handling score setting
-                self.set_score(torch.abs(x))
-                ###
+                self.set_score(x)
                 self.mask = self.sparseness.get_mask(self.score)
                 x, _ = Sparsifier.apply(
                     x, self.score, self.sparseness, self.backward_mode
