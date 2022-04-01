@@ -81,7 +81,7 @@ def save_to_file(graph_dict: dict, filename: str, format="csv") -> None:
         raise ValueError(f"unsupported Graph file format: {format}")
 
 
-def prune_graph(graph_dict, ops_to_prune=("flatten", "batchnorm", "reshape")):
+def prune_graph(graph_dict, ops_to_prune=("flatten", "batchnorm", "reshape", "size", "view")):
     # remove specified ops from graph, overwrite inputs/outputs for affected nodes
     found = False
     # find the first node to be eliminated:

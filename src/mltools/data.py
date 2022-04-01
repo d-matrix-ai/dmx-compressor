@@ -39,7 +39,7 @@ class CIFAR():
     def __init__(
             self,
             num_classes=10,
-            data_dir='~/data/cifar',
+            data_dir='~/data',
             train_batch_size=64,
             test_batch_size=64,
             cuda=False,
@@ -48,7 +48,8 @@ class CIFAR():
         ):
         gpu_conf = {
             'num_workers': num_workers,
-            'pin_memory': True
+            'pin_memory': True,
+            'persistent_workers': True
         } if cuda else {}
         normalize = tv.transforms.Normalize(
             (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
@@ -70,7 +71,7 @@ class CIFAR():
             batch_size=train_batch_size,
             shuffle=shuffle,
             **gpu_conf)
-        self.test = torch.utils.data.DataLoader(
+        self.val = torch.utils.data.DataLoader(
             eval("tv.datasets.CIFAR{:d}".format(num_classes))(
                 data_dir, train=False, download=True,
                 transform=transform_test),
@@ -97,7 +98,8 @@ class I1K():
         ):
         gpu_conf = {
             'num_workers': num_workers,
-            'pin_memory': True
+            'pin_memory': True,
+            'persistent_workers': True
         } if cuda else {}
         normalize = tv.transforms.Normalize(
             (0.485, 0.456, 0.406), (0.229, 0.224, 0.225),
