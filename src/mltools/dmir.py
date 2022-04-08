@@ -1019,13 +1019,16 @@ def dump(
     tracer = DMIRTracer(flat=flat)
 
     if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
+
+        # infer batch_size and sequence length
+        bs = sample_input[0]["input_ids"].shape[0]
+        seq_len = sample_input[0]["input_ids"].shape[1]
+
         gm = fx_hf.symbolic_trace(
             m,
             input_names=["input_ids"],
-            batch_size=sample_input[0]["input_ids"].shape[
-                0
-            ],  # TODO work for non input-id tensors
-            sequence_length=384,
+            batch_size=bs,
+            sequence_length=seq_len,
         )
 
         sample_input = sample_input[0]
