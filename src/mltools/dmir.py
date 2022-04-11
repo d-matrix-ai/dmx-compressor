@@ -56,6 +56,7 @@ FORMAT_DICT = {
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARN)
 
+
 class TensorMetadata(NamedTuple):
     r"""
     TensorMetadata is a structure containing pertinent information
@@ -961,24 +962,31 @@ def parse_fx(
                 if op_name == "matmul":
                     weight_shape = list(node.args[1].meta["tensor_meta"].shape)
                     weight_format = "FP16"
-                elif op_name == 'avg_pool2d':
-                    if node.meta["tensor_meta"].shape[2] == 1 and node.meta["tensor_meta"].shape[3] == 1:
+                elif op_name == "avg_pool2d":
+                    if (
+                        node.meta["tensor_meta"].shape[2] == 1
+                        and node.meta["tensor_meta"].shape[3] == 1
+                    ):
                         op_name = "global_avg_pool"  # but can also be regular avg_pool
-                        padding = node.kwargs['padding'] if 'padding' in node.kwargs else 0
-                        stride = node.kwargs['stride']  if 'stride' in node.kwargs else 0
+                        padding = (
+                            node.kwargs["padding"] if "padding" in node.kwargs else 0
+                        )
+                        stride = node.kwargs["stride"] if "stride" in node.kwargs else 0
                         kernel_size = node.args[1]
                     else:
-                        logger.warning(f'\n\nSOL tool only supports global average pooling layers.'
-                              f'Global average pooling should output 1x1 feature maps, but this {node} layer outputs '
-                              f'{node.meta["tensor_meta"].shape[2]}x{node.meta["tensor_meta"].shape[3]} '
-                              f'feature maps\n\n')
+                        logger.warning(
+                            f"\n\nSOL tool only supports global average pooling layers."
+                            f"Global average pooling should output 1x1 feature maps, but this {node} layer outputs "
+                            f'{node.meta["tensor_meta"].shape[2]}x{node.meta["tensor_meta"].shape[3]} '
+                            f"feature maps\n\n"
+                        )
 
         else:
             raise RuntimeError(f"illegal FXIR node opcode {node.op}")
 
         if node.args != ():
             input_shape = list(node.args[0].meta["tensor_meta"].shape)
-            if node.name == 'size':
+            if node.name == "size":
                 output_shape = input_shape
             else:
                 output_shape = list(node.meta["tensor_meta"].shape)
@@ -1018,8 +1026,7 @@ def dump(
 
     tracer = DMIRTracer(flat=flat)
 
-    if isinstance(m, transformers.models.bert.modeling_bert.BertForQuestionAnswering):
-
+    if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
         # infer batch_size and sequence length
         bs = sample_input[0]["input_ids"].shape[0]
         seq_len = sample_input[0]["input_ids"].shape[1]
