@@ -22,6 +22,7 @@ import torch
 from torch import fx
 import transformers.utils.fx as fx_hf
 import transformers
+from transformers.modeling_outputs import *
 from mltools import numerical, sparse, approximate, corsair
 
 __ALL__ = [
@@ -342,8 +343,6 @@ def _tensor_meta_dict(meta):
     if isinstance(meta, list):
         assert len(meta) == 1
         meta = meta[0]
-    if isinstance(meta, fx.immutable_collections.immutable_dict):
-        meta = meta["start_logits"]
 
     if isinstance(meta, tuple) and len(meta) == 2:
         meta = meta[0]
@@ -1028,6 +1027,7 @@ def dump(
 
     if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
         # infer batch_size and sequence length
+
         bs = sample_input[0]["input_ids"].shape[0]
         seq_len = sample_input[0]["input_ids"].shape[1]
 
@@ -1039,12 +1039,19 @@ def dump(
         )
 
         sample_input = sample_input[0]
-        # MyProp(gm).propagate(*sample_input)
+        sample_output = m(**sample_input)
+        if isinstance(
+            sample_output,
+            (QuestionAnsweringModelOutput, Seq2SeqQuestionAnsweringModelOutput),
+        ):
+            _output_key = "start_logits"
+        else:
+            _output_key = "logits"
+
         ShapeProp(gm).propagate(
             sample_input["input_ids"],
         )
         device = sample_input["input_ids"].device
-
     else:
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
@@ -1056,6 +1063,17 @@ def dump(
     intermediate = []
     subgraph = []
     dependency = []
+
+    for node in traced.nodes:
+        if node.op == "output":  # handling output if it is a dict
+            if isinstance(node.args[0], fx.immutable_collections.immutable_dict):
+                node.args = [
+                    a[_output_key] if i == 0 else a for i, a in enumerate(node.args)
+                ]
+            if isinstance(
+                node.meta["tensor_meta"], fx.immutable_collections.immutable_dict
+            ):
+                node.meta["tensor_meta"] = node.meta["tensor_meta"][_output_key]
 
     for node in traced.nodes:
         if node.op == "placeholder":  # dynamic inputs
@@ -1087,15 +1105,7 @@ def dump(
                     operation=_legal_op_type(
                         f"{traced._target_to_str(torch.nn.Identity)}"
                     ),
-                    argument=(
-                        _make_var_name(
-                            node.args[0]["start_logits"].name
-                            if isinstance(
-                                node.args[0], fx.immutable_collections.immutable_dict
-                            )
-                            else node.args[0].name
-                        ),
-                    ),
+                    argument=(_make_var_name(node.args[0].name),),
                     result=(_make_var_name(node.name),),
                 )
             )
