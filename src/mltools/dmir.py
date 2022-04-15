@@ -865,9 +865,52 @@ def parse_fx(
     graph_dict: dict = None,
 ):
     tracer = DMIRTracer()
-    gm = fx.GraphModule(root=m, graph=tracer.trace(m))
-    ShapeProp(gm).propagate(*sample_input)
+    
+    if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
+        # infer batch_size and sequence length
+
+        bs = sample_input[0]["input_ids"].shape[0]
+        seq_len = sample_input[0]["input_ids"].shape[1]
+
+        gm = fx_hf.symbolic_trace(
+            m,
+            input_names=["input_ids"],
+            batch_size=bs,
+            sequence_length=seq_len,
+        )
+
+        sample_input = sample_input[0]
+        sample_output = m(**sample_input)
+        if isinstance(
+            sample_output,
+            (QuestionAnsweringModelOutput, Seq2SeqQuestionAnsweringModelOutput),
+        ):
+            _output_key = "start_logits"
+        else:
+            _output_key = "logits"
+
+        ShapeProp(gm).propagate(
+            sample_input["input_ids"],
+        )
+        device = sample_input["input_ids"].device
+    else:
+        graph = tracer.trace(m)
+        gm = fx.GraphModule(root=m, graph=graph)
+        ShapeProp(gm).propagate(*sample_input)
+        
+        
     traced = gm.graph
+    
+    for node in traced.nodes:
+        if node.op == "output":  # handling output if it is a dict
+            if isinstance(node.args[0], fx.immutable_collections.immutable_dict):
+                node.args = [
+                    a[_output_key] if i == 0 else a for i, a in enumerate(node.args)
+                ]
+            if isinstance(
+                node.meta["tensor_meta"], fx.immutable_collections.immutable_dict
+            ):
+                node.meta["tensor_meta"] = node.meta["tensor_meta"][_output_key]
 
     for node in traced.nodes:
         op_name = node.name
