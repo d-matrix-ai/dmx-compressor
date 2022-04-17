@@ -62,7 +62,7 @@ class Model(torch.nn.Module):
                 for r in config["transformation_rules"]:
                     if (
                         isinstance(m, eval(r["instance"]))
-                        and any([_n in n for _n in r["name_includes"]])
+                        and all([_n in n for _n in r["name_includes"]])
                         and all([not _n in n for _n in r["name_excludes"]])
                     ):
                         m._transform(r["config"])
