@@ -58,6 +58,7 @@ message Tensor {
   float q_scale = 8;
   int32 q_zero_point = 9;
   string device = 10; // place holder for HW model entities
+  repeated Attribute attribute = 11; // additional field for logical shape	
 }
 
 message Attribute {
