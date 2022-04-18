@@ -1167,7 +1167,7 @@ def dump(
                 if isinstance(_m, numerical.CastTo):
                     dependency.append(
                         Dependency(
-                            operation=node.name,
+                            operation="cast",  # node.name,
                             argument=_input_names,
                             result=_output_names,
                             attribute=_corsair_specific_attributes(_m),
