@@ -85,4 +85,4 @@ class Model(torch.nn.Module):
     def sol_analyze(self, sample_input, corsair_hw=corsair_hw.Slice(), **kwargs):
         graph = self.fx_graph(sample_input)
         pruned_graph = graph_utils.prune_graph(graph)
-        return sol_sim.analyze(pruned_graph, **kwargs)
+        return sol_sim.analyze(pruned_graph, corsair_hw=corsair_hw, **kwargs)
