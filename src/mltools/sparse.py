@@ -277,7 +277,7 @@ class WeightSparseMixin:
     @property
     def effective_weight(self):
         return (
-            None
+            self.weight
             if self.weight_sparsifier is None
             else self.weight_sparsifier(self.weight)
         )
