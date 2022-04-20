@@ -242,6 +242,7 @@ class DMIRTracer(fx.Tracer):
                 torch.nn.modules.pooling._AvgPoolNd,
                 torch.nn.modules.ReLU,
                 torch.nn.modules.Linear,
+                torch.nn.modules.LayerNorm,
             ),
         )
         if self.flat:
@@ -463,6 +464,62 @@ def _batch_norm_graph(m, node, input_names, output_names, omit_value=False):
                         kind=Attribute.FLOAT,
                         name="momentum",
                         float_value=m.momentum,
+                    ),
+                    Attribute(
+                        kind=Attribute.FLOAT,
+                        name="eps",
+                        float_value=m.eps,
+                    ),
+                ),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
+def _layer_norm_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        intermediate=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="weight"),
+                value=[] if omit_value else _make_value_for_dumping(m.weight),
+                shape=m.weight.shape,
+                format=_legal_format(m.weight.dtype),
+            ),  # this is a static input
+            Tensor(
+                name=_make_var_name(node.name, suffix="bias"),
+                value=[] if omit_value else _make_value_for_dumping(m.bias),
+                shape=m.bias.shape,
+                format=_legal_format(m.bias.dtype),
+            ),  # this is a static input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"{_legal_op_type(node.graph._target_to_str(torch.layer_norm))}",
+                argument=(
+                    _make_var_name(node.name, suffix="input"),
+                    _make_var_name(node.name, suffix="weight"),
+                    _make_var_name(node.name, suffix="bias"),
+                ),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=Attribute.INTS,
+                        name="normalized_shape",
+                        integer_values=m.normalized_shape,
                     ),
                     Attribute(
                         kind=Attribute.FLOAT,
@@ -865,7 +922,7 @@ def parse_fx(
     graph_dict: dict = None,
 ):
     tracer = DMIRTracer()
-    
+
     if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
         # infer batch_size and sequence length
 
@@ -897,10 +954,9 @@ def parse_fx(
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
-        
-        
+
     traced = gm.graph
-    
+
     for node in traced.nodes:
         if node.op == "output":  # handling output if it is a dict
             if isinstance(node.args[0], fx.immutable_collections.immutable_dict):
@@ -1099,8 +1155,8 @@ def dump(
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
-        device = sample_input.device
-        
+        device = sample_input[0].device
+
     traced = gm.graph
     input = []
     output = []
@@ -1304,6 +1360,49 @@ def dump(
                         )
                         subgraph.append(
                             _batch_norm_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
+                            )
+                        )
+                elif isinstance(_m, torch.nn.modules.LayerNorm):
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    if isinstance(_m, corsair.nn.LayerNorm):
+                        _graph = dump(
+                            _m,
+                            *[
+                                torch.randn(
+                                    arg.meta["tensor_meta"].shape,
+                                    dtype=arg.meta["tensor_meta"].dtype,
+                                    device=device,
+                                )
+                                for arg in node.args
+                            ],
+                            name=node.name,
+                            input_names=_input_names,
+                            output_names=_output_names,
+                            flat=flat,
+                            omit_value=omit_value,
+                            metadata=_nn_module_meta(_m),
+                        )
+                        # TODO: new torch.fx mechanisms should obviate the following ugliness
+                        # ugly reconnection transformation starts
+                        _graph.dependency[3].argument[1] = _graph.dependency[1].result[0]
+                        _graph.dependency[3].argument[2] = _graph.dependency[2].result[0]
+                        # ugly reconnection transformation ends
+                        subgraph.append(_graph)
+                    else:
+                        subgraph.append(
+                            _layer_norm_graph(
                                 _m,
                                 node,
                                 _input_names,

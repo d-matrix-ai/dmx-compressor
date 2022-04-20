@@ -72,6 +72,18 @@ class CorsairModule(
                 config["approximation_function"]
             )
 
+    @property
+    def _weight(self):
+        return (
+            self.weight_cast(self.effective_weight)
+            if self.weight_cast is not None
+            else None
+        )
+
+    @property
+    def _bias(self):
+        return self.bias_cast(self.bias) if self.bias_cast is not None else None
+
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
         _output = self._forward(_input)
@@ -92,7 +104,6 @@ class Linear(CorsairModule, torch.nn.Linear):
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.approximator.function, LowRankWeight):
             self.weight.data = self.approximator(self.weight.data)
-        _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
                 self.input_cast.format.block_size
@@ -106,17 +117,16 @@ class Linear(CorsairModule, torch.nn.Linear):
             )
             B = max(64, min(B_i, B_w))
             _inputs = torch.split(_input, B, dim=-1)
-            _weights = torch.split(_weight, B, dim=-1)
+            _weights = torch.split(self._weight, B, dim=-1)
             _products = (
                 self.accum_cast(torch.matmul(_i, _w.t()))
                 for _i, _w in zip(_inputs, _weights)
             )
             _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
         else:
-            _product = self.accum_cast(torch.matmul(_input, _weight.t()))
-        if self.bias is not None:
-            _bias = self.bias_cast(self.bias)
-            _output = torch.add(_product, _bias)
+            _product = self.accum_cast(torch.matmul(_input, self._weight.t()))
+        if self._bias is not None:
+            _output = torch.add(_product, self._bias)
         else:
             _output = _product
         return _output
@@ -152,7 +162,6 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.approximator.function, LowRankWeight):
             self.weight.data = self.approximator(self.weight.data)
-        _weight = self.weight_cast(self.effective_weight)
         if isinstance(self.accum_cast.format, BlockFloatingPoint):
             B_i = (
                 self.input_cast.format.block_size
@@ -166,17 +175,16 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             )
             B = max(64, min(B_i, B_w), self.groups)
             _inputs = torch.split(_input, B, dim=1)
-            _weights = torch.split(_weight, B, dim=1)
+            _weights = torch.split(self._weight, B, dim=1)
             _convolutions = (
                 self.accum_cast(self._conv_forward(_i, _w, None))
                 for _i, _w in zip(_inputs, _weights)
             )
             _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
         else:
-            _convolution = self.accum_cast(self._conv_forward(_input, _weight, None))
-        if self.bias is not None:
-            _bias = self.bias_cast(self.bias)
-            _output = torch.add(_convolution, _bias.unsqueeze(-1).unsqueeze(-1))
+            _convolution = self.accum_cast(self._conv_forward(_input, self._weight, None))
+        if self._bias is not None:
+            _output = torch.add(_convolution, self._bias.unsqueeze(-1).unsqueeze(-1))
         else:
             _output = _convolution
         return _output
@@ -236,12 +244,8 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _weight = (
-            self.weight_cast(self.weight) if self.weight_cast is not None else None
-        )
-        _bias = self.bias_cast(self.bias) if self.bias_cast is not None else None
         _output = self.approx_forward(
-            _input, self.normalized_shape, _weight, _bias, self.eps
+            _input, self.normalized_shape, self._weight, self._bias, self.eps
         )
         return _output
 
@@ -264,8 +268,6 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _weight = self.weight_cast(self.weight)
-        _bias = self.bias_cast(self.bias)
         self._check_input_dim(_input)
         if self.momentum is None:
             exponential_average_factor = 0.0
@@ -288,8 +290,8 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
             if not self.training or self.track_running_stats
             else None,
             self.running_var if not self.training or self.track_running_stats else None,
-            _weight,
-            _bias,
+            self._weight,
+            self._bias,
             bn_training,
             exponential_average_factor,
             self.eps,
