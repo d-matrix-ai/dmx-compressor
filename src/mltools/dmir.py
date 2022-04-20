@@ -1156,7 +1156,7 @@ def dump(
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
         device = sample_input[0].device
-
+        
     traced = gm.graph
     input = []
     output = []
