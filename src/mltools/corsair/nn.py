@@ -125,7 +125,7 @@ class Linear(CorsairModule, torch.nn.Linear):
             _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
         else:
             _product = self.accum_cast(torch.matmul(_input, self._weight.t()))
-        if self._bias is not None:
+        if self.bias is not None:
             _output = torch.add(_product, self._bias)
         else:
             _output = _product
@@ -183,7 +183,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
         else:
             _convolution = self.accum_cast(self._conv_forward(_input, self._weight, None))
-        if self._bias is not None:
+        if self.bias is not None:
             _output = torch.add(_convolution, self._bias.unsqueeze(-1).unsqueeze(-1))
         else:
             _output = _convolution
