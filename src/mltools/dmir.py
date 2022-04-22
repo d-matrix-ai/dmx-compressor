@@ -1230,14 +1230,6 @@ def dump(
                         )
                     )
                 elif isinstance(_m, sparse.Sparsify):
-                    dependency.append(
-                        Dependency(
-                            operation=node.name,
-                            argument=_input_names,
-                            result=_output_names,
-                            attribute=_corsair_specific_attributes(_m),
-                        )
-                    )
                     if isinstance(_m.sparseness, sparse.Dense):
                         dependency.append(
                             Dependency(
@@ -1272,6 +1264,14 @@ def dump(
                                 ),
                             )
                         else:
+                            dependency.append(
+                                Dependency(
+                                    operation=node.name,
+                                    argument=_input_names,
+                                    result=_output_names,
+                                    attribute=_corsair_specific_attributes(_m),
+                                )
+                            )
                             subgraph.append(
                                 _sparsifier_graph(
                                     _m,
