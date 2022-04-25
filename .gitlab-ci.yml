@@ -12,4 +12,4 @@ test:
     - git clone -b sol-dev git@git.d-matrix.ai:software/software.git ../software
     - poetry install
     - poetry run pip list
-    - poetry run pytest ./tests/*matmul*.py ./tests/test_bert_base.py ./tests/test_bert_encoder_layer.py
+    - poetry run pytest ./tests/*.py
