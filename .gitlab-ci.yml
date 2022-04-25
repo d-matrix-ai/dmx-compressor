@@ -1,0 +1,15 @@
+image: "dmatrix.azurecr.io/mlops:v8"
+
+test:
+  before_script:
+    - eval $(ssh-agent -s)
+    - ssh-add ~/.ssh/id_rsa
+    - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - export PATH=/home/root/.poetry/bin/:$PATH
+
+  script:
+    - git clone -b sol-dev git@git.d-matrix.ai:software/software.git ../software
+    - poetry install
+    - poetry run pip list
+    - poetry run pytest ./tests/*matmul*.py ./tests/test_bert_base.py ./tests/test_bert_encoder_layer.py

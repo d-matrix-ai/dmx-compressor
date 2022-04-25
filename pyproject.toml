@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "mltools"
+version = "0.0.3.dev"
+description = "d-MATRiX ML tools"
+authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>"]
+
+[tool.poetry.dependencies]
+python = "^3.9.7"
+torch = "1.9.1"
+torchvision = "0.10.1"
+datasets = "^1.18.4"
+pytest = "^7.1.1"
+networkx = "^2.8"
+sol = {path = "../software/tools/models/"}
+ortools = "^9.3.10497"
+plotly = "^5.7.0"
+
+[build-system]
+requires = ["poetry-core @ git+https://github.com/python-poetry/poetry-core.git"]
+build-backend = "poetry.core.masonry.api"
