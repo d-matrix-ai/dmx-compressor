@@ -240,6 +240,7 @@ class DMIRTracer(fx.Tracer):
                 torch.nn.modules.pooling._MaxPoolNd,
                 torch.nn.modules.pooling._AdaptiveAvgPoolNd,
                 torch.nn.modules.pooling._AvgPoolNd,
+                torch.nn.modules.Softmax,
                 torch.nn.modules.ReLU,
                 torch.nn.modules.GELU,
                 torch.nn.modules.Linear,
@@ -735,6 +736,39 @@ def _gelu_graph(m, node, input_names, output_names, omit_value=False):
                 operation=f"gelu",
                 argument=(_make_var_name(node.name, suffix="input"),),
                 result=(_make_var_name(node.name, suffix="output"),),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
+def _softmax_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"softmax",
+                argument=(_make_var_name(node.name, suffix="input"),),
+                result=(_make_var_name(node.name, suffix="output"),),
+                attribute=(
+                    Attribute(
+                        kind=Attribute.INT,
+                        name="dim",
+                        integer_value=m.dim,
+                    ),
+                ),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -1884,6 +1918,24 @@ def dump(
                     )
                     subgraph.append(
                         _gelu_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
+                        )
+                    )
+                elif isinstance(_m, torch.nn.modules.Softmax):
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    subgraph.append(
+                        _softmax_graph(
                             _m,
                             node,
                             _input_names,
