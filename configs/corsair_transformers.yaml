@@ -60,64 +60,64 @@ config_gelu: &config_gelu
   
 # transformation rules, validated for bert, roberta, distilbert.
 transformation_rules:
-# - rule: |
-#     query projection layers in self-attention
-#     for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
-#   instance: Linear
-#   name_includes: [".encoder.layer", "attention.self.query"]
-#   name_excludes: []
-#   config: *config_qkv
-# - rule: | 
-#     key projection layers in self-attention
-#     for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
-#   instance: Linear
-#   name_includes: [".encoder.layer", "attention.self.key"]
-#   name_excludes: []
-#   config: *config_qkv
-# - rule: | 
-#     value projection layers in self-attention
-#     for `torch.matmul(attention_probs, value_layer)`
-#   instance: Linear
-#   name_includes: [".encoder.layer", "attention.self.value"]
-#   name_excludes: []
-#   config: *config_qkv
-# - rule: |
-#     output projection layers in self-attention
-#   instance: Linear
-#   name_includes: [".encoder.layer", "attention.output.dense"]
-#   name_excludes: []
-#   config: *config_dense
-# - rule: | 
-#     intermediate projection layers in feedforward layers
-#   instance: Linear
-#   name_includes: [".encoder.layer", "intermediate.dense"]
-#   name_excludes: []
-#   config: *config_dense
-# - rule: |
-#     output projection layers in feedforward layers
-#   instance: Linear
-#   name_includes: [".encoder.layer", "output.dense"]
-#   name_excludes: ["attention"]
-#   config: *config_dense
-# - rule: | 
-#     dropout before applying attention
-#     for `torch.matmul(attention_probs, value_layer)`
-#   instance: Dropout
-#   name_includes: [".encoder.layer", "attention.self.dropout"]
-#   name_excludes: []
-#   config: *config_do
-# - rule: | 
-#     softmax of attention
-#   instance: Softmax
-#   name_includes: []
-#   name_excludes: []
-#   config: *config_sm
-# - rule: | 
-#     layernorms
-#   instance: LayerNorm
-#   name_includes: []
-#   name_excludes: ["embedding"]
-#   config: *config_ln
+- rule: |
+    query projection layers in self-attention
+    for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.query"]
+  name_excludes: []
+  config: *config_qkv
+- rule: | 
+    key projection layers in self-attention
+    for `torch.matmul(query_layer, key_layer.transpose(-1, -2))`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.key"]
+  name_excludes: []
+  config: *config_qkv
+- rule: | 
+    value projection layers in self-attention
+    for `torch.matmul(attention_probs, value_layer)`
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.self.value"]
+  name_excludes: []
+  config: *config_qkv
+- rule: |
+    output projection layers in self-attention
+  instance: Linear
+  name_includes: [".encoder.layer", "attention.output.dense"]
+  name_excludes: []
+  config: *config_dense
+- rule: | 
+    intermediate projection layers in feedforward layers
+  instance: Linear
+  name_includes: [".encoder.layer", "intermediate.dense"]
+  name_excludes: []
+  config: *config_dense
+- rule: |
+    output projection layers in feedforward layers
+  instance: Linear
+  name_includes: [".encoder.layer", "output.dense"]
+  name_excludes: ["attention"]
+  config: *config_dense
+- rule: | 
+    dropout before applying attention
+    for `torch.matmul(attention_probs, value_layer)`
+  instance: Dropout
+  name_includes: [".encoder.layer", "attention.self.dropout"]
+  name_excludes: []
+  config: *config_do
+- rule: | 
+    softmax of attention
+  instance: Softmax
+  name_includes: []
+  name_excludes: []
+  config: *config_sm
+- rule: | 
+    layernorms
+  instance: LayerNorm
+  name_includes: []
+  name_excludes: ["embedding"]
+  config: *config_ln
 - rule: | 
     gelus
   instance: GELU
