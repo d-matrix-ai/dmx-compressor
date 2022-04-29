@@ -241,6 +241,7 @@ class DMIRTracer(fx.Tracer):
                 torch.nn.modules.pooling._AdaptiveAvgPoolNd,
                 torch.nn.modules.pooling._AvgPoolNd,
                 torch.nn.modules.ReLU,
+                torch.nn.modules.GELU,
                 torch.nn.modules.Linear,
                 torch.nn.modules.LayerNorm,
             ),
@@ -714,6 +715,32 @@ def _relu_graph(m, node, input_names, output_names, omit_value=False):
     )
 
 
+def _gelu_graph(m, node, input_names, output_names, omit_value=False):
+    return Graph(
+        name=node.name,
+        input=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="input"),
+                **_tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+            ),  # this is a dynamic input
+        ),
+        output=(
+            Tensor(
+                name=_make_var_name(node.name, suffix="output"),
+                **_tensor_meta_dict(node.meta["tensor_meta"]),
+            ),
+        ),
+        dependency=(
+            Dependency(
+                operation=f"gelu",
+                argument=(_make_var_name(node.name, suffix="input"),),
+                result=(_make_var_name(node.name, suffix="output"),),
+            ),
+        ),
+        metadata=_nn_module_meta(m),
+    )
+
+
 def _max_pool_graph(m, node, input_names, output_names, omit_value=False):
     return Graph(
         name=node.name,
@@ -1156,7 +1183,7 @@ def dump(
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
         device = sample_input[0].device
-        
+
     traced = gm.graph
     input = []
     output = []
@@ -1396,8 +1423,12 @@ def dump(
                         )
                         # TODO: new torch.fx mechanisms should obviate the following ugliness
                         # ugly reconnection transformation starts
-                        _graph.dependency[3].argument[1] = _graph.dependency[1].result[0]
-                        _graph.dependency[3].argument[2] = _graph.dependency[2].result[0]
+                        _graph.dependency[3].argument[1] = _graph.dependency[1].result[
+                            0
+                        ]
+                        _graph.dependency[3].argument[2] = _graph.dependency[2].result[
+                            0
+                        ]
                         # ugly reconnection transformation ends
                         subgraph.append(_graph)
                     else:
@@ -1842,6 +1873,24 @@ def dump(
                                 omit_value=omit_value,
                             )
                         )
+                elif isinstance(_m, torch.nn.modules.GELU):
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    subgraph.append(
+                        _gelu_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
+                        )
+                    )
                 else:  # custom modules
                     dependency.append(
                         Dependency(
