@@ -517,7 +517,7 @@ def _layer_norm_graph(m, node, input_names, output_names, omit_value=False):
                     _make_var_name(node.name, suffix="bias"),
                 ),
                 result=(_make_var_name(node.name, suffix="output"),),
-                attribute=(
+                attribute=[
                     Attribute(
                         kind=Attribute.INTS,
                         name="normalized_shape",
@@ -528,7 +528,7 @@ def _layer_norm_graph(m, node, input_names, output_names, omit_value=False):
                         name="eps",
                         float_value=m.eps,
                     ),
-                ),
+                ] + _corsair_specific_attributes(m),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -736,6 +736,7 @@ def _gelu_graph(m, node, input_names, output_names, omit_value=False):
                 operation=f"gelu",
                 argument=(_make_var_name(node.name, suffix="input"),),
                 result=(_make_var_name(node.name, suffix="output"),),
+                attribute=_corsair_specific_attributes(m),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -762,13 +763,13 @@ def _softmax_graph(m, node, input_names, output_names, omit_value=False):
                 operation=f"softmax",
                 argument=(_make_var_name(node.name, suffix="input"),),
                 result=(_make_var_name(node.name, suffix="output"),),
-                attribute=(
+                attribute=[
                     Attribute(
                         kind=Attribute.INT,
                         name="dim",
                         integer_value=m.dim,
                     ),
-                ),
+                 ] + _corsair_specific_attributes(m),
             ),
         ),
         metadata=_nn_module_meta(m),
