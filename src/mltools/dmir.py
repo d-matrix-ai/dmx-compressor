@@ -1438,44 +1438,15 @@ def dump(
                             attribute=_corsair_specific_attributes(_m),
                         )
                     )
-                    if isinstance(_m, corsair.nn.LayerNorm):
-                        _graph = dump(
+                    subgraph.append(
+                        _layer_norm_graph(
                             _m,
-                            *[
-                                torch.randn(
-                                    arg.meta["tensor_meta"].shape,
-                                    dtype=arg.meta["tensor_meta"].dtype,
-                                    device=device,
-                                )
-                                for arg in node.args
-                            ],
-                            name=node.name,
-                            input_names=_input_names,
-                            output_names=_output_names,
-                            flat=flat,
+                            node,
+                            _input_names,
+                            _output_names,
                             omit_value=omit_value,
-                            metadata=_nn_module_meta(_m),
                         )
-                        # TODO: new torch.fx mechanisms should obviate the following ugliness
-                        # ugly reconnection transformation starts
-                        _graph.dependency[3].argument[1] = _graph.dependency[1].result[
-                            0
-                        ]
-                        _graph.dependency[3].argument[2] = _graph.dependency[2].result[
-                            0
-                        ]
-                        # ugly reconnection transformation ends
-                        subgraph.append(_graph)
-                    else:
-                        subgraph.append(
-                            _layer_norm_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.Linear):
                     _weight = Tensor(
                         name=_make_var_name(node.name, suffix="weight"),
