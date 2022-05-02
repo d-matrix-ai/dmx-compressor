@@ -185,7 +185,7 @@ class BlockFloatingPoint(Format):
         self.block_dim = block_dim
         self.rounding = rounding
 
-    def cast(self, x):
+    def cast(self, x : torch.Tensor):
         # input of Linear: [B, ..., Cin], dim=-1
         # weight of Linear: [Cout, Cin], dim=-1
         # input of Conv1D: [B, Cin, L], dim=1
