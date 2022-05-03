@@ -165,7 +165,7 @@ class ShapeProp(fx.Interpreter):
 
         if "getitem" in node.name or "add" in node.name:
             meta = fx.node.map_aggregate(result, extract_const_meta)
-            meta = meta.clone().detach().requires_grad_(True)
+            meta = torch.tensor(meta)
             if found_const:
                 node.meta["tensor_meta"] = extract_tensor_metadata(meta)
 
