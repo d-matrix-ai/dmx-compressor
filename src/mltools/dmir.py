@@ -132,11 +132,11 @@ class ShapeProp(fx.Interpreter):
     Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
     """
 
-    def run_node(self, n: fx.node.Node) -> Any:
-        result = super().run_node(n)
+    def run_node(self, node: fx.node.Node) -> Any:
+        result = super().run_node(node)
 
         found_tensor = False
-        found_float = False
+        found_const = False
 
         def extract_tensor_meta(obj):
             if isinstance(obj, torch.Tensor):
@@ -146,23 +146,33 @@ class ShapeProp(fx.Interpreter):
             else:
                 return obj
 
-        def insert_const(obj):
-            if isinstance(obj, float):
-                nonlocal found_float
-                found_float = True
-                return obj
+        def extract_const_meta(obj):
+            if isinstance(obj, (float, int)):
+                nonlocal found_const
+                found_const = True
+                return torch.tensor(obj)
             else:
                 return obj
 
+
+        meta = {}
+        node.meta = meta
+
         meta = fx.node.map_aggregate(result, extract_tensor_meta)
-        # out = fx.node.map_aggregate(result, insert_const)
         if found_tensor:
-            n.meta["tensor_meta"] = meta
+            node.meta["tensor_meta"] = meta
+
+
+        if "getitem" in node.name or "add" in node.name:
+            meta = fx.node.map_aggregate(result, extract_const_meta)
+            meta = meta.clone().detach().requires_grad_(True)
+            if found_const:
+                node.meta["tensor_meta"] = extract_tensor_metadata(meta)
 
         elif isinstance(result, torch.Size):
-            n.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
+            node.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
 
-        n.meta["type"] = type(result)
+        node.meta["type"] = meta
         return result
 
     def propagate(self, *args):
@@ -2079,7 +2089,7 @@ def dump(
                     or node.target == torch.reshape
                     or node.target == "reshape"
                 ):
-                    shape = node.args[1:]
+                    shape = node.meta["tensor_meta"].shape
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
