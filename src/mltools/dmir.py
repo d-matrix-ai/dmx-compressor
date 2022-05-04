@@ -2,6 +2,7 @@ from numpy import true_divide
 from mltools.utils.dmir_pb2 import *
 
 # from mltools.utils.graph_to_csv import graph_to_csv
+import inspect
 import itertools
 import logging
 from google.protobuf.json_format import MessageToJson, Parse
@@ -125,69 +126,17 @@ def extract_tensor_metadata(result: torch.Tensor) -> TensorMetadata:
     )
 
 
-class MyProp:
-    def __init__(self, mod):
-        self.mod = mod
-        self.graph = mod.graph
-        self.modules = dict(self.mod.named_modules())
-
-    def propagate(self, *args):
-        args_iter = iter(args)
-        env: Dict[str, Node] = {}
-
-        def load_arg(a):
-            return torch.fx.graph.map_arg(a, lambda n: env[n.name])
-
-        def fetch_attr(target: str):
-            target_atoms = target.split(".")
-            attr_itr = self.mod
-            for i, atom in enumerate(target_atoms):
-                if not hasattr(attr_itr, atom):
-                    raise RuntimeError(
-                        f"Node referenced nonexistant target {'.'.join(target_atoms[:i])}"
-                    )
-                attr_itr = getattr(attr_itr, atom)
-            return attr_itr
-
-        print("tracing")
-        for node in self.graph.nodes:
-            result = None
-            if node.op == "placeholder":
-                result = next(args_iter)
-            if node.op == "get_attr":
-                result = fetch_attr(node.target)
-            elif node.op == "call_function":
-                result = node.target(*load_arg(node.args), **load_arg(node.kwargs))
-            elif node.op == "call_method":
-                self_obj, *args = load_arg(node.args)
-                kwargs = load_arg(node.kwargs)
-                result = getattr(self_obj, node.target)(*args, **kwargs)
-            # elif node.op == "call_module":
-
-            #     if node.target
-            #     result = self.modules[node.target](
-            #         *load_arg(node.args), **load_arg(node.kwargs)
-            #     )
-
-            if isinstance(result, float):
-                breakpoint()
-
-            if not (Result):
-                env[node.name] = result
-
-        return load_arg(self.graph.result)
-
 
 class ShapeProp(fx.Interpreter):
     r"""
     Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
     """
 
-    def run_node(self, n: fx.node.Node) -> Any:
-        result = super().run_node(n)
+    def run_node(self, node: fx.node.Node) -> Any:
+        result = super().run_node(node)
 
         found_tensor = False
-        found_float = False
+        found_const = False
 
         def extract_tensor_meta(obj):
             if isinstance(obj, torch.Tensor):
@@ -197,27 +146,63 @@ class ShapeProp(fx.Interpreter):
             else:
                 return obj
 
-        def insert_const(obj):
-            if isinstance(obj, float):
-                nonlocal found_float
-                found_float = True
-                return obj
+        def extract_const_meta(obj):
+            if isinstance(obj, (float, int)):
+                nonlocal found_const
+                found_const = True
+                return torch.tensor(obj)
             else:
                 return obj
 
+
+        meta = {}
+        node.meta = meta
+
         meta = fx.node.map_aggregate(result, extract_tensor_meta)
-        # out = fx.node.map_aggregate(result, insert_const)
         if found_tensor:
-            n.meta["tensor_meta"] = meta
+            node.meta["tensor_meta"] = meta
+
+
+        if "getitem" in node.name or "add" in node.name:
+            meta = fx.node.map_aggregate(result, extract_const_meta)
+            meta = torch.tensor(meta)
+            if found_const:
+                node.meta["tensor_meta"] = extract_tensor_metadata(meta)
 
         elif isinstance(result, torch.Size):
-            n.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
+            node.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
 
-        n.meta["type"] = type(result)
+        node.meta["type"] = meta
         return result
 
     def propagate(self, *args):
         return super().run(*args)
+
+class DMIRHFTracer(fx_hf.HFTracer):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
+        is_leaf = isinstance(
+            m,
+            (
+                numerical.CastTo,
+                sparse.Sparsify,
+                torch.nn.modules.batchnorm._BatchNorm,
+                torch.nn.modules.conv._ConvNd,
+                torch.nn.modules.pooling._MaxPoolNd,
+                torch.nn.modules.pooling._AdaptiveAvgPoolNd,
+                torch.nn.modules.pooling._AvgPoolNd,
+                torch.nn.modules.ReLU,
+                torch.nn.modules.Linear,
+                torch.nn.modules.LayerNorm,
+            ),
+        )
+        return (
+            is_leaf
+            or m.__module__.startswith("torch.nn")
+            or m.__module__.startswith("corsair.nn")
+        ) and not isinstance(m, torch.nn.Sequential) or super().is_leaf_module(m, module_qualified_name)
 
 
 class DMIRTracer(fx.Tracer):
@@ -977,6 +962,19 @@ def _adaptive_avg_pool_graph(m, node, input_names, output_names, omit_value=Fals
 def _list_to_int(x):
     return [x if isinstance(x, int) else x[0]][0]
 
+def symbolic_trace(model, input_names) -> fx.GraphModule:
+
+    if input_names is None:
+        input_names = model.dummy_inputs.keys()
+
+    sig = inspect.signature(model.forward)
+    concrete_args = {p.name: p.default for p in sig.parameters.values() if p.name not in input_names}
+
+    tracer = DMIRHFTracer()
+    traced_graph = tracer.trace(model, concrete_args=concrete_args)
+    traced = torch.fx.GraphModule(model, traced_graph)
+
+    return traced
 
 def parse_fx(
     m: torch.nn.Module,
@@ -994,8 +992,6 @@ def parse_fx(
         gm = fx_hf.symbolic_trace(
             m,
             input_names=["input_ids"],
-            batch_size=bs,
-            sequence_length=seq_len,
         )
 
         sample_input = sample_input[0]
@@ -1192,11 +1188,9 @@ def dump(
         bs = sample_input[0]["input_ids"].shape[0]
         seq_len = sample_input[0]["input_ids"].shape[1]
 
-        gm = fx_hf.symbolic_trace(
+        gm = symbolic_trace(
             m,
             input_names=["input_ids"],
-            batch_size=bs,
-            sequence_length=seq_len,
         )
 
         sample_input = sample_input[0]
@@ -2095,7 +2089,7 @@ def dump(
                     or node.target == torch.reshape
                     or node.target == "reshape"
                 ):
-                    shape = node.args[1:]
+                    shape = node.meta["tensor_meta"].shape
                     dependency.append(
                         Dependency(
                             operation=f"{traced._target_to_str(node.target)}",
@@ -2106,7 +2100,7 @@ def dump(
                                     kind=Attribute.INTS,
                                     name="shape",
                                     integer_values=shape,
-                                ),
+                               ),
                             ),
                         )
                     )

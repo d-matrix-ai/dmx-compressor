@@ -16,8 +16,8 @@ pytest = "^7.1.1"
 python = "^3.9.7"
 qtorch = {git = "git@git.d-matrix.ai:ml-team/qtorch.git", rev = "dm"}
 sol = {path = "../software/tools/models/"}
-torch = "1.9.1"
-torchvision = "0.10.1"
+torch = "1.10.1"
+torchvision = "0.11.2"
 tqdm = "^4.64.0"
 transformers = {git = "git@git.d-matrix.ai:ml-team/transformers", rev = "dm-refactor"}
 
