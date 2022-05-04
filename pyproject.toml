@@ -15,7 +15,7 @@ plotly = "^5.7.0"
 pytest = "^7.1.1"
 python = "^3.9.7"
 qtorch = {git = "git@git.d-matrix.ai:ml-team/qtorch.git", rev = "dm"}
-sol = {path = "../software/tools/models/"}
+sol = {path = "../software/tools/models/", develop = true}
 torch = "1.10.1"
 torchvision = "0.11.2"
 tqdm = "^4.64.0"
