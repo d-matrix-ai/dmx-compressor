@@ -1012,6 +1012,7 @@ def parse_fx(
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
+        device = sample_input[0].device
 
     traced = gm.graph
 
