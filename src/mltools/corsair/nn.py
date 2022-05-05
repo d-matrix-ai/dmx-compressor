@@ -104,27 +104,7 @@ class Linear(CorsairModule, torch.nn.Linear):
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.approximator.function, LowRankWeight):
             self.weight.data = self.approximator(self.weight.data)
-        if isinstance(self.accum_cast.format, BlockFloatingPoint):
-            B_i = (
-                self.input_cast.format.block_size
-                if isinstance(self.input_cast.format, BlockFloatingPoint)
-                else 1
-            )
-            B_w = (
-                self.weight_cast.format.block_size
-                if isinstance(self.weight_cast.format, BlockFloatingPoint)
-                else 1
-            )
-            B = max(64, min(B_i, B_w))
-            _inputs = torch.split(_input, B, dim=-1)
-            _weights = torch.split(self._weight, B, dim=-1)
-            _products = (
-                self.accum_cast(torch.matmul(_i, _w.t()))
-                for _i, _w in zip(_inputs, _weights)
-            )
-            _product = reduce((lambda x, y: self.accum_cast(x + y)), _products)
-        else:
-            _product = self.accum_cast(torch.matmul(_input, self._weight.t()))
+        _product = self.accum_cast(torch.matmul(_input, self._weight.t()))
         if self.bias is not None:
             _output = torch.add(_product, self._bias)
         else:
@@ -162,27 +142,7 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.approximator.function, LowRankWeight):
             self.weight.data = self.approximator(self.weight.data)
-        if isinstance(self.accum_cast.format, BlockFloatingPoint):
-            B_i = (
-                self.input_cast.format.block_size
-                if isinstance(self.input_cast.format, BlockFloatingPoint)
-                else 1
-            )
-            B_w = (
-                self.weight_cast.format.block_size
-                if isinstance(self.weight_cast.format, BlockFloatingPoint)
-                else 1
-            )
-            B = max(64, min(B_i, B_w), self.groups)
-            _inputs = torch.split(_input, B, dim=1)
-            _weights = torch.split(self._weight, B, dim=1)
-            _convolutions = (
-                self.accum_cast(self._conv_forward(_i, _w, None))
-                for _i, _w in zip(_inputs, _weights)
-            )
-            _convolution = reduce((lambda x, y: self.accum_cast(x + y)), _convolutions)
-        else:
-            _convolution = self.accum_cast(self._conv_forward(_input, self._weight, None))
+        _convolution = self.accum_cast(self._conv_forward(_input, self._weight, None))
         if self.bias is not None:
             _output = torch.add(_convolution, self._bias.unsqueeze(-1).unsqueeze(-1))
         else:
