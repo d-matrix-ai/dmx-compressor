@@ -126,7 +126,6 @@ def extract_tensor_metadata(result: torch.Tensor) -> TensorMetadata:
     )
 
 
-
 class ShapeProp(fx.Interpreter):
     r"""
     Taken from https://github.com/pytorch/pytorch/blob/master/torch/fx/passes/shape_prop.py
@@ -154,14 +153,12 @@ class ShapeProp(fx.Interpreter):
             else:
                 return obj
 
-
         meta = {}
         node.meta = meta
 
         meta = fx.node.map_aggregate(result, extract_tensor_meta)
         if found_tensor:
             node.meta["tensor_meta"] = meta
-
 
         if "getitem" in node.name or "add" in node.name:
             meta = fx.node.map_aggregate(result, extract_const_meta)
@@ -177,6 +174,7 @@ class ShapeProp(fx.Interpreter):
 
     def propagate(self, *args):
         return super().run(*args)
+
 
 class DMIRHFTracer(fx_hf.HFTracer):
     def __init__(self) -> None:
@@ -199,10 +197,14 @@ class DMIRHFTracer(fx_hf.HFTracer):
             ),
         )
         return (
-            is_leaf
-            or m.__module__.startswith("torch.nn")
-            or m.__module__.startswith("corsair.nn")
-        ) and not isinstance(m, torch.nn.Sequential) or super().is_leaf_module(m, module_qualified_name)
+            (
+                is_leaf
+                or m.__module__.startswith("torch.nn")
+                or m.__module__.startswith("corsair.nn")
+            )
+            and not isinstance(m, torch.nn.Sequential)
+            or super().is_leaf_module(m, module_qualified_name)
+        )
 
 
 class DMIRTracer(fx.Tracer):
@@ -210,36 +212,31 @@ class DMIRTracer(fx.Tracer):
     This is a DMIR-0 tracer that takes a PyTorch module and generates DMIR-0 of it.
     """
 
-    def __init__(self, flat: bool = False) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.flat = flat
 
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
-        is_leaf = isinstance(
-            m,
-            (
-                numerical.CastTo,
-                sparse.Sparsify,
-                torch.nn.modules.batchnorm._BatchNorm,
-                torch.nn.modules.conv._ConvNd,
-                torch.nn.modules.pooling._MaxPoolNd,
-                torch.nn.modules.pooling._AdaptiveAvgPoolNd,
-                torch.nn.modules.pooling._AvgPoolNd,
-                torch.nn.modules.Softmax,
-                torch.nn.modules.ReLU,
-                torch.nn.modules.GELU,
-                torch.nn.modules.Linear,
-                torch.nn.modules.LayerNorm,
-            ),
-        )
-        if self.flat:
-            return is_leaf
-        else:
-            return (
-                is_leaf
-                or m.__module__.startswith("torch.nn")
-                or m.__module__.startswith("corsair.nn")
-            ) and not isinstance(m, torch.nn.Sequential)
+        return (
+            isinstance(
+                m,
+                (
+                    numerical.CastTo,
+                    sparse.Sparsify,
+                    torch.nn.modules.batchnorm._BatchNorm,
+                    torch.nn.modules.conv._ConvNd,
+                    torch.nn.modules.pooling._MaxPoolNd,
+                    torch.nn.modules.pooling._AdaptiveAvgPoolNd,
+                    torch.nn.modules.pooling._AvgPoolNd,
+                    torch.nn.modules.Softmax,
+                    torch.nn.modules.ReLU,
+                    torch.nn.modules.GELU,
+                    torch.nn.modules.Linear,
+                    torch.nn.modules.LayerNorm,
+                ),
+            )
+            or m.__module__.startswith("torch.nn")
+            or m.__module__.startswith("corsair.nn")
+        ) and not isinstance(m, torch.nn.Sequential)
 
     def call_module(
         self,
@@ -513,7 +510,8 @@ def _layer_norm_graph(m, node, input_names, output_names, omit_value=False):
                         name="eps",
                         float_value=m.eps,
                     ),
-                ] + _corsair_specific_attributes(m),
+                ]
+                + _corsair_specific_attributes(m),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -754,7 +752,8 @@ def _softmax_graph(m, node, input_names, output_names, omit_value=False):
                         name="dim",
                         integer_value=m.dim,
                     ),
-                 ] + _corsair_specific_attributes(m),
+                ]
+                + _corsair_specific_attributes(m),
             ),
         ),
         metadata=_nn_module_meta(m),
@@ -962,19 +961,23 @@ def _adaptive_avg_pool_graph(m, node, input_names, output_names, omit_value=Fals
 def _list_to_int(x):
     return [x if isinstance(x, int) else x[0]][0]
 
+
 def symbolic_trace(model, input_names) -> fx.GraphModule:
 
     if input_names is None:
         input_names = model.dummy_inputs.keys()
 
     sig = inspect.signature(model.forward)
-    concrete_args = {p.name: p.default for p in sig.parameters.values() if p.name not in input_names}
+    concrete_args = {
+        p.name: p.default for p in sig.parameters.values() if p.name not in input_names
+    }
 
     tracer = DMIRHFTracer()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
     traced = torch.fx.GraphModule(model, traced_graph)
 
     return traced
+
 
 def parse_fx(
     m: torch.nn.Module,
@@ -1176,12 +1179,11 @@ def dump(
     name: str = "",
     input_names: Optional[List[str]] = None,
     output_names: Optional[List[str]] = None,
-    flat: bool = False,
     omit_value: bool = False,
     metadata: str = "",
 ) -> Graph:
 
-    tracer = DMIRTracer(flat=flat)
+    tracer = DMIRTracer()
 
     if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
         # infer batch_size and sequence length
@@ -1298,115 +1300,6 @@ def dump(
                             ),
                         )
                     else:
-                        if flat:
-                            intermediate.append(
-                                Tensor(
-                                    name=_make_var_name(node.name, suffix="mask"),
-                                    value=[]
-                                    if omit_value
-                                    else _make_value_for_dumping(m.mask),
-                                    **_tensor_meta_dict(node.meta["tensor_meta"]),
-                                ),  # this is a static input
-                            )
-                            dependency.append(
-                                Dependency(
-                                    operation=_legal_op_type(
-                                        f"{traced._target_to_str(torch.mul)}"
-                                    ),
-                                    argument=(
-                                        _input_names[0],
-                                        _make_var_name(node.name, suffix="mask"),
-                                    ),
-                                    result=(_output_names[0],),
-                                ),
-                            )
-                        else:
-                            dependency.append(
-                                Dependency(
-                                    operation=node.name,
-                                    argument=_input_names,
-                                    result=_output_names,
-                                    attribute=_corsair_specific_attributes(_m),
-                                )
-                            )
-                            subgraph.append(
-                                _sparsifier_graph(
-                                    _m,
-                                    node,
-                                    _input_names,
-                                    _output_names,
-                                    omit_value=omit_value,
-                                )
-                            )
-                elif isinstance(_m, torch.nn.modules.batchnorm._BatchNorm):
-                    # manually add a batch_norm op
-                    if flat:
-                        intermediate.append(
-                            Tensor(
-                                name=_make_var_name(node.name, suffix="running_mean"),
-                                value=[]
-                                if omit_value
-                                else _make_value_for_dumping(_m.running_mean),
-                                shape=_m.running_mean.shape,
-                                format=_legal_format(_m.running_mean.dtype),
-                            ),  # this is a static input
-                        )
-                        intermediate.append(
-                            Tensor(
-                                name=_make_var_name(node.name, suffix="running_var"),
-                                value=[]
-                                if omit_value
-                                else _make_value_for_dumping(_m.running_var),
-                                shape=_m.running_var.shape,
-                                format=_legal_format(_m.running_var.dtype),
-                            ),  # this is a static input
-                        )
-                        intermediate.append(
-                            Tensor(
-                                name=_make_var_name(node.name, suffix="weight"),
-                                value=[]
-                                if omit_value
-                                else _make_value_for_dumping(_m.weight),
-                                shape=_m.weight.shape,
-                                format=_legal_format(_m.weight.dtype),
-                            ),  # this is a static input
-                        )
-                        intermediate.append(
-                            Tensor(
-                                name=_make_var_name(node.name, suffix="bias"),
-                                value=[]
-                                if omit_value
-                                else _make_value_for_dumping(_m.bias),
-                                shape=_m.bias.shape,
-                                format=_legal_format(_m.bias.dtype),
-                            ),  # this is a static input
-                        )
-                        dependency.append(
-                            Dependency(
-                                operation=f"{_legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
-                                argument=(
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="running_mean"),
-                                    _make_var_name(node.name, suffix="running_var"),
-                                    _make_var_name(node.name, suffix="weight"),
-                                    _make_var_name(node.name, suffix="bias"),
-                                ),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.FLOAT,
-                                        name="momentum",
-                                        float_value=_m.momentum,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.FLOAT,
-                                        name="eps",
-                                        float_value=_m.eps,
-                                    ),
-                                ),
-                            ),
-                        )
-                    else:
                         dependency.append(
                             Dependency(
                                 operation=node.name,
@@ -1416,7 +1309,7 @@ def dump(
                             )
                         )
                         subgraph.append(
-                            _batch_norm_graph(
+                            _sparsifier_graph(
                                 _m,
                                 node,
                                 _input_names,
@@ -1424,6 +1317,25 @@ def dump(
                                 omit_value=omit_value,
                             )
                         )
+                elif isinstance(_m, torch.nn.modules.batchnorm._BatchNorm):
+                    # manually add a batch_norm op
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    subgraph.append(
+                        _batch_norm_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
+                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.LayerNorm):
                     dependency.append(
                         Dependency(
@@ -1461,66 +1373,43 @@ def dump(
                         if _m.bias is not None
                         else None
                     )  # this is a static input
-                    if flat:
-                        intermediate.append(_weight)
-                        if _bias is not None:
-                            intermediate.append(_bias)
-                        dependency.append(
-                            Dependency(
-                                operation=f"linear",
-                                argument=(
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="weight"),
-                                )
-                                if _bias is None
-                                else (
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="weight"),
-                                    _make_var_name(node.name, suffix="bias"),
-                                ),
-                                result=(_output_names[0],),
-                                attribute=(),
-                            ),
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    if isinstance(_m, corsair.nn.Linear):
+                        subgraph.append(
+                            dump(
+                                _m,
+                                *[
+                                    torch.randn(
+                                        arg.meta["tensor_meta"].shape,
+                                        dtype=arg.meta["tensor_meta"].dtype,
+                                        device=_m.weight.device,
+                                    )
+                                    for arg in node.args
+                                ],
+                                name=node.name,
+                                input_names=_input_names,
+                                output_names=_output_names,
+                                omit_value=omit_value,
+                                metadata=_nn_module_meta(_m),
+                            )
                         )
                     else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
+                        subgraph.append(
+                            _linear_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
                             )
                         )
-                        if isinstance(_m, corsair.nn.Linear):
-                            subgraph.append(
-                                dump(
-                                    _m,
-                                    *[
-                                        torch.randn(
-                                            arg.meta["tensor_meta"].shape,
-                                            dtype=arg.meta["tensor_meta"].dtype,
-                                            device=_m.weight.device,
-                                        )
-                                        for arg in node.args
-                                    ],
-                                    name=node.name,
-                                    input_names=_input_names,
-                                    output_names=_output_names,
-                                    flat=flat,
-                                    omit_value=omit_value,
-                                    metadata=_nn_module_meta(_m),
-                                )
-                            )
-                        else:
-                            subgraph.append(
-                                _linear_graph(
-                                    _m,
-                                    node,
-                                    _input_names,
-                                    _output_names,
-                                    omit_value=omit_value,
-                                )
-                            )
                 elif isinstance(_m, torch.nn.modules.conv._ConvNd):
                     _weight = Tensor(
                         name=_make_var_name(node.name, suffix="weight"),
@@ -1540,340 +1429,115 @@ def dump(
                         if _m.bias is not None
                         else None
                     )  # this is a static input
-                    if flat:
-                        intermediate.append(_weight)
-                        if _bias is not None:
-                            intermediate.append(_bias)
-                        dependency.append(
-                            Dependency(
-                                operation=f"conv",
-                                argument=(
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="weight"),
-                                )
-                                if _bias is None
-                                else (
-                                    _input_names[0],
-                                    _make_var_name(node.name, suffix="weight"),
-                                    _make_var_name(node.name, suffix="bias"),
-                                ),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="stride",
-                                        integer_values=_m.stride,
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
+                        )
+                    )
+                    if isinstance(_m, corsair.nn.Conv2d):
+                        subgraph.append(
+                            dump(
+                                _m,
+                                *[
+                                    torch.randn(
+                                        arg.meta["tensor_meta"].shape,
+                                        dtype=arg.meta["tensor_meta"].dtype,
+                                        device=_m.weight.device,
                                     )
-                                    if isinstance(_m.stride, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="stride",
-                                        integer_value=_m.stride,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="padding",
-                                        integer_values=_m.padding,
-                                    )
-                                    if isinstance(_m.padding, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="padding",
-                                        integer_value=_m.padding,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="dilation",
-                                        integer_values=_m.dilation,
-                                    )
-                                    if isinstance(_m.dilation, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="dilation",
-                                        integer_value=_m.dilation,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INT,
-                                        name="groups",
-                                        integer_value=_m.groups,
-                                    ),
-                                ),
-                            ),
+                                    for arg in node.args
+                                ],
+                                name=node.name,
+                                input_names=_input_names,
+                                output_names=_output_names,
+                                omit_value=omit_value,
+                                metadata=_nn_module_meta(_m),
+                            )
                         )
                     else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
+                        subgraph.append(
+                            _conv_graph(
+                                _m,
+                                node,
+                                _input_names,
+                                _output_names,
+                                omit_value=omit_value,
                             )
                         )
-                        if isinstance(_m, corsair.nn.Conv2d):
-                            subgraph.append(
-                                dump(
-                                    _m,
-                                    *[
-                                        torch.randn(
-                                            arg.meta["tensor_meta"].shape,
-                                            dtype=arg.meta["tensor_meta"].dtype,
-                                            device=_m.weight.device,
-                                        )
-                                        for arg in node.args
-                                    ],
-                                    name=node.name,
-                                    input_names=_input_names,
-                                    output_names=_output_names,
-                                    flat=flat,
-                                    omit_value=omit_value,
-                                    metadata=_nn_module_meta(_m),
-                                )
-                            )
-                        else:
-                            subgraph.append(
-                                _conv_graph(
-                                    _m,
-                                    node,
-                                    _input_names,
-                                    _output_names,
-                                    omit_value=omit_value,
-                                )
-                            )
                 elif isinstance(_m, torch.nn.modules.pooling._MaxPoolNd):
-                    if flat:
-                        dependency.append(
-                            Dependency(
-                                operation=f"max_pool",
-                                argument=(_input_names[0],),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="kernel_size",
-                                        integer_values=_m.kernel_size,
-                                    )
-                                    if isinstance(_m.kernel_size, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="kernel_size",
-                                        integer_value=_m.kernel_size,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="stride",
-                                        integer_values=_m.stride,
-                                    )
-                                    if isinstance(_m.stride, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="stride",
-                                        integer_value=_m.stride,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="padding",
-                                        integer_values=_m.padding,
-                                    )
-                                    if isinstance(_m.padding, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="padding",
-                                        integer_value=_m.padding,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="dilation",
-                                        integer_values=_m.dilation,
-                                    )
-                                    if isinstance(_m.dilation, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="dilation",
-                                        integer_value=_m.dilation,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INT,
-                                        name="ceil_mode",
-                                        integer_value=int(_m.ceil_mode),
-                                    ),
-                                ),
-                            )
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
                         )
-                    else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
-                            )
+                    )
+                    subgraph.append(
+                        _max_pool_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
                         )
-                        subgraph.append(
-                            _max_pool_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.pooling._AvgPoolNd):
-                    if flat:
-                        dependency.append(
-                            Dependency(
-                                operation=f"average_pool",
-                                argument=(_input_names[0],),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="kernel_size",
-                                        integer_values=_m.kernel_size,
-                                    )
-                                    if isinstance(_m.kernel_size, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="kernel_size",
-                                        integer_value=_m.kernel_size,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="stride",
-                                        integer_values=_m.stride,
-                                    )
-                                    if isinstance(_m.stride, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="stride",
-                                        integer_value=_m.stride,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="padding",
-                                        integer_values=_m.padding,
-                                    )
-                                    if isinstance(_m.padding, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="padding",
-                                        integer_value=_m.padding,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="dilation",
-                                        integer_values=_m.dilation,
-                                    )
-                                    if isinstance(_m.dilation, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="dilation",
-                                        integer_value=_m.dilation,
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INT,
-                                        name="ceil_mode",
-                                        integer_value=int(_m.ceil_mode),
-                                    ),
-                                    Attribute(
-                                        kind=Attribute.INT,
-                                        name="count_include_pad",
-                                        integer_value=int(_m.count_include_pad),
-                                    ),
-                                ),
-                            )
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
                         )
-                    else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
-                            )
+                    )
+                    subgraph.append(
+                        _avg_pool_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
                         )
-                        subgraph.append(
-                            _avg_pool_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.pooling._AdaptiveAvgPoolNd):
-                    if flat:
-                        dependency.append(
-                            Dependency(
-                                operation=f"adaptive_average_pool",
-                                argument=(_input_names[0],),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.INTS,
-                                        name="output_size",
-                                        integer_values=_m.output_size,
-                                    )
-                                    if isinstance(_m.output_size, tuple)
-                                    else Attribute(
-                                        kind=Attribute.INT,
-                                        name="output_size",
-                                        integer_value=_m.output_size,
-                                    ),
-                                ),
-                            )
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
                         )
-                    else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
-                            )
+                    )
+                    subgraph.append(
+                        _adaptive_avg_pool_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
                         )
-                        subgraph.append(
-                            _adaptive_avg_pool_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.ReLU):
-                    if flat:
-                        dependency.append(
-                            Dependency(
-                                operation=f"{_legal_op_type(node.graph._target_to_str(torch.relu))}",
-                                argument=(_input_names[0],),
-                                result=(_output_names[0],),
-                                attribute=(
-                                    Attribute(
-                                        kind=Attribute.INT,
-                                        name="inplace",
-                                        integer_value=int(_m.inplace),
-                                    ),
-                                ),
-                            ),
+                    dependency.append(
+                        Dependency(
+                            operation=node.name,
+                            argument=_input_names,
+                            result=_output_names,
+                            attribute=_corsair_specific_attributes(_m),
                         )
-                    else:
-                        dependency.append(
-                            Dependency(
-                                operation=node.name,
-                                argument=_input_names,
-                                result=_output_names,
-                                attribute=_corsair_specific_attributes(_m),
-                            )
+                    )
+                    subgraph.append(
+                        _relu_graph(
+                            _m,
+                            node,
+                            _input_names,
+                            _output_names,
+                            omit_value=omit_value,
                         )
-                        subgraph.append(
-                            _relu_graph(
-                                _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
+                    )
                 elif isinstance(_m, torch.nn.modules.GELU):
                     dependency.append(
                         Dependency(
@@ -1933,7 +1597,6 @@ def dump(
                             name=node.name,
                             input_names=_input_names,
                             output_names=_output_names,
-                            flat=flat,
                             omit_value=omit_value,
                             metadata=_nn_module_meta(_m),
                         )
@@ -2101,7 +1764,7 @@ def dump(
                                     kind=Attribute.INTS,
                                     name="shape",
                                     integer_values=shape,
-                               ),
+                                ),
                             ),
                         )
                     )
