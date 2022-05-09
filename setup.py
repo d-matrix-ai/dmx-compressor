@@ -22,6 +22,7 @@ class DevelopWrapper(develop):
 class InstallWrapper(install):
     """Pre-installation for installation mode."""
 
+
     def run(self):
         if os.path.exists(os.path.join(DMIR_PROTO_DIR, DMIR_PROTO_FILE)):
             os.system(
@@ -38,10 +39,14 @@ setup(
     license="MIT",
     packages=find_packages("src", exclude=("tests", "docs", "experiments", "sandbox")),
     package_dir={"": "src"},
+    package_data={
+        'configs': ['*.yaml']
+    },
     install_requires=(
-        "torch==1.9.1",
-        "torchvision==0.10.1",
+        "torch>=1.10"
+        "torchvision",
         "transformers @ git+ssh://git@git.d-matrix.ai/ml-team/transformers.git@dm-refactor",
+        "sol"
         "datasets",
         "numpy",
         "scipy",
@@ -55,7 +60,7 @@ setup(
         "python-dotenv",
         "pytest",
     ),
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     cmdclass={
         "develop": DevelopWrapper,
         "install": InstallWrapper,
