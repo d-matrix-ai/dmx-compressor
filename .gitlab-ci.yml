@@ -9,7 +9,8 @@ test:
     - export PATH=/home/root/.poetry/bin/:$PATH
 
   script:
-    - git clone -b sol-dev git@git.d-matrix.ai:software/software.git ../software
-    - poetry install
-    - poetry run pip list
-    - poetry run pytest ./tests/*.py
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -e .
+    - pytest -vv ./tests/*.py
