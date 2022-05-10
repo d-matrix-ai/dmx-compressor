@@ -34,6 +34,7 @@ from mltools.approximate import (
     Approximate,
     LowRankWeight,
 )
+from mltools import dmir
 
 
 class CorsairModule(
@@ -84,6 +85,57 @@ class CorsairModule(
     def _bias(self):
         return self.bias_cast(self.bias) if self.bias_cast is not None else None
 
+    def dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=dmir._make_var_name(
+                name=node.name,
+                suffix="wrap",
+                end="",
+            ),
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="wrap_input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),
+            ),
+            intermediate=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="wrap_output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            subgraph=(self._dmir_graph(node, omit_value=omit_value),),
+            dependency=(
+                dmir.Dependency(
+                    operation="cast",
+                    argument=[dmir._make_var_name(node.name, suffix="wrap_input")],
+                    result=[dmir._make_var_name(node.name, suffix="input")],
+                    attribute=dmir._corsair_specific_attributes(self.input_cast),
+                ),
+                dmir.Dependency(
+                    operation=node.name,
+                    argument=[dmir._make_var_name(node.name, suffix="input")],
+                    result=[dmir._make_var_name(node.name, suffix="output")],
+                ),
+                dmir.Dependency(
+                    operation="cast",
+                    argument=[dmir._make_var_name(node.name, suffix="output")],
+                    result=[dmir._make_var_name(node.name, suffix="wrap_output")],
+                    attribute=dmir._corsair_specific_attributes(self.output_cast),
+                ),
+            ),
+        )
+
     def forward(self, input: Tensor) -> Tensor:
         _input = self.input_cast(input)
         _output = self._forward(_input)
@@ -110,6 +162,24 @@ class Linear(CorsairModule, torch.nn.Linear):
         else:
             _output = _product
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.dump(
+            self,
+            *[
+                torch.randn(
+                    arg.meta["tensor_meta"].shape,
+                    dtype=arg.meta["tensor_meta"].dtype,
+                    device=self.weight.device,
+                )
+                for arg in node.args
+            ],
+            name=node.name,
+            input_names=[dmir._make_var_name(n.__str__()) for n in node.args],
+            output_names=[dmir._make_var_name(node.name)],
+            omit_value=omit_value,
+            metadata=dmir._nn_module_meta(self),
+        )
 
 
 class Conv2d(CorsairModule, torch.nn.Conv2d):
@@ -149,6 +219,24 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
             _output = _convolution
         return _output
 
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.dump(
+            self,
+            *[
+                torch.randn(
+                    arg.meta["tensor_meta"].shape,
+                    dtype=arg.meta["tensor_meta"].dtype,
+                    device=self.weight.device,
+                )
+                for arg in node.args
+            ],
+            name=node.name,
+            input_names=[dmir._make_var_name(n.__str__()) for n in node.args],
+            output_names=[dmir._make_var_name(node.name)],
+            omit_value=omit_value,
+            metadata=dmir._nn_module_meta(self),
+        )
+
 
 class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
     def __init__(self, output_size) -> None:
@@ -157,6 +245,134 @@ class AdaptiveAvgPool2d(CorsairModule, torch.nn.AdaptiveAvgPool2d):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"adaptive_average_pool",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="output_size",
+                            integer_values=self.output_size,
+                        )
+                        if isinstance(self.output_size, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="output_size",
+                            integer_value=self.output_size,
+                        ),
+                    ),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
+
+
+class AvgPool2d(CorsairModule, torch.nn.AvgPool2d):
+    def __init__(self, output_size) -> None:
+        super().__init__(output_size)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(_input)
+        return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"average_pool",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="kernel_size",
+                            integer_values=self.kernel_size,
+                        )
+                        if isinstance(self.kernel_size, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="kernel_size",
+                            integer_value=self.kernel_size,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="stride",
+                            integer_values=self.stride,
+                        )
+                        if isinstance(self.stride, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="stride",
+                            integer_value=self.stride,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="padding",
+                            integer_values=self.padding,
+                        )
+                        if isinstance(self.padding, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="padding",
+                            integer_value=self.padding,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="dilation",
+                            integer_values=self.dilation,
+                        )
+                        if isinstance(self.dilation, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="dilation",
+                            integer_value=self.dilation,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="ceil_mode",
+                            integer_value=int(self.ceil_mode),
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="count_include_pad",
+                            integer_value=int(self.count_include_pad),
+                        ),
+                    ),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
 
 
 class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
@@ -182,6 +398,82 @@ class MaxPool2d(CorsairModule, torch.nn.MaxPool2d):
         _output = self.approx_forward(_input)
         return _output
 
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"max_pool",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="kernel_size",
+                            integer_values=self.kernel_size,
+                        )
+                        if isinstance(self.kernel_size, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="kernel_size",
+                            integer_value=self.kernel_size,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="stride",
+                            integer_values=self.stride,
+                        )
+                        if isinstance(self.stride, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="stride",
+                            integer_value=self.stride,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="padding",
+                            integer_values=self.padding,
+                        )
+                        if isinstance(self.padding, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="padding",
+                            integer_value=self.padding,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="dilation",
+                            integer_values=self.dilation,
+                        )
+                        if isinstance(self.dilation, tuple)
+                        else dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="dilation",
+                            integer_value=self.dilation,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="ceil_mode",
+                            integer_value=int(self.ceil_mode),
+                        ),
+                    ),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
+
 
 class Softmax(CorsairModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
@@ -190,6 +482,39 @@ class Softmax(CorsairModule, torch.nn.Softmax):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input, dim=self.dim)
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"softmax",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=[
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="dim",
+                            integer_value=self.dim,
+                        ),
+                    ]
+                    + dmir._corsair_specific_attributes(self),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
 
 
 class LayerNorm(CorsairModule, torch.nn.LayerNorm):
@@ -208,6 +533,64 @@ class LayerNorm(CorsairModule, torch.nn.LayerNorm):
             _input, self.normalized_shape, self._weight, self._bias, self.eps
         )
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            intermediate=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="weight"),
+                    value=[]
+                    if omit_value
+                    else dmir._make_value_for_dumping(self.weight),
+                    shape=self.weight.shape,
+                    format=dmir._legal_format(self.weight.dtype),
+                ),  # this is a static input
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="bias"),
+                    value=[] if omit_value else dmir._make_value_for_dumping(self.bias),
+                    shape=self.bias.shape,
+                    format=dmir._legal_format(self.bias.dtype),
+                ),  # this is a static input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"{dmir._legal_op_type(node.graph._target_to_str(torch.layer_norm))}",
+                    argument=(
+                        dmir._make_var_name(node.name, suffix="input"),
+                        dmir._make_var_name(node.name, suffix="weight"),
+                        dmir._make_var_name(node.name, suffix="bias"),
+                    ),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=[
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INTS,
+                            name="normalized_shape",
+                            integer_values=self.normalized_shape,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.FLOAT,
+                            name="eps",
+                            float_value=self.eps,
+                        ),
+                    ]
+                    + dmir._corsair_specific_attributes(self),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
 
 
 class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
@@ -258,6 +641,81 @@ class BatchNorm2d(CorsairModule, torch.nn.BatchNorm2d):
         )
         return _output
 
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            intermediate=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="running_mean"),
+                    value=[]
+                    if omit_value
+                    else dmir._make_value_for_dumping(self.running_mean),
+                    shape=self.running_mean.shape,
+                    format=dmir._legal_format(self.running_mean.dtype),
+                ),  # this is a static input
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="running_var"),
+                    value=[]
+                    if omit_value
+                    else dmir._make_value_for_dumping(self.running_var),
+                    shape=self.running_var.shape,
+                    format=dmir._legal_format(self.running_var.dtype),
+                ),  # this is a static input
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="weight"),
+                    value=[]
+                    if omit_value
+                    else dmir._make_value_for_dumping(self.weight),
+                    shape=self.weight.shape,
+                    format=dmir._legal_format(self.weight.dtype),
+                ),  # this is a static input
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="bias"),
+                    value=[] if omit_value else dmir._make_value_for_dumping(self.bias),
+                    shape=self.bias.shape,
+                    format=dmir._legal_format(self.bias.dtype),
+                ),  # this is a static input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"{dmir._legal_op_type(node.graph._target_to_str(torch.batch_norm))}",
+                    argument=(
+                        dmir._make_var_name(node.name, suffix="input"),
+                        dmir._make_var_name(node.name, suffix="running_mean"),
+                        dmir._make_var_name(node.name, suffix="running_var"),
+                        dmir._make_var_name(node.name, suffix="weight"),
+                        dmir._make_var_name(node.name, suffix="bias"),
+                    ),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.FLOAT,
+                            name="momentum",
+                            float_value=self.momentum,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.FLOAT,
+                            name="eps",
+                            float_value=self.eps,
+                        ),
+                    ),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
+
 
 class Dropout(CorsairModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
@@ -266,6 +724,42 @@ class Dropout(CorsairModule, torch.nn.Dropout):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"dropout",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.FLOAT,
+                            name="p",
+                            float_value=self.p,
+                        ),
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="inplace",
+                            integer_value=int(self.inplace),
+                        ),
+                    ),
+                ),
+            ),
+        )
 
 
 class ReLU(CorsairModule, torch.nn.ReLU):
@@ -276,6 +770,37 @@ class ReLU(CorsairModule, torch.nn.ReLU):
         _output = self.approx_forward(_input)
         return _output
 
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"relu",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="inplace",
+                            integer_value=int(self.inplace),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
 
 class ReLU6(CorsairModule, torch.nn.ReLU6):
     def __init__(self, inplace: bool = False) -> None:
@@ -284,6 +809,37 @@ class ReLU6(CorsairModule, torch.nn.ReLU6):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"relu6",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=(
+                        dmir.Attribute(
+                            kind=dmir.Attribute.INT,
+                            name="inplace",
+                            integer_value=int(self.inplace),
+                        ),
+                    ),
+                ),
+            ),
+        )
 
 
 class Tanh(CorsairModule, torch.nn.Tanh):
@@ -294,6 +850,32 @@ class Tanh(CorsairModule, torch.nn.Tanh):
         _output = self.approx_forward(_input)
         return _output
 
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"tanh",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=dmir._corsair_specific_attributes(self),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
+
 
 class GELU(CorsairModule, torch.nn.GELU):
     def __init__(self) -> None:
@@ -302,3 +884,29 @@ class GELU(CorsairModule, torch.nn.GELU):
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
         return _output
+
+    def _dmir_graph(self, node, omit_value=False):
+        return dmir.Graph(
+            name=node.name,
+            input=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="input"),
+                    **dmir._tensor_meta_dict(node.args[0].meta["tensor_meta"]),
+                ),  # this is a dynamic input
+            ),
+            output=(
+                dmir.Tensor(
+                    name=dmir._make_var_name(node.name, suffix="output"),
+                    **dmir._tensor_meta_dict(node.meta["tensor_meta"]),
+                ),
+            ),
+            dependency=(
+                dmir.Dependency(
+                    operation=f"gelu",
+                    argument=(dmir._make_var_name(node.name, suffix="input"),),
+                    result=(dmir._make_var_name(node.name, suffix="output"),),
+                    attribute=dmir._corsair_specific_attributes(self),
+                ),
+            ),
+            metadata=dmir._nn_module_meta(self),
+        )
