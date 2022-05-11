@@ -413,8 +413,7 @@ def parse_fx(
 
         bs = sample_input[0]["input_ids"].shape[0]
         seq_len = sample_input[0]["input_ids"].shape[1]
-
-        gm = fx_hf.symbolic_trace(
+        gm = symbolic_trace(
             m,
             input_names=["input_ids"],
         )
@@ -429,16 +428,14 @@ def parse_fx(
         else:
             _output_key = "logits"
 
-        ShapeProp(gm).propagate(
-            sample_input["input_ids"],
-        )
+        ShapeProp(gm).propagate(sample_input["input_ids"],)
         device = sample_input["input_ids"].device
     else:
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
         ShapeProp(gm).propagate(*sample_input)
         device = sample_input[0].device
-
+        
     traced = gm.graph
 
     for node in traced.nodes:
@@ -466,7 +463,7 @@ def parse_fx(
 
         elif node.op == "output":
             op_name = "output"
-
+            
         elif node.op == "get_attr":  # static inputs
             pass  # .T (transpose) op applied in the forward call can be processed here
 
@@ -566,12 +563,32 @@ def parse_fx(
         else:
             raise RuntimeError(f"illegal FXIR node opcode {node.op}")
 
+        if isinstance(node.meta["type"], transformers.models.bert.modeling_bert.BertSelfAttention):
+            op_name = "attention_block"
+
         if node.args != ():
-            input_shape = list(node.args[0].meta["tensor_meta"].shape)
+            if isinstance(node.args[0], Tuple):
+                node.args = node.args[0]
+                _input_names = [node.args[0].name, node.args[1].name]
+
+            if isinstance(node.args[0], float) or 'transpose_for_scores' in node.name or 'view_for_context' in node.name:
+                # transpose_for_scores and view_for_context ops are functions which have self as its first argument
+                # swap the args assuming the second arg is a valid op
+                node.args = (node.args[1], node.args[0])
+                _input_names = [_input_names[1], _input_names[0]]
+                
+            if 'split' in node.args[0].name:
+                input_shape = list(node.args[0].meta["tensor_meta"][0].shape)
+            else:
+                input_shape = list(node.args[0].meta["tensor_meta"].shape)
+                
             if node.name == "size":
                 output_shape = input_shape
+            elif node.name == "split":
+                output_shape = list(node.meta["tensor_meta"][0].shape)
             else:
                 output_shape = list(node.meta["tensor_meta"].shape)
+                
             if input_format is None:
                 input_format = "FP16"
             if output_format is None:
