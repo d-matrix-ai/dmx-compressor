@@ -79,21 +79,80 @@ def save_to_file(graph_dict: dict, filename: str, format="csv") -> None:
             f.write(json_dict)
     else:
         raise ValueError(f"unsupported Graph file format: {format}")
+    
+def prune_graph(graph_dict, childless_nodes=None, debug=False, ops_to_prune=("flatten", 
+                                                                            "batchnorm",
+                                                                            "layer_norm",
+                                                                            "dropout",
+                                                                            "truediv",
+                                                                            "reshape", 
+                                                                            "size", 
+                                                                            "view", 
+                                                                            "split", 
+                                                                            "squeeze",
+                                                                            "expand",
+                                                                            "getitem",
+                                                                            "permute",
+                                                                            "clone",
+                                                                            "identity",
+                                                                            "contiguous",
+                                                                            "transpose",
+                                                                            "t",
+                                                                            "ones",
+                                                                            "to",
+                                                                            "sub",
+                                                                            "mul",
+                                                                            "attention_block",
+                                                                            )):
 
-
-def prune_graph(graph_dict, ops_to_prune=("flatten", "batchnorm", "reshape", "size", "view")):
     # remove specified ops from graph, overwrite inputs/outputs for affected nodes
+    if childless_nodes is None:  # only print the graph once (the first iteration)
+        if debug:
+            print('\n\n\n\n\nUnpruned graph\n\n\n')
+        for node in graph_dict:
+            if debug:
+                print(node, graph_dict[node]["op"], [i for i in graph_dict[node]["input_name"]])
+        
+        # find detached nodes (nodes which are not inputs to any other nodes in the graph)
+        if debug:
+            print('\n\n\n\nLooking for childless nodes\n\n')
+        childless_nodes = []
+        for node in graph_dict:
+            found_as_input = False
+            for n in graph_dict:
+                if node in graph_dict[n]["input_name"]:
+                    found_as_input = True
+            if not found_as_input:
+                if debug:
+                    print(f'\n\n{node}: {graph_dict[node]}')
+                childless_nodes.append(node)
+                
     found = False
     # find the first node to be eliminated:
     for node in graph_dict:
-        if graph_dict[node]["op"] in ops_to_prune:
-            # assume this node has only one input
+        if 'split' in graph_dict[node]["op"] and debug:
+            if debug:
+                print('\n\n\n\n', node, '\n\n\n', graph_dict[node], '\n\n\n')
+
+        if ((graph_dict[node]["op"] in ops_to_prune 
+            or any([name in graph_dict[node]["op"] for name in ["layer_norm", 
+                                                                "embedding", 
+                                                                "cast", 
+                                                                "transpose_for_scores",
+                                                                "view_for_context"
+                                                                ]])
+            or 'add' in node and graph_dict[node]["input_name"][1][0] =="(") # second input is a tuple
+            and graph_dict[node]["input_name"] != []):
+            # assume this node has only one input TODO what about multi input node deletion? It might create childless nodes
+            # for example, "ones" op in bert_large takes ['getitem', 'add'] as inputs, and deleting it makes  "add" childless
             input_node = graph_dict[node]["input_name"][0]
             # find all nodes that use this node as input
             for n in graph_dict:
                 # node can have multiple inputs, check all of them
                 for i, name in enumerate(graph_dict[n]["input_name"]):
                     if name == node:
+                        #if debug:
+                            #print(f'\n\n{node} is input of {n}, deleting {node} and assigning its input {input_node} to be input of {n}\n\n')
                         graph_dict[n]["input_name"][i] = input_node
                         found = True
 
@@ -101,14 +160,61 @@ def prune_graph(graph_dict, ops_to_prune=("flatten", "batchnorm", "reshape", "si
             if found:
                 del graph_dict[node]
                 break
+
     if not found:
-        # End of pruning, now remove input and output nodes
-        node_names = []
+        # End of pruning, now remove any leaf nodes
+        if debug:
+            print('\n\n\n\nPartially pruned graph\n\n\n')
         for node in graph_dict:
-            if graph_dict[node]["op"] in ["input", "output"]:
-                node_names.append(node)
-        for node in node_names:
+            if debug:
+                print(node, graph_dict[node]["op"], [i for i in graph_dict[node]["input_name"]])
+
+        if debug:
+            print('\n\n\n\nLooking for childless nodes (nodes which are not inputs to any other node) \n\n')
+        childless_nodes_after_pruning = []
+        for node in graph_dict:
+            found_as_input = False
+            for n in graph_dict:
+                if node in graph_dict[n]["input_name"]:
+                    found_as_input = True
+            if not found_as_input:
+                if debug:
+                    print(f'\n\n{node}: {graph_dict[node]}\n\n')
+                if graph_dict[node]["op"] == "attention_block":
+                    if debug:
+                        print(f'*** ignoring {node} - not a real node ***')
+                elif node == "add":
+                    if debug:
+                        print(f'*** ignoring {node} - extra input to "ones" ***')
+                else:
+                    childless_nodes_after_pruning.append(node)
+                
+        # check that no new childless nodes have been created during pruning:
+        if debug:
+            print(f'\n\nChecking that no childless nodes got created during pruning:\n\nBefore:\n'
+                  f'{childless_nodes}\nAfter:\n{childless_nodes_after_pruning}')
+        assert(sorted(childless_nodes) == sorted(childless_nodes_after_pruning))
+        
+        if debug:
+            print('\n\n\n\nLooking for leaf nodes (nodes which have no inputs)\n\n')
+        leaf_nodes = []
+        for node in graph_dict:
+            if graph_dict[node]["input_name"] == []:
+                if debug:
+                    print(f'\n\n{node}: {graph_dict[node]}')
+                leaf_nodes.append(node)
+                
+        nodes_to_remove = set(childless_nodes + leaf_nodes)
+        for node in nodes_to_remove:
             del graph_dict[node]
+            
+        if debug:
+            print('\n\n\n\nFinal pruned graph:\n\n') 
+        for node in graph_dict:
+            if debug:
+                print(node, graph_dict[node]["op"], [i for i in graph_dict[node]["input_name"]])
+        if debug:
+            print('\n\n\n\n\n')
         return graph_dict
     else:
-        return prune_graph(graph_dict)
+        return prune_graph(graph_dict, childless_nodes=childless_nodes, debug=debug)
