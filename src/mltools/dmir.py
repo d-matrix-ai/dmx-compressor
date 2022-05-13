@@ -785,7 +785,11 @@ def dump(
                 elif hasattr(_m, "dmir_graph"):
                     dependency.append(
                         Dependency(
-                            operation=node.name,
+                            operation=_make_var_name(
+                                name=node.name,
+                                suffix="wrap",
+                                end="",
+                            ),
                             argument=_input_names,
                             result=_output_names,
                             attribute=_corsair_specific_attributes(_m),
