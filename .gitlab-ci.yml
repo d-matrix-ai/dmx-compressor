@@ -14,3 +14,9 @@ test:
     - pip install --upgrade pip
     - pip install -e .
     - pytest -vv ./tests/*.py
+
+staging:
+  variables:
+    ENVIRONMENT: staging
+  stage: deploy
+  trigger: ml-team/mlreferences
