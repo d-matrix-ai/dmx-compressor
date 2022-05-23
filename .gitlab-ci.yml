@@ -1,5 +1,18 @@
 image: "dmatrix.azurecr.io/mlops:v8"
 
+stages:
+  - test
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: mlteam-pip-install
+  paths:
+    - .cache/pip
+    - .venv/
+
 test:
   before_script:
     - eval $(ssh-agent -s)
@@ -15,7 +28,7 @@ test:
     - pip install -e .
     - pytest -vv ./tests/*.py
 
-staging:
+triger-mlreferences:
   variables:
     UPSTREAM_MLTOOLS_BRANCH: $CI_COMMIT_REF_NAME
   stage: deploy
