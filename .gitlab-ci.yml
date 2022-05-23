@@ -17,6 +17,6 @@ test:
 
 staging:
   variables:
-    ENVIRONMENT: staging
+    UPSTREAM_MLTOOLS_BRANCH: $CI_COMMIT_REF_NAME
   stage: deploy
   trigger: ml-team/mlreferences
