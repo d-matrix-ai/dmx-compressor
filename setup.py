@@ -46,7 +46,7 @@ setup(
         "torch>=1.10"
         "torchvision",
         "transformers @ git+ssh://git@git.d-matrix.ai/ml-team/transformers.git@dm-refactor",
-        "sol"
+        "sol",
         "datasets",
         "numpy",
         "scipy",
