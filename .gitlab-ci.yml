@@ -32,4 +32,6 @@ triger-mlreferences:
   variables:
     UPSTREAM_MLTOOLS_BRANCH: $CI_COMMIT_REF_NAME
   stage: deploy
-  trigger: ml-team/mlreferences
+  trigger:
+    project: ml-team/mlreferences
+    strategy: depend
