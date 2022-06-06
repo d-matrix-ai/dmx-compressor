@@ -4,6 +4,9 @@ version = "0.0.3.dev"
 description = "d-MATRiX ML tools"
 authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>"]
 
+[tool.poetry.scripts]
+build-dmir-proto = "mltools.utils:run_protoc_dmir"
+
 [tool.poetry.dependencies]
 datasets = "^1.18.4"
 networkx = "^2.8"
