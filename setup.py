@@ -18,23 +18,5 @@ setup(
     package_data={
         'configs': ['*.yaml']
     },
-    install_requires=(
-        "torch>=1.10"
-        "torchvision",
-        "transformers @ git+ssh://git@git.d-matrix.ai/ml-team/transformers.git@dm-refactor",
-        "sol",
-        "datasets",
-        "numpy",
-        "scipy",
-        "sklearn",
-        "qtorch @ git+ssh://git@git.d-matrix.ai/ml-team/qtorch.git@dm",
-        "tensorboard",
-        "pyyaml",
-        "tqdm",
-        "parse",
-        "ninja",
-        "python-dotenv",
-        "pytest",
-    ),
     python_requires=">=3.8",
 )

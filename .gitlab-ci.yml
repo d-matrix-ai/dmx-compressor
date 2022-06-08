@@ -1,31 +1,31 @@
-image: "dmatrix.azurecr.io/mlops:v8"
+image: "dmatrix.azurecr.io/test-mlteam:v3"
 
 stages:
   - test
   - deploy
 
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-
 cache:
-  key: mlteam-pip-install
+  key: $CI_PIPELINE_ID
   paths:
-    - .cache/pip
-    - .venv/
+    - .venv
 
 test:
   before_script:
+    - export PYENV_ROOT=$HOME/.pyenv
+    - export PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+    - mc alias set minio http://10.10.6.184:9000 rootuser rootpass123
+    - mc cp minio/creds/gitlab_runner_ed25519 ~/.ssh/id_rsa
+    - mc cp minio/creds/git.d-matrix.ai.crt /usr/local/share/ca-certificates
+    - update-ca-certificates
+    - chmod 400 ~/.ssh/id_rsa
     - eval $(ssh-agent -s)
     - ssh-add ~/.ssh/id_rsa
     - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-    - chmod 644 ~/.ssh/known_hosts
-    - export PATH=/home/root/.poetry/bin/:$PATH
-
   script:
     - python -m venv .venv
     - source .venv/bin/activate
-    - pip install --upgrade pip
-    - pip install -e .
+    - pip install .
+    - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python build-dmir-proto
     - pytest -vv ./tests/*.py
 
 triger-mlreferences:
