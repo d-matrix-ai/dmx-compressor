@@ -126,3 +126,6 @@ data_dir/
 out_dir/
 runs/
 cached*
+
+# jupyter notebooks
+*.ipynb
