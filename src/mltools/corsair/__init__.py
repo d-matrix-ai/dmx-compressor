@@ -5,6 +5,12 @@ from ..approximate import Approximate
 from .transform import Model, aware
 from . import nn
 
+from sol.src.sys import corsair_hw
+
+Slice = corsair_hw.Slice
+Quad = corsair_hw.Quad
+Chiplet = corsair_hw.Chiplet
+
 counterpart = {
     torch.nn.Linear: nn.Linear,
     torch.nn.Conv2d: nn.Conv2d,
