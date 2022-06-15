@@ -26,6 +26,9 @@ def aware():
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
 
+class CorsairTransform(fx.Transformer):
+     def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+         pass
 
 class Model(torch.nn.Module):
     r"""
