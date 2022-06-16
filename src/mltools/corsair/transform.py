@@ -5,7 +5,9 @@ from mltools import dmir
 from mltools.utils import load_config_file, graph_utils
 from sol.src.sys.corsair_hw import *
 from sol.src.sol_sim import *
-
+import torch.fx as fx
+from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 def aware():
     # add new torch.nn modules for corsair
@@ -28,7 +30,8 @@ def aware():
 
 class CorsairTransform(fx.Transformer):
      def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-         pass
+         call_self, *rest_of_args = args
+         return call_self(rest_of_args)
 
 class Model(torch.nn.Module):
     r"""

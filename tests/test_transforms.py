@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from mltools import corsair
+from mltools.corsair.transform import CorsairTransform
 import inspect
 
 RANDOM_SEED = 0
@@ -13,10 +14,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(RANDOM_SEED)
 
 def test_corsair_transform():
-    corsair.aware()
     net = Net()
     net = corsair.Model(net)
-    assert (isinstance(net.linear, corsair.nn.Linear))
+
+    gm = torch.fx.symbolic_trace(net.body)
+    transformed : torch.nn.Module = CorsairTransform(gm).transform()
+
+    assert (isinstance(transformed.linear, corsair.nn.Linear))
 
 
 class Net(torch.nn.Module):
