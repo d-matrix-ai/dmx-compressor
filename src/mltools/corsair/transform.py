@@ -8,7 +8,6 @@ from sol.src.sol_sim import *
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-import ipdb
 
 def aware():
     # add new torch.nn modules for corsair
@@ -52,7 +51,6 @@ class CorsairTransform(fx.Transformer):
             in_features = self.module.linear.in_features
             out_features = self.module.linear.out_features
             self.module.linear = Linear(in_features,out_features)
-        # ipdb.set_trace()
         return fx.GraphModule(self.module, self.new_graph)
 
 
