@@ -7,6 +7,7 @@ import torch.nn as nn
 from mltools import corsair
 from mltools.corsair.transform import CorsairTransform
 import inspect
+import ipdb
 
 RANDOM_SEED = 0
 
@@ -19,6 +20,7 @@ def test_corsair_transform():
 
     gm = torch.fx.symbolic_trace(net.body)
     transformed : torch.nn.Module = CorsairTransform(gm).transform()
+    # ipdb.set_trace()
 
     assert (isinstance(transformed.linear, corsair.nn.Linear))
 
