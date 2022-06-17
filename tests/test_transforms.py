@@ -17,19 +17,30 @@ torch.manual_seed(RANDOM_SEED)
 def test_corsair_transform():
     net = Net()
     net = corsair.Model(net)
-    gm = torch.fx.symbolic_trace(net.body)
-    # ipdb.set_trace()
-    transformed : torch.nn.Module = CorsairTransform(gm).transform()
-    # ipdb.set_trace()
-    # Found that gm was transformed in place to Corsair
-    assert (isinstance(gm.linear, corsair.nn.Linear))
-    # assert (isinstance(transformed.linear, corsair.nn.Linear))
 
+    cnet = CorsairNet()
+    cnet = corsair.Model(cnet)
+
+    gm = torch.fx.symbolic_trace(net.body)
+    cgm = torch.fx.symbolic_trace(cnet.body)
+
+    # Call Transform TODO
+    transformed : torch.nn.Module = CorsairTransform(gm).transform()
+
+    assert(cgm.code == gm.code)
 
 class Net(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.linear = nn.Linear(64, 64)
+
+    def forward(self, input):
+        return self.linear(input)
+
+class CorsairNet(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.linear = corsair.nn.Linear(64, 64)
 
     def forward(self, input):
         return self.linear(input)
