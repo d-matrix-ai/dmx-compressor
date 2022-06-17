@@ -8,6 +8,7 @@ from sol.src.sol_sim import *
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+import ipdb
 
 def aware():
     # add new torch.nn modules for corsair
@@ -29,29 +30,41 @@ def aware():
     torch.nn.GELU = GELU
 
 class CorsairTransform(fx.Transformer):
-    # def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-    #     call_self, *rest_of_args = args
-    #     submod  = self.fetch_attr(target)
-    #     submod.forward = Linear(64,64).forward
-    #     ipdb.set_trace()
-    #     return self.tracer.call_module(submod, submod.forward, args, kwargs)
-    #     #  return call_self(rest_of_args)
-
-    def transform(self) -> fx.GraphModule:
-        """
-        Transform ``self.module`` and return the transformed
-        ``GraphModule``.
-        """
-        result = super().run()
-        if result is not None:
-            def strip_proxy(a : Union[Argument, fx.Proxy]) -> Any:
-                return a.node if isinstance(a, fx.Proxy) else a
-            self.new_graph.output(map_aggregate(result, strip_proxy))
-        if (isinstance(self.module.linear, torch.nn.Linear)):
-            in_features = self.module.linear.in_features
-            out_features = self.module.linear.out_features
+    def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+        # call_self, *rest_of_args = args
+        submod  = self.fetch_attr(target)
+        self_obj, *args_tail = args
+        # ipdb.set_trace()
+        if target=='linear':
+            in_features = submod.in_features
+            out_features = submod.out_features
             self.module.linear = Linear(in_features,out_features)
-        return fx.GraphModule(self.module, self.new_graph)
+        
+        # return getattr(self_obj, target)(*args_tail, **kwargs)
+        # submod = Linear(64,64)
+        # self.module.add_submodule(target,Linear(64,64))
+        
+        # ipdb.set_trace()
+        return fx.Transformer.call_method(self_obj,target,args,kwargs)
+        # return fx.proxy(submod)
+        # return self.tracer.call_module(submod, submod.forward, args, kwargs)
+        # return call_self(rest_of_args)
+
+    # def transform(self) -> fx.GraphModule:
+    #     """
+    #     Transform ``self.module`` and return the transformed
+    #     ``GraphModule``.
+    #     """
+    #     result = super().run()
+    #     if result is not None:
+    #         def strip_proxy(a : Union[Argument, fx.Proxy]) -> Any:
+    #             return a.node if isinstance(a, fx.Proxy) else a
+    #         self.new_graph.output(map_aggregate(result, strip_proxy))
+    #     if (isinstance(self.module.linear, torch.nn.Linear)):
+    #         in_features = self.module.linear.in_features
+    #         out_features = self.module.linear.out_features
+    #         self.module.linear = Linear(in_features,out_features)
+    #     return fx.GraphModule(self.module, self.new_graph)
 
 
 class Model(torch.nn.Module):
