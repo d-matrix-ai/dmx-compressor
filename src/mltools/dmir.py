@@ -1,4 +1,3 @@
-from numpy import true_divide
 from mltools.utils.dmir_pb2 import *
 
 # from mltools.utils.graph_to_csv import graph_to_csv
@@ -166,10 +165,33 @@ class ShapeProp(fx.Interpreter):
             if found_const:
                 node.meta["tensor_meta"] = extract_tensor_metadata(meta)
 
-        elif isinstance(result, torch.Size):
-            node.meta["tensor_meta"] = extract_tensor_metadata(torch.tensor(result))
+        elif node.target == "size":
+            node.meta["tensor_meta"] = extract_tensor_metadata(
+                torch.tensor(
+                    result if isinstance(result, torch.Size) else torch.Size((result,))
+                )
+            )
+
+        elif node.graph._target_to_str(node.target) == "pow":
+            node.meta["tensor_meta"] = extract_tensor_metadata(
+                torch.Tensor([result]) if isinstance(result, float) else result
+            )
+
+        elif node.graph._target_to_str(node.target) == "sub":
+            node.meta["tensor_meta"] = extract_tensor_metadata(
+                torch.Tensor([result])
+                if isinstance(
+                    result,
+                    (
+                        int,
+                        float,
+                    ),
+                )
+                else result
+            )
 
         node.meta["type"] = meta
+        node.ignore = False
         return result
 
     def propagate(self, *args):
@@ -186,14 +208,7 @@ class DMIRHFTracer(fx_hf.HFTracer):
             (
                 numerical.CastTo,
                 sparse.Sparsify,
-                torch.nn.modules.batchnorm._BatchNorm,
-                torch.nn.modules.conv._ConvNd,
-                torch.nn.modules.pooling._MaxPoolNd,
-                torch.nn.modules.pooling._AdaptiveAvgPoolNd,
-                torch.nn.modules.pooling._AvgPoolNd,
-                torch.nn.modules.ReLU,
-                torch.nn.modules.Linear,
-                torch.nn.modules.LayerNorm,
+                corsair.nn.CorsairModule,
             ),
         )
         return (
@@ -650,7 +665,13 @@ def dump(
 
     tracer = DMIRTracer()
 
-    if isinstance(m, transformers.models.bert.modeling_bert.BertPreTrainedModel):
+    if isinstance(
+        m,
+        (
+            transformers.models.bert.modeling_bert.BertPreTrainedModel,
+            transformers.models.gpt2.modeling_gpt2.GPT2LMHeadModel,
+        ),
+    ):
         # infer batch_size and sequence length
 
         bs = sample_input[0]["input_ids"].shape[0]
@@ -700,71 +721,125 @@ def dump(
                 node.meta["tensor_meta"] = node.meta["tensor_meta"][_output_key]
 
     for node in traced.nodes:
-        if node.op == "placeholder":  # dynamic inputs
-            input.append(
-                Tensor(
-                    name=_make_var_name(node.name),
-                    **_tensor_meta_dict(node.meta["tensor_meta"]),
+        if not node.ignore: 
+            if node.op == "placeholder":  # dynamic inputs
+                input.append(
+                    Tensor(
+                        name=_make_var_name(node.name),
+                        **_tensor_meta_dict(node.meta["tensor_meta"]),
+                    )
                 )
-            )
-        elif node.op == "get_attr":  # static inputs
-            _p = eval(_torch_qualified_name(f"m.{node.target}"))
-            intermediate.append(
-                Tensor(
-                    name=_make_var_name(node.name),
-                    value=[] if omit_value else _make_value_for_dumping(_p),
-                    **_tensor_meta_dict(node.meta["tensor_meta"]),
+            elif node.op == "get_attr":  # static inputs
+                _p = eval(_torch_qualified_name(f"m.{node.target}"))
+                intermediate.append(
+                    Tensor(
+                        name=_make_var_name(node.name),
+                        value=[] if omit_value else _make_value_for_dumping(_p),
+                        **_tensor_meta_dict(node.meta["tensor_meta"]),
+                    )
                 )
-            )
-        elif node.op == "output":  # output
-            assert len(node.args) == 1
-            output.append(
-                Tensor(
-                    name=_make_var_name(node.name),
-                    **_tensor_meta_dict(node.meta["tensor_meta"]),
+            elif node.op == "output":  # output
+                assert len(node.args) == 1
+                output.append(
+                    Tensor(
+                        name=_make_var_name(node.name),
+                        **_tensor_meta_dict(node.meta["tensor_meta"]),
+                    )
                 )
-            )
-            dependency.append(
-                Dependency(
-                    operation=_legal_op_type(
-                        f"{traced._target_to_str(torch.nn.Identity)}"
-                    ),
-                    argument=(_make_var_name(node.args[0].name),),
-                    result=(_make_var_name(node.name),),
+                dependency.append(
+                    Dependency(
+                        operation=_legal_op_type(
+                            f"{traced._target_to_str(torch.nn.Identity)}"
+                        ),
+                        argument=(_make_var_name(node.args[0].name),),
+                        result=(_make_var_name(node.name),),
+                    )
                 )
-            )
-        elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
-            intermediate.append(
-                Tensor(
-                    name=_make_var_name(node.name),
-                    **_tensor_meta_dict(node.meta["tensor_meta"]),
-                )
-            )
-            if node.op == "call_module":
-                _m = eval(_torch_qualified_name(f"m.{node.target}"))
-                _input_names = [_make_var_name(n.__str__()) for n in node.args]
-                _output_names = [_make_var_name(node.name)]
-                if isinstance(_m, numerical.CastTo):
-                    dependency.append(
-                        Dependency(
-                            operation="cast",  # node.name,
-                            argument=_input_names,
-                            result=_output_names,
-                            attribute=_corsair_specific_attributes(_m),
+            elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
+                if "split" in node.name:  # need to add multiple outputs and mark the next getitems to ignore
+                    nout = len(node.meta["tensor_meta"])
+                    names, _n = [], node
+                    for _ in range(nout):
+                        _n = _n.next
+                        names.append(_make_var_name(_n.name))
+                        _n.ignore = True
+                    for name, tensor_meta in zip(names, node.meta["tensor_meta"]):
+                        intermediate.append(
+                            Tensor(
+                                name=name,
+                                **_tensor_meta_dict(tensor_meta),
+                            )
+                        )
+                    node.split_output_names = names
+                else:
+                    intermediate.append(
+                        Tensor(
+                            name=_make_var_name(node.name),
+                            **_tensor_meta_dict(node.meta["tensor_meta"]),
                         )
                     )
-                elif isinstance(_m, sparse.Sparsify):
-                    if isinstance(_m.sparseness, sparse.Dense):
+                if node.op == "call_module":
+                    _m = eval(_torch_qualified_name(f"m.{node.target}"))
+                    _input_names = [_make_var_name(n.__str__()) for n in node.args]
+                    _output_names = [_make_var_name(node.name)]
+                    if isinstance(_m, numerical.CastTo):
                         dependency.append(
                             Dependency(
-                                operation=_legal_op_type(
-                                    f"{traced._target_to_str(torch.nn.Identity)}"
-                                ),
-                                argument=(_input_names[0],),
-                                result=(_output_names[0],),
-                            ),
+                                operation="cast",  # node.name,
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
                         )
-                    else:
+                    elif isinstance(_m, sparse.Sparsify):
+                        if isinstance(_m.sparseness, sparse.Dense):
+                            dependency.append(
+                                Dependency(
+                                    operation=_legal_op_type(
+                                        f"{traced._target_to_str(torch.nn.Identity)}"
+                                    ),
+                                    argument=(_input_names[0],),
+                                    result=(_output_names[0],),
+                                ),
+                            )
+                        else:
+                            dependency.append(
+                                Dependency(
+                                    operation=node.name,
+                                    argument=_input_names,
+                                    result=_output_names,
+                                    attribute=_corsair_specific_attributes(_m),
+                                )
+                            )
+                            subgraph.append(
+                                _sparsifier_graph(
+                                    _m,
+                                    node,
+                                    _input_names,
+                                    _output_names,
+                                    omit_value=omit_value,
+                                )
+                            )
+                    elif hasattr(_m, "dmir_graph"):
+                        dependency.append(
+                            Dependency(
+                                operation=_make_var_name(
+                                    name=node.name,
+                                    suffix="wrap",
+                                    end="",
+                                ),
+                                argument=_input_names,
+                                result=_output_names,
+                                attribute=_corsair_specific_attributes(_m),
+                            )
+                        )
+                        subgraph.append(
+                            _m.dmir_graph(
+                                node,
+                                omit_value=omit_value,
+                            )
+                        )
+                    else:  # custom modules
                         dependency.append(
                             Dependency(
                                 operation=node.name,
@@ -774,407 +849,396 @@ def dump(
                             )
                         )
                         subgraph.append(
-                            _sparsifier_graph(
+                            dump(
                                 _m,
-                                node,
-                                _input_names,
-                                _output_names,
-                                omit_value=omit_value,
-                            )
-                        )
-                elif hasattr(_m, "dmir_graph"):
-                    dependency.append(
-                        Dependency(
-                            operation=_make_var_name(
+                                *[
+                                    torch.zeros(
+                                        arg.meta["tensor_meta"].shape,
+                                        dtype=arg.meta["tensor_meta"].dtype,
+                                        device=device,
+                                    )
+                                    for arg in node.args
+                                ],
                                 name=node.name,
-                                suffix="wrap",
-                                end="",
+                                input_names=_input_names,
+                                output_names=_output_names,
+                                omit_value=omit_value,
+                                metadata=_nn_module_meta(_m),
+                            )
+                        )
+                else:  # built-in function or tensor method
+                    if any(
+                        map(lambda x: isinstance(x, float), node.args)
+                    ) and "truediv" in str(node):
+                        dependency.append(
+                            Dependency(
+                                operation="const",
+                                result=(
+                                    _make_var_name(node.name.replace("truediv", "const")),
+                                ),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.FLOAT,
+                                        name="value",
+                                        float_value=node.args[1],
+                                    ),
+                                ),
+                            )
+                        )
+                        intermediate.append(
+                            Tensor(
+                                name=_make_var_name(node.name.replace("truediv", "const")),
+                                value=_make_value_for_dumping(torch.tensor(node.args[1])),
+                                shape=(),
+                                format=_legal_format(torch.float32),
+                                qscheme="",
                             ),
-                            argument=_input_names,
-                            result=_output_names,
-                            attribute=_corsair_specific_attributes(_m),
                         )
-                    )
-                    subgraph.append(
-                        _m.dmir_graph(
-                            node,
-                            omit_value=omit_value,
+                        node.args = (node.args[0], node.name.replace("truediv", "const"))
+                    if node.target == torch.flatten:
+                        start_dim = node.args[1] if len(node.args) > 1 else 0
+                        end_dim = node.args[2] if len(node.args) > 2 else -1
+                        node.args = (node.args[0],)
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=itertools.chain(
+                                    (_make_var_name(n.__str__()) for n in node.args),
+                                    (
+                                        _make_var_name(v.__str__())
+                                        for k, v in node.kwargs.items()
+                                    ),
+                                ),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="start_dim",
+                                        integer_value=start_dim,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="end_dim",
+                                        integer_value=end_dim,
+                                    ),
+                                ),
+                            )
                         )
-                    )
-                else:  # custom modules
-                    dependency.append(
-                        Dependency(
-                            operation=node.name,
-                            argument=_input_names,
-                            result=_output_names,
-                            attribute=_corsair_specific_attributes(_m),
-                        )
-                    )
-                    subgraph.append(
-                        dump(
-                            _m,
-                            *[
-                                torch.zeros(
-                                    arg.meta["tensor_meta"].shape,
-                                    dtype=arg.meta["tensor_meta"].dtype,
-                                    device=device,
+                    elif node.target == torch.nn.functional.conv2d:
+                        (
+                            _input,
+                            _weight,
+                            _bias,
+                            _stride,
+                            _padding,
+                            _dilation,
+                            _groups,
+                        ) = node.args
+                        dependency.append(
+                            Dependency(
+                                operation=f"conv",
+                                argument=(
+                                    _make_var_name(_input.name),
+                                    _make_var_name(_weight.name),
                                 )
-                                for arg in node.args
-                            ],
-                            name=node.name,
-                            input_names=_input_names,
-                            output_names=_output_names,
-                            omit_value=omit_value,
-                            metadata=_nn_module_meta(_m),
-                        )
-                    )
-            else:  # built-in function or tensor method
-                if any(
-                    map(lambda x: isinstance(x, float), node.args)
-                ) and "truediv" in str(node):
-                    dependency.append(
-                        Dependency(
-                            operation="const",
-                            result=(
-                                _make_var_name(node.name.replace("truediv", "const")),
+                                if _bias is None
+                                else (
+                                    _make_var_name(_input.name),
+                                    _make_var_name(_weight.name),
+                                    _make_var_name(_bias.name),
+                                ),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="stride",
+                                        integer_values=_stride,
+                                    )
+                                    if isinstance(_stride, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="stride",
+                                        integer_value=_stride,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="padding",
+                                        integer_values=_padding,
+                                    )
+                                    if isinstance(_padding, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="padding",
+                                        integer_value=_padding,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="dilation",
+                                        integer_values=_dilation,
+                                    )
+                                    if isinstance(_dilation, tuple)
+                                    else Attribute(
+                                        kind=Attribute.INT,
+                                        name="dilation",
+                                        integer_value=_dilation,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="groups",
+                                        integer_value=_groups,
+                                    ),
+                                ),
                             ),
-                            attribute=(
+                        )
+                    elif (
+                        node.target == torch.unsqueeze
+                        or node.target == "unsqueeze"
+                        or node.target == torch.squeeze
+                        or node.target == "squeeze"
+                    ):
+                        dim = node.args[1] if len(node.args) > 1 else None
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="dim",
+                                        integer_value=dim,
+                                    ),
+                                )
+                                if dim is not None
+                                else (),
+                            )
+                        )
+                    elif (
+                        node.target == "view"
+                        or node.target == torch.reshape
+                        or node.target == "reshape"
+                    ):
+                        shape = node.meta["tensor_meta"].shape
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="shape",
+                                        integer_values=shape,
+                                    ),
+                                ),
+                            )
+                        )
+                    elif node.target == "transpose" or node.target == torch.transpose:
+                        dim0, dim1 = node.args[1], node.args[2]
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="dim0",
+                                        integer_value=dim0,
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="dim1",
+                                        integer_value=dim1,
+                                    ),
+                                ),
+                            )
+                        )
+                    elif node.target == "permute" or node.target == torch.permute:
+                        dims = node.args[1:]
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="dim",
+                                        integer_values=dims,
+                                    ),
+                                ),
+                            )
+                        )
+                    elif (
+                        node.target == "softmax"
+                        or node.target == torch.nn.functional.softmax
+                    ):
+                        dim = node.args[1] if len(node.args) > 1 else -1
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="dim",
+                                        integer_value=-1 if dim is None else dim,
+                                    ),
+                                ),
+                            )
+                        )
+                    elif (
+                        node.target == "layer_norm"
+                        or node.target == torch.nn.functional.layer_norm
+                    ):
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(
+                                    _make_var_name(node.args[0].name),
+                                    _make_var_name(node.kwargs["weight"].name),
+                                    _make_var_name(node.kwargs["bias"].name),
+                                ),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.INTS,
+                                        name="normalized_shape",
+                                        integer_values=node.args[1],
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.FLOAT,
+                                        name="eps",
+                                        float_value=node.kwargs["eps"],
+                                    ),
+                                ),
+                            )
+                        )
+                    elif (
+                        node.target == "embedding"
+                        or node.target == torch.nn.functional.embedding
+                    ):
+                        attrs = []
+                        if node.args[2] is not None:
+                            attrs.append(
+                                Attribute(
+                                    kind=Attribute.INT,
+                                    name="padding_idx",
+                                    integer_value=node.args[2],
+                                )
+                            )
+                        if node.args[3] is not None:
+                            attrs.append(
                                 Attribute(
                                     kind=Attribute.FLOAT,
-                                    name="value",
-                                    float_value=node.args[1],
-                                ),
-                            ),
-                        )
-                    )
-                    intermediate.append(
-                        Tensor(
-                            name=_make_var_name(node.name.replace("truediv", "const")),
-                            value=_make_value_for_dumping(torch.tensor(node.args[1])),
-                            shape=(),
-                            format=_legal_format(torch.float32),
-                            qscheme="",
-                        ),
-                    )
-                    node.args = (node.args[0], node.name.replace("truediv", "const"))
-                if node.target == torch.flatten:
-                    start_dim = node.args[1] if len(node.args) > 1 else 0
-                    end_dim = node.args[2] if len(node.args) > 2 else -1
-                    node.args = (node.args[0],)
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=itertools.chain(
-                                (_make_var_name(n.__str__()) for n in node.args),
-                                (
-                                    _make_var_name(v.__str__())
-                                    for k, v in node.kwargs.items()
-                                ),
-                            ),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="start_dim",
-                                    integer_value=start_dim,
-                                ),
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="end_dim",
-                                    integer_value=end_dim,
-                                ),
-                            ),
-                        )
-                    )
-                elif node.target == torch.nn.functional.conv2d:
-                    (
-                        _input,
-                        _weight,
-                        _bias,
-                        _stride,
-                        _padding,
-                        _dilation,
-                        _groups,
-                    ) = node.args
-                    dependency.append(
-                        Dependency(
-                            operation=f"conv",
-                            argument=(
-                                _make_var_name(_input.name),
-                                _make_var_name(_weight.name),
-                            )
-                            if _bias is None
-                            else (
-                                _make_var_name(_input.name),
-                                _make_var_name(_weight.name),
-                                _make_var_name(_bias.name),
-                            ),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="stride",
-                                    integer_values=_stride,
+                                    name="max_norm",
+                                    float_value=node.args[3],
                                 )
-                                if isinstance(_stride, tuple)
-                                else Attribute(
-                                    kind=Attribute.INT,
-                                    name="stride",
-                                    integer_value=_stride,
-                                ),
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="padding",
-                                    integer_values=_padding,
-                                )
-                                if isinstance(_padding, tuple)
-                                else Attribute(
-                                    kind=Attribute.INT,
-                                    name="padding",
-                                    integer_value=_padding,
-                                ),
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="dilation",
-                                    integer_values=_dilation,
-                                )
-                                if isinstance(_dilation, tuple)
-                                else Attribute(
-                                    kind=Attribute.INT,
-                                    name="dilation",
-                                    integer_value=_dilation,
-                                ),
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="groups",
-                                    integer_value=_groups,
-                                ),
-                            ),
-                        ),
-                    )
-                elif (
-                    node.target == torch.unsqueeze
-                    or node.target == "unsqueeze"
-                    or node.target == torch.squeeze
-                    or node.target == "squeeze"
-                ):
-                    dim = node.args[1] if len(node.args) > 1 else None
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="dim",
-                                    integer_value=dim,
-                                ),
                             )
-                            if dim is not None
-                            else (),
-                        )
-                    )
-                elif (
-                    node.target == "view"
-                    or node.target == torch.reshape
-                    or node.target == "reshape"
-                ):
-                    shape = node.meta["tensor_meta"].shape
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="shape",
-                                    integer_values=shape,
-                                ),
-                            ),
-                        )
-                    )
-                elif node.target == "transpose" or node.target == torch.transpose:
-                    dim0, dim1 = node.args[1], node.args[2]
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="dim0",
-                                    integer_value=dim0,
-                                ),
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="dim1",
-                                    integer_value=dim1,
-                                ),
-                            ),
-                        )
-                    )
-                elif node.target == "permute" or node.target == torch.permute:
-                    dims = node.args[1:]
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="dim",
-                                    integer_values=dims,
-                                ),
-                            ),
-                        )
-                    )
-                elif (
-                    node.target == "softmax"
-                    or node.target == torch.nn.functional.softmax
-                ):
-                    dim = node.args[1] if len(node.args) > 1 else -1
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="dim",
-                                    integer_value=-1 if dim is None else dim,
-                                ),
-                            ),
-                        )
-                    )
-                elif (
-                    node.target == "layer_norm"
-                    or node.target == torch.nn.functional.layer_norm
-                ):
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(
-                                _make_var_name(node.args[0].name),
-                                _make_var_name(node.kwargs["weight"].name),
-                                _make_var_name(node.kwargs["bias"].name),
-                            ),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.INTS,
-                                    name="normalized_shape",
-                                    integer_values=node.args[1],
-                                ),
-                                Attribute(
-                                    kind=Attribute.FLOAT,
-                                    name="eps",
-                                    float_value=node.kwargs["eps"],
-                                ),
-                            ),
-                        )
-                    )
-                elif (
-                    node.target == "embedding"
-                    or node.target == torch.nn.functional.embedding
-                ):
-                    attrs = []
-                    if node.args[2] is not None:
-                        attrs.append(
-                            Attribute(
-                                kind=Attribute.INT,
-                                name="padding_idx",
-                                integer_value=node.args[2],
-                            )
-                        )
-                    if node.args[3] is not None:
                         attrs.append(
                             Attribute(
                                 kind=Attribute.FLOAT,
-                                name="max_norm",
-                                float_value=node.args[3],
+                                name="norm_type",
+                                float_value=node.args[4],
                             )
                         )
-                    attrs.append(
-                        Attribute(
-                            kind=Attribute.FLOAT,
-                            name="norm_type",
-                            float_value=node.args[4],
+                        attrs.append(
+                            Attribute(
+                                kind=Attribute.INT,
+                                name="scale_grad_by_freq",
+                                integer_value=int(node.args[5]),
+                            )
                         )
-                    )
-                    attrs.append(
-                        Attribute(
-                            kind=Attribute.INT,
-                            name="scale_grad_by_freq",
-                            integer_value=int(node.args[5]),
+                        attrs.append(
+                            Attribute(
+                                kind=Attribute.INT,
+                                name="sparse",
+                                integer_value=int(node.args[6]),
+                            )
                         )
-                    )
-                    attrs.append(
-                        Attribute(
-                            kind=Attribute.INT,
-                            name="sparse",
-                            integer_value=int(node.args[6]),
-                        )
-                    )
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(
-                                _make_var_name(node.args[0].name),
-                                _make_var_name(node.args[1].name),
-                            ),
-                            result=(_make_var_name(node.name),),
-                            attribute=attrs,
-                        )
-                    )
-                elif (
-                    node.target == "dropout"
-                    or node.target == torch.nn.functional.dropout
-                ):
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=(_make_var_name(node.args[0].name),),
-                            result=(_make_var_name(node.name),),
-                            attribute=(
-                                Attribute(
-                                    kind=Attribute.FLOAT,
-                                    name="p",
-                                    float_value=node.kwargs["p"],
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(
+                                    _make_var_name(node.args[0].name),
+                                    _make_var_name(node.args[1].name),
                                 ),
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="training",
-                                    integer_value=int(node.kwargs["training"]),
-                                ),
-                                Attribute(
-                                    kind=Attribute.INT,
-                                    name="inplace",
-                                    integer_value=int(node.kwargs["inplace"]),
-                                ),
-                            ),
+                                result=(_make_var_name(node.name),),
+                                attribute=attrs,
+                            )
                         )
-                    )
-                else:
-                    dependency.append(
-                        Dependency(
-                            operation=f"{traced._target_to_str(node.target)}",
-                            argument=itertools.chain(
-                                (_make_var_name(n.__str__()) for n in node.args),
-                                (
-                                    _make_var_name(v.__str__())
-                                    for k, v in node.kwargs.items()
+                    elif (
+                        node.target == "dropout"
+                        or node.target == torch.nn.functional.dropout
+                    ):
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=(_make_var_name(node.args[0].name),),
+                                result=(_make_var_name(node.name),),
+                                attribute=(
+                                    Attribute(
+                                        kind=Attribute.FLOAT,
+                                        name="p",
+                                        float_value=node.kwargs["p"],
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="training",
+                                        integer_value=int(node.kwargs["training"]),
+                                    ),
+                                    Attribute(
+                                        kind=Attribute.INT,
+                                        name="inplace",
+                                        integer_value=int(node.kwargs["inplace"]),
+                                    ),
                                 ),
-                            ),
-                            result=(_make_var_name(node.name),),
+                            )
                         )
-                    )
-        else:
-            raise RuntimeError(f"illegal FXIR node opcode {node.op}")
+                    elif node.target == "split" or node.target == torch.split:
+                        for i, oname in enumerate(node.split_output_names):
+                            dependency.append(
+                                Dependency(
+                                    operation="slice",
+                                    argument=(_make_var_name(node.args[0].name),),
+                                    result=(oname,),
+                                    attribute=(
+                                        Attribute(
+                                            kind=Attribute.INT,
+                                            name="dim",
+                                            integer_value=node.kwargs["dim"],
+                                        ),
+                                        Attribute(
+                                            kind=Attribute.INT,
+                                            name="start",
+                                            integer_value=int(i*node.args[1]),
+                                        ),
+                                        Attribute(
+                                            kind=Attribute.INT,
+                                            name="size",
+                                            integer_value=int(node.args[1]),  # NOTE: only a single chunk size is supported--beware!
+                                        ),
+                                    ),
+                                )
+                            )
+                    else:
+                        dependency.append(
+                            Dependency(
+                                operation=f"{traced._target_to_str(node.target)}",
+                                argument=itertools.chain(
+                                    (_make_var_name(n.__str__()) for n in node.args),
+                                    (
+                                        _make_var_name(v.__str__())
+                                        for k, v in node.kwargs.items()
+                                    ),
+                                ),
+                                result=(_make_var_name(node.name),),
+                            )
+                        )
+            else:
+                raise RuntimeError(f"illegal FXIR node opcode {node.op}")
 
     return Graph(
         name=name,
