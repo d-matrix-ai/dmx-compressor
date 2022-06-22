@@ -763,11 +763,11 @@ def dump(
                         _n = _n.next
                         names.append(_make_var_name(_n.name))
                         _n.ignore = True
-                    for name, tensor_meta in zip(names, node.meta["tensor_meta"]):
+                    for _name, _tensor_meta in zip(names, node.meta["tensor_meta"]):
                         intermediate.append(
                             Tensor(
-                                name=name,
-                                **_tensor_meta_dict(tensor_meta),
+                                name=_name,
+                                **_tensor_meta_dict(_tensor_meta),
                             )
                         )
                     node.split_output_names = names
