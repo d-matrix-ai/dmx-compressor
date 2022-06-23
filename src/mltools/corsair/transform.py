@@ -31,7 +31,7 @@ def aware():
 
 class CorsairTransform(fx.Transformer):
     def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-        return self.tracer.create_proxy('call_module', 'linear', args, kwargs)
+        return self.tracer.create_proxy('call_module', 'clinear', args, kwargs)
 
 class Model(torch.nn.Module):
     r"""
