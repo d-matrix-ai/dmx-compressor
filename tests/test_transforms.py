@@ -25,6 +25,21 @@ def test_corsair_transform():
 
     assert(cgm.code == gm.code)
 
+def test_fakecast_transform():
+    net = Net()
+    cnet = FakecastNet()
+
+    cgm = torch.fx.symbolic_trace(cnet)
+    gm = cast_input_output_transform(net, downcast, upcast)
+
+    assert(cgm.code == gm.code)
+
+def downcast(input):
+    return input
+
+def upcast(input):
+    return input
+
 class Net(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -43,4 +58,16 @@ class CorsairNet(torch.nn.Module):
         clone = input_1.clone();
         linear = self.linear(clone);
         clone_1 = linear.clone();
+        return clone_1
+
+class FakecastNet(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.linear = nn.Linear(64, 64)
+
+    def forward(self, input):
+        input_1 = input
+        clone = downcast(input_1);
+        linear = self.linear(clone);
+        clone_1 = upcast(linear);
         return clone_1
