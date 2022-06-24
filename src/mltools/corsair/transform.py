@@ -12,7 +12,7 @@ from sol.src.sol_sim import *
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-import ipdb
+import torch.nn as nn
 
 def aware():
     # add new torch.nn modules for corsair
@@ -36,6 +36,25 @@ def aware():
 class CorsairTransform(fx.Transformer):
     def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
         return self.tracer.create_proxy('call_module', 'clinear', args, kwargs)
+
+
+def cast_input_output_transform(module: nn.Module) -> nn.Module:
+    gm = torch.fx.symbolic_trace(module)
+    for i in gm.graph.nodes:
+        if i.target == 'input':
+            gm.graph.inserting_after(i)
+            gm.graph.create_node('call_method','clone',args=(i,))
+        elif i.target =='output':
+            gm.graph.inserting_before(i)
+            prev=gm.graph.create_node('call_method','clone',args=(prev,))
+            i.args = (prev,)
+        else:
+            if len(i.args)!=0:
+                i.args = (prev,)
+        prev = i
+    gm.recompile()
+    return gm
+
 
 class Model(torch.nn.Module):
     r"""
