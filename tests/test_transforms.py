@@ -30,6 +30,7 @@ def test_fakecast_transform():
     cnet = FakecastNet()
 
     cgm = torch.fx.symbolic_trace(cnet)
+    ipdb.set_trace()
     gm = cast_input_output_transform(net, downcast, upcast)
 
     assert(cgm.code == gm.code)
@@ -67,7 +68,7 @@ class FakecastNet(torch.nn.Module):
 
     def forward(self, input):
         input_1 = input
-        clone = downcast(input_1);
-        linear = self.linear(clone);
-        clone_1 = upcast(linear);
-        return clone_1
+        downcast = downcast(input_1);
+        linear = self.linear(downcast);
+        upcast = upcast(linear);
+        return upcast

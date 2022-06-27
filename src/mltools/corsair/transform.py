@@ -38,15 +38,38 @@ class CorsairTransform(fx.Transformer):
         return self.tracer.create_proxy('call_module', 'clinear', args, kwargs)
 
 
-def cast_input_output_transform(module: nn.Module) -> nn.Module:
+# def cast_input_output_transform(module: nn.Module) -> nn.Module:
+#     gm = torch.fx.symbolic_trace(module)
+#     for i in gm.graph.nodes:
+#         if i.target == 'input':
+#             gm.graph.inserting_after(i)
+#             gm.graph.create_node('call_method','clone',args=(i,))
+#         elif i.target =='output':
+#             gm.graph.inserting_before(i)
+#             prev=gm.graph.create_node('call_method','clone',args=(prev,))
+#             i.args = (prev,)
+#         else:
+#             if len(i.args)!=0:
+#                 i.args = (prev,)
+#         prev = i
+#     gm.recompile()
+#     return gm
+
+def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
     gm = torch.fx.symbolic_trace(module)
     for i in gm.graph.nodes:
         if i.target == 'input':
             gm.graph.inserting_after(i)
-            gm.graph.create_node('call_method','clone',args=(i,))
+            if fn1==None:
+                gm.graph.create_node('call_method','clone',args=(i,))
+            else:
+                gm.graph.create_node('call_function',fn1,args=(i,))
         elif i.target =='output':
             gm.graph.inserting_before(i)
-            prev=gm.graph.create_node('call_method','clone',args=(prev,))
+            if fn2==None:
+                prev=gm.graph.create_node('call_method','clone',args=(prev,))
+            else:
+                prev=gm.graph.create_node('call_function',fn2,args=(prev,))
             i.args = (prev,)
         else:
             if len(i.args)!=0:
