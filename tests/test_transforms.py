@@ -25,21 +25,22 @@ def test_corsair_transform():
 
     assert(cgm.code == gm.code)
 
-def test_fakecast_transform():
-    net = Net()
-    cnet = FakecastNet()
-
-    cgm = torch.fx.symbolic_trace(cnet)
-    ipdb.set_trace()
-    gm = cast_input_output_transform(net, downcast, upcast)
-
-    assert(cgm.code == gm.code)
-
 def downcast(input):
     return input
 
 def upcast(input):
     return input
+
+def test_fakecast_transform():
+    net = Net()
+    # cnet = FakecastNet()
+
+    # cgm = torch.fx.symbolic_trace(cnet)
+    fakecode = '\n\n\ndef forward(self, input):\n    input_1 = input\n    downcast = test_transforms_downcast(input_1);  input_1 = None\n    linear = self.linear(downcast);  downcast = None\n    upcast = test_transforms_upcast(linear);  linear = None\n    return upcast\n    '
+    gm = cast_input_output_transform(net, downcast, upcast)
+    assert(fakecode == gm.code)
+
+
 
 class Net(torch.nn.Module):
     def __init__(self) -> None:
@@ -68,7 +69,7 @@ class FakecastNet(torch.nn.Module):
 
     def forward(self, input):
         input_1 = input
-        downcast = downcast(input_1);
-        linear = self.linear(downcast);
-        upcast = upcast(linear);
-        return upcast
+        downcast1 = downcast(input_1);
+        linear = self.linear(downcast1);
+        upcast1 = upcast(linear);
+        return upcast1
