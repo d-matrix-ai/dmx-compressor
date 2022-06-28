@@ -55,26 +55,55 @@ class CorsairTransform(fx.Transformer):
 #     gm.recompile()
 #     return gm
 
+# def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
+#     gm = torch.fx.symbolic_trace(module)
+#     for i in gm.graph.nodes:
+#         if 'input' in i.target:
+#             gm.graph.inserting_after(i)
+#             if fn1==None:
+#                 gm.graph.create_node('call_method','clone',args=(i,))
+#                 print("inserting for",i)
+#             else:
+#                 gm.graph.create_node('call_function',fn1,args=(i,))
+#         elif i.target == 'output':
+#             gm.graph.inserting_before(i)
+#             if fn2==None:
+#                 prev=gm.graph.create_node('call_method','clone',args=(prev,))
+#                 print("inserting for",i)
+#             else:
+#                 prev=gm.graph.create_node('call_function',fn2,args=(prev,))
+#             i.args = (prev,)
+#         else:
+#             if len(i.args)!=0:
+#                 i.args = (prev,)
+#         prev = i
+#     gm.recompile()
+#     return gm
+
 def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
     gm = torch.fx.symbolic_trace(module)
+    prev=None
+    nodeList = []
     for i in gm.graph.nodes:
-        if i.target == 'input':
-            gm.graph.inserting_after(i)
-            if fn1==None:
-                gm.graph.create_node('call_method','clone',args=(i,))
-            else:
-                gm.graph.create_node('call_function',fn1,args=(i,))
-        elif i.target =='output':
-            gm.graph.inserting_before(i)
-            if fn2==None:
-                prev=gm.graph.create_node('call_method','clone',args=(prev,))
-            else:
-                prev=gm.graph.create_node('call_function',fn2,args=(prev,))
+        nodeList.append(i)
+    for enum,i in enumerate(nodeList):
+        if enum==0:
+            prev = i
+        elif enum==len(nodeList)-1:
             i.args = (prev,)
         else:
-            if len(i.args)!=0:
-                i.args = (prev,)
-        prev = i
+            gm.graph.inserting_before(i)
+            print("inserting for",i)
+            if fn1==None:
+                prev=gm.graph.create_node('call_method','clone',args=(prev,))
+            else:
+                prev=gm.graph.create_node('call_function',fn1,args=(prev,))
+            i.args = (prev,)
+            gm.graph.inserting_after(i)
+            if fn2==None:
+                prev=gm.graph.create_node('call_method','clone',args=(i,))
+            else:
+                prev=gm.graph.create_node('call_function',fn2,args=(i,))
     gm.recompile()
     return gm
 
