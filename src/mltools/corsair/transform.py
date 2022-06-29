@@ -11,6 +11,7 @@ from sol.src.sys.corsair_hw import *
 from sol.src.sol_sim import *
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
+from torch.fx.proxy import Proxy
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 
@@ -34,8 +35,19 @@ def aware():
     torch.nn.GELU = GELU
 
 class CorsairTransform(fx.Transformer):
-    def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-        return self.tracer.create_proxy('call_module', 'clinear', args, kwargs)
+    # def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+    #     import ipdb; ipdb.set_trace()
+    # def call_placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+    #     import ipdb; ipdb.set_trace()
+    # def call_placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
+    #     import ipdb; ipdb.set_trace()
+    def placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Proxy:
+        assert isinstance(target, str)
+        # default_value = next(iter(args)) if args else inspect.Signature.empty
+
+        placeholder_node = self.new_graph.placeholder(target)
+        placeholder_node_cast = self.new_graph.create_node('call_method','clone',args=(placeholder_node,))
+        return Proxy(placeholder_node, self.tracer)
 
 
 # def cast_input_output_transform(module: nn.Module) -> nn.Module:
@@ -82,30 +94,26 @@ class CorsairTransform(fx.Transformer):
 
 def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
     gm = torch.fx.symbolic_trace(module)
-    prev=None
-    nodeList = []
-    for i in gm.graph.nodes:
-        nodeList.append(i)
-    for enum,i in enumerate(nodeList):
-        if enum==0:
-            prev = i
-        elif enum==len(nodeList)-1:
-            i.args = (prev,)
-        else:
-            gm.graph.inserting_before(i)
-            print("inserting for",i)
-            if fn1==None:
-                prev=gm.graph.create_node('call_method','clone',args=(prev,))
-            else:
-                prev=gm.graph.create_node('call_function',fn1,args=(prev,))
-            i.args = (prev,)
-            gm.graph.inserting_after(i)
-            if fn2==None:
-                prev=gm.graph.create_node('call_method','clone',args=(i,))
-            else:
-                prev=gm.graph.create_node('call_function',fn2,args=(i,))
-    gm.recompile()
-    return gm
+    transformed = CorsairTransform(gm).transform()
+    # for i in gm.graph.nodes:
+    #     if i.target == 'input':
+    #         gm.graph.inserting_after(i)
+    #         if fn1==None:
+    #             gm.graph.create_node('call_method','clone',args=(i,))
+    #         else:
+    #             gm.graph.create_node('call_function',fn1,args=(i,))
+    #     elif i.target =='output':
+    #         gm.graph.inserting_before(i)
+    #         if fn2==None:
+    #             prev=gm.graph.create_node('call_method','clone',args=(prev,))
+    #         else:
+    #             prev=gm.graph.create_node('call_function',fn2,args=(prev,))
+    #         i.args = (prev,)
+    #     else:
+    #         if len(i.args)!=0:
+    #             i.args = (prev,)
+    #     prev = i
+    return transformed
 
 
 class Model(torch.nn.Module):
