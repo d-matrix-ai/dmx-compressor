@@ -23,6 +23,7 @@ def test_corsair_transform():
     cgm = torch.fx.symbolic_trace(cnet)
 
     gm = cast_input_output_transform(net)
+    ipdb.set_trace()
     assert(cgm.code == gm.code)
 
 def downcast(input):
@@ -56,6 +57,7 @@ def test_lenet_1hid_fakecast_transform():
     net = LeNet([10,10])
     fakecode = '\n\n\ndef forward(self, x : torch.Tensor) -> torch.Tensor:\n    downcast = test_transforms_downcast(x);  x = None\n    input_layer = self.input_layer(downcast);  downcast = None\n    upcast = test_transforms_upcast(input_layer);  input_layer = None\n    downcast_1 = test_transforms_downcast(upcast);  upcast = None\n    act_func = self.act_func(downcast_1);  downcast_1 = None\n    upcast_1 = test_transforms_upcast(act_func);  act_func = None\n    downcast_2 = test_transforms_downcast(upcast_1);  upcast_1 = None\n    intermediate_layers_0 = getattr(self.intermediate_layers, "0")(downcast_2);  downcast_2 = None\n    upcast_2 = test_transforms_upcast(intermediate_layers_0);  intermediate_layers_0 = None\n    downcast_3 = test_transforms_downcast(upcast_2);  upcast_2 = None\n    act_func_1 = self.act_func(downcast_3);  downcast_3 = None\n    upcast_3 = test_transforms_upcast(act_func_1);  act_func_1 = None\n    downcast_4 = test_transforms_downcast(upcast_3);  upcast_3 = None\n    output_layer = self.output_layer(downcast_4);  downcast_4 = None\n    upcast_4 = test_transforms_upcast(output_layer);  output_layer = None\n    return upcast_4\n    '
     gm = cast_input_output_transform(net,downcast,upcast)
+    ipdb.set_trace()
     assert(fakecode == gm.code)
 
 def test_lenet_5hid_fakecast_transform():

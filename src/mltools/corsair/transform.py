@@ -34,21 +34,22 @@ def aware():
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
 
-class CorsairTransform(fx.Transformer):
-    # def call_module(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-    #     import ipdb; ipdb.set_trace()
-    # def call_placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-    #     import ipdb; ipdb.set_trace()
-    # def call_placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
-    #     import ipdb; ipdb.set_trace()
+class InputOutputTransformer(fx.Transformer):
     def placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Proxy:
         assert isinstance(target, str)
+        # TODO for newer versions of fx you can pass in default values
         # default_value = next(iter(args)) if args else inspect.Signature.empty
 
         placeholder_node = self.new_graph.placeholder(target)
         placeholder_node_cast = self.new_graph.create_node('call_method','clone',args=(placeholder_node,))
-        return Proxy(placeholder_node, self.tracer)
+        return Proxy(placeholder_node_cast, self.tracer)
 
+class WeightCastTransformer(fx.Transformer):
+    def get_attr():
+        pass
+
+    def forward():
+        weight = self.weight
 
 # def cast_input_output_transform(module: nn.Module) -> nn.Module:
 #     gm = torch.fx.symbolic_trace(module)
@@ -94,7 +95,7 @@ class CorsairTransform(fx.Transformer):
 
 def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
     gm = torch.fx.symbolic_trace(module)
-    transformed = CorsairTransform(gm).transform()
+    transformed = InputOutputTransformer(gm).transform()
     # for i in gm.graph.nodes:
     #     if i.target == 'input':
     #         gm.graph.inserting_after(i)
