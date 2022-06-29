@@ -84,5 +84,19 @@ class Model(torch.nn.Module):
         )
 
     def sol_analyze(self, sample_input, corsair_hw=Slice(), **kwargs):
-        graph = self.fx_graph(sample_input)
-        return analyze(graph, corsair_hw=corsair_hw, **kwargs)
+        
+        def filter_sol_output(perf_data, power_data):
+            perf_data = perf_data['SOL_Performance_Analysis']
+            power_data = power_data['On-Chip_Dynamic_Power']
+            
+            # remove utilization percentages from power_data:
+            for k in power_data:
+                power_data[k] = power_data[k]['power(mW)']
+            
+            return perf_data, power_data
+            
+        graph = self.dmir_graph(sample_input)
+        perf_data, power_data = analyze(graph, corsair_hw=corsair_hw, **kwargs)
+        perf_data, power_data = filter_sol_output(perf_data, power_data)
+
+        return perf_data, power_data
