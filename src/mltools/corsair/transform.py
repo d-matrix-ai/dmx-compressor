@@ -14,6 +14,7 @@ from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
+from ..numerical import CastTo
 
 def aware():
     # add new torch.nn modules for corsair
@@ -41,7 +42,7 @@ class InputOutputTransformer(fx.Transformer):
         # default_value = next(iter(args)) if args else inspect.Signature.empty
 
         placeholder_node = self.new_graph.placeholder(target)
-        placeholder_node_cast = self.new_graph.create_node('call_method','clone',args=(placeholder_node,))
+        placeholder_node_cast = self.new_graph.create_node('call_module','input_cast',args=(placeholder_node,))
         return Proxy(placeholder_node_cast, self.tracer)
 
 class WeightCastTransformer(fx.Transformer):
@@ -51,69 +52,12 @@ class WeightCastTransformer(fx.Transformer):
     def forward():
         weight = self.weight
 
-# def cast_input_output_transform(module: nn.Module) -> nn.Module:
-#     gm = torch.fx.symbolic_trace(module)
-#     for i in gm.graph.nodes:
-#         if i.target == 'input':
-#             gm.graph.inserting_after(i)
-#             gm.graph.create_node('call_method','clone',args=(i,))
-#         elif i.target =='output':
-#             gm.graph.inserting_before(i)
-#             prev=gm.graph.create_node('call_method','clone',args=(prev,))
-#             i.args = (prev,)
-#         else:
-#             if len(i.args)!=0:
-#                 i.args = (prev,)
-#         prev = i
-#     gm.recompile()
-#     return gm
-
-# def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
-#     gm = torch.fx.symbolic_trace(module)
-#     for i in gm.graph.nodes:
-#         if 'input' in i.target:
-#             gm.graph.inserting_after(i)
-#             if fn1==None:
-#                 gm.graph.create_node('call_method','clone',args=(i,))
-#                 print("inserting for",i)
-#             else:
-#                 gm.graph.create_node('call_function',fn1,args=(i,))
-#         elif i.target == 'output':
-#             gm.graph.inserting_before(i)
-#             if fn2==None:
-#                 prev=gm.graph.create_node('call_method','clone',args=(prev,))
-#                 print("inserting for",i)
-#             else:
-#                 prev=gm.graph.create_node('call_function',fn2,args=(prev,))
-#             i.args = (prev,)
-#         else:
-#             if len(i.args)!=0:
-#                 i.args = (prev,)
-#         prev = i
-#     gm.recompile()
-#     return gm
 
 def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
-    gm = torch.fx.symbolic_trace(module)
+    gm = fx.symbolic_trace(module)
+    gm.add_submodule('input_cast', CastTo())
+    gm.add_submodule('output_cast', CastTo())
     transformed = InputOutputTransformer(gm).transform()
-    # for i in gm.graph.nodes:
-    #     if i.target == 'input':
-    #         gm.graph.inserting_after(i)
-    #         if fn1==None:
-    #             gm.graph.create_node('call_method','clone',args=(i,))
-    #         else:
-    #             gm.graph.create_node('call_function',fn1,args=(i,))
-    #     elif i.target =='output':
-    #         gm.graph.inserting_before(i)
-    #         if fn2==None:
-    #             prev=gm.graph.create_node('call_method','clone',args=(prev,))
-    #         else:
-    #             prev=gm.graph.create_node('call_function',fn2,args=(prev,))
-    #         i.args = (prev,)
-    #     else:
-    #         if len(i.args)!=0:
-    #             i.args = (prev,)
-    #     prev = i
     return transformed
 
 

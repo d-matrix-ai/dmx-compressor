@@ -7,7 +7,9 @@ import torch.nn as nn
 from mltools import corsair
 from mltools.models import LeNet
 from mltools.corsair.transform import cast_input_output_transform
+import torch.fx as fx
 import inspect
+
 import ipdb
 
 RANDOM_SEED = 0
@@ -20,7 +22,7 @@ def test_corsair_transform():
 
     cnet = CorsairNet()
 
-    cgm = torch.fx.symbolic_trace(cnet)
+    cgm = fx.symbolic_trace(cnet)
 
     gm = cast_input_output_transform(net)
     ipdb.set_trace()
