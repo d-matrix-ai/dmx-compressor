@@ -1,12 +1,13 @@
 from ast import Str
+from logging import PlaceHolder
 import sys
 import yaml
 import re
 import torch
 from types import SimpleNamespace
 from .nn import *
-from mltools import corsair, dmir
-from mltools.utils import load_config_file, save_config_file, print_model_tree
+from mltools import corsair, dmir, numerical
+from mltools.utils import load_config_file, graph_utils, save_config_file, print_model_tree
 from sol.src.sys.corsair_hw import *
 from sol.src.sol_sim import *
 import torch.fx as fx
@@ -15,6 +16,7 @@ from torch.fx.proxy import Proxy
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 from ..numerical import CastTo
+import ipdb
 
 def aware():
     # add new torch.nn modules for corsair
@@ -45,19 +47,50 @@ class InputOutputTransformer(fx.Transformer):
         placeholder_node_cast = self.new_graph.create_node('call_module','input_cast',args=(placeholder_node,))
         return Proxy(placeholder_node_cast, self.tracer)
 
-class WeightCastTransformer(fx.Transformer):
-    def get_attr():
-        pass
+    def output(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        output_node = self.new_graph.output(target)
+        self.new_graph.inserting_before(output_node)
+        output_node_cast = self.new_graph.create_node('call_module','output_cast',args=(output_node.prev,))
+        self.new_graph.erase_node(output_node)
+        return Proxy(output_node_cast,self.tracer)
+   
+    def get_attr(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Proxy:
+        # ipdb.set_trace()
+        get_attr_node = self.new_graph.get_attr(target)
+        get_attr_node_cast = self.new_graph.create_node('call_module','weight_cast',args = (get_attr_node,))
+        return Proxy(get_attr_node_cast,self.tracer) 
 
-    def forward():
-        weight = self.weight
+   
+        
+
+# class WeightCastTransformer(fx.Transformer):
+#     def get_attr(self, qualified_name: str, type_expr: Optional[Any] = None) -> Node:
+#         ipdb.set_trace()
+#         get_attr_node = self.new_graph.get_attr(qualified_name)
+#         get_attr_node_cast = self.new_graph.create_node('call_function',torch.zeros_like(),args = (get_attr_node,))
+#         ipdb.set_trace()
+#         return Proxy(get_attr_node_cast,self.tracer) 
+
+
 
 
 def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Module:
     gm = fx.symbolic_trace(module)
+    nodeList = []
+    for i in gm.graph.nodes:
+        nodeList.append(i)
     gm.add_submodule('input_cast', CastTo())
     gm.add_submodule('output_cast', CastTo())
+    gm.add_submodule('weight_cast',CastTo())
     transformed = InputOutputTransformer(gm).transform()
+
+    for i in nodeList:
+        if i.op=="call_module":
+            # print(i.name)
+            transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
+            transformed.delete_submodule(i.target)
+            transformed.add_submodule(i.target,transformed_gm)
+ 
     return transformed
 
 
