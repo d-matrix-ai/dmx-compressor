@@ -51,11 +51,10 @@ class InputOutputTransformer(fx.Transformer):
         output_node = self.new_graph.output(target)
         self.new_graph.inserting_before(output_node)
         output_node_cast = self.new_graph.create_node('call_module','output_cast',args=(output_node.prev,))
-        self.new_graph.erase_node(output_node)
+        assert(self.new_graph.erase_node(output_node),True)
         return Proxy(output_node_cast,self.tracer)
    
     def get_attr(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Proxy:
-        # ipdb.set_trace()
         get_attr_node = self.new_graph.get_attr(target)
         get_attr_node_cast = self.new_graph.create_node('call_module','weight_cast',args = (get_attr_node,))
         return Proxy(get_attr_node_cast,self.tracer) 
@@ -79,17 +78,16 @@ def cast_input_output_transform(module: nn.Module,fn1=None,fn2=None) -> nn.Modul
     nodeList = []
     for i in gm.graph.nodes:
         nodeList.append(i)
-    gm.add_submodule('input_cast', CastTo())
-    gm.add_submodule('output_cast', CastTo())
-    gm.add_submodule('weight_cast',CastTo())
+    assert(gm.add_submodule('input_cast', CastTo()),True)
+    assert(gm.add_submodule('output_cast', CastTo()),True)
+    assert(gm.add_submodule('weight_cast',CastTo()),True)
     transformed = InputOutputTransformer(gm).transform()
 
     for i in nodeList:
         if i.op=="call_module":
-            # print(i.name)
             transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
-            transformed.delete_submodule(i.target)
-            transformed.add_submodule(i.target,transformed_gm)
+            assert(transformed.delete_submodule(i.target),True)
+            assert(transformed.add_submodule(i.target,transformed_gm),True)
  
     return transformed
 
