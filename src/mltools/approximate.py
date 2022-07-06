@@ -254,3 +254,7 @@ class ApproximationMixin:
                 self.approximation_error = _approx - _output.data
                 _output.data = _approx
         return _output
+
+    @property
+    def approximation_function(self):
+        return repr(self.approximator.function)

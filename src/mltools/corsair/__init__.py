@@ -1,15 +1,50 @@
+from types import SimpleNamespace
 import torch
-from ..numerical import CastTo
+from ..numerical import CastTo, Format
 from ..sparse import Sparsify
 from ..approximate import Approximate
-from .transform import Model, aware
+from .transform import Model, aware, CorsairConfig, CorsairTransformation
 from . import nn
-
 from sol.src.sys import corsair_hw
+from sol.src.sol_sim import analyze
 
-Slice = corsair_hw.Slice
-Quad = corsair_hw.Quad
-Chiplet = corsair_hw.Chiplet
+# Expose corsair_hw through mltools.corsair
+hw = SimpleNamespace(
+    Slice=corsair_hw.Slice,
+    Quad=corsair_hw.Quad,
+    Chiplet=corsair_hw.Chiplet,
+)
+
+
+def sol_analyze(dmir_graph, corsair_hw=hw.Slice(), **kwargs):
+    def filter_sol_output(perf_data, power_data):
+        perf_data = perf_data["SOL_Performance_Analysis"]
+        power_data = power_data["On-Chip_Dynamic_Power"]
+
+        # remove derived utilization percentages from power_data:
+        for k in power_data:
+            power_data[k] = power_data[k]["power(mW)"]
+
+        return perf_data, power_data
+
+    perf_data, power_data = analyze(dmir_graph, corsair_hw=corsair_hw, **kwargs)
+    perf_data, power_data = filter_sol_output(perf_data, power_data)
+
+    return perf_data, power_data
+
+
+# Numerical format aliases
+format = SimpleNamespace(
+    FLOAT32=Format.from_shorthand("FP[1|8|23](N)"),
+    FLOAT16=Format.from_shorthand("FP[1|5|10](N)"),
+    BFLOAT16=Format.from_shorthand("FP[1|8|7](N)"),
+    INT8=Format.from_shorthand("XP[8,0](CSN)"),
+    INT4=Format.from_shorthand("XP[4,0](CSN)"),
+    BFP16_64_LD=Format.from_shorthand("BFP[8|8]{64,-1}(N)"),
+    BFP16_64_FD=Format.from_shorthand("BFP[8|8]{64,1}(N)"),
+    BFP12_128_LD=Format.from_shorthand("BFP[4|8]{128,-1}(N)"),
+    BFP12_128_FD=Format.from_shorthand("BFP[4|8]{128,1}(N)"),
+)
 
 counterpart = {
     torch.nn.Linear: nn.Linear,

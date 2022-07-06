@@ -185,7 +185,7 @@ class BlockFloatingPoint(Format):
         self.block_dim = block_dim
         self.rounding = rounding
 
-    def cast(self, x : torch.Tensor):
+    def cast(self, x: torch.Tensor):
         # input of Linear: [B, ..., Cin], dim=-1
         # weight of Linear: [Cout, Cin], dim=-1
         # input of Conv1D: [B, Cin, L], dim=1
@@ -249,10 +249,13 @@ class CastTo(nn.Module):
 
     def __init__(self, format="SAME", dump_to=None):
         super().__init__()
+        self.set_format(format)
+        self.dump_to = dump_to
+
+    def set_format(self, format):
         if not isinstance(format, Format):
             format = Format.from_shorthand(format)
         self.format = format
-        self.dump_to = dump_to
 
     def forward(self, x):
         x = CastToFormat.apply(x, self.format) if x is not None else None
@@ -275,8 +278,8 @@ class NumericalCastMixin:
 
     def init_casts(self):
         # dynamic i/o casts
-        self.input_cast = CastTo() # if isinstance(self, CorsairModule) else None
-        self.output_cast = CastTo() # if isinstance(self, CorsairModule) else None
+        self.input_cast = CastTo()  # if isinstance(self, CorsairModule) else None
+        self.output_cast = CastTo()  # if isinstance(self, CorsairModule) else None
         # dynamic intermediate casts
         if isinstance(
             self,
@@ -294,3 +297,23 @@ class NumericalCastMixin:
         pnames = [n for n, _ in self.named_parameters()]
         self.weight_cast = CastTo() if "weight" in pnames else None
         self.bias_cast = CastTo() if "bias" in pnames else None
+
+    @property
+    def input_format(self):
+        return repr(self.input_cast.format)
+
+    @property
+    def output_format(self):
+        return repr(self.output_cast.format)
+
+    @property
+    def accum_format(self):
+        return repr(self.accum_cast.format) if self.accum_cast is not None else None
+
+    @property
+    def weight_format(self):
+        return repr(self.weight_cast.format) if self.weight_cast is not None else None
+
+    @property
+    def bias_format(self):
+        return repr(self.bias_cast.format) if self.bias_cast is not None else None
