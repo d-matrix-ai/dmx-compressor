@@ -662,7 +662,6 @@ def dump(
     omit_value: bool = False,
     metadata: str = "",
 ) -> Graph:
-
     tracer = DMIRTracer()
 
     if isinstance(
@@ -670,12 +669,15 @@ def dump(
         (
             transformers.models.bert.modeling_bert.BertPreTrainedModel,
             transformers.models.gpt2.modeling_gpt2.GPT2LMHeadModel,
+            transformers.models.gpt2.modeling_gpt2.GPT2Model,
         ),
     ):
         # infer batch_size and sequence length
 
-        bs = sample_input[0]["input_ids"].shape[0]
-        seq_len = sample_input[0]["input_ids"].shape[1]
+        # bs = sample_input[0]["input_ids"].shape[0]
+        # seq_len = sample_input[0]["input_ids"].shape[1]
+        bs = sample_input[0][0].shape[0]
+        seq_len = sample_input[0][0].shape[1]
 
         gm = symbolic_trace(
             m,
@@ -683,22 +685,37 @@ def dump(
         )
 
         sample_input = sample_input[0]
-        sample_output = m(**sample_input)
+        sample_output = m(*sample_input)
         if isinstance(
             sample_output,
-            (QuestionAnsweringModelOutput, Seq2SeqQuestionAnsweringModelOutput),
+            (
+                QuestionAnsweringModelOutput,
+                Seq2SeqQuestionAnsweringModelOutput,
+            ),
         ):
             _output_key = "start_logits"
+        elif isinstance(
+            sample_output,
+            (
+                BaseModelOutputWithPoolingAndCrossAttentions,
+                BaseModelOutputWithPastAndCrossAttentions,
+            ),
+        ):
+            _output_key = "last_hidden_state"
         else:
             _output_key = "logits"
 
         ShapeProp(gm).propagate(
-            sample_input["input_ids"],
+            # sample_input["input_ids"],
+            *sample_input,
         )
-        device = sample_input["input_ids"].device
+        # device = sample_input["input_ids"].device
+        device = sample_input[0].device
     else:
         graph = tracer.trace(m)
         gm = fx.GraphModule(root=m, graph=graph)
+        if isinstance(sample_input[0], tuple):
+            sample_input = sample_input[0]
         ShapeProp(gm).propagate(*sample_input)
         device = sample_input[0].device
 
@@ -721,7 +738,7 @@ def dump(
                 node.meta["tensor_meta"] = node.meta["tensor_meta"][_output_key]
 
     for node in traced.nodes:
-        if not node.ignore: 
+        if not node.ignore:
             if node.op == "placeholder":  # dynamic inputs
                 input.append(
                     Tensor(
@@ -755,8 +772,14 @@ def dump(
                         result=(_make_var_name(node.name),),
                     )
                 )
-            elif node.op in ("call_function", "call_method", "call_module"):  # subgraphs
-                if "split" in node.name:  # need to add multiple outputs and mark the next getitems to ignore
+            elif node.op in (
+                "call_function",
+                "call_method",
+                "call_module",
+            ):  # subgraphs
+                if (
+                    "split" in node.name
+                ):  # need to add multiple outputs and mark the next getitems to ignore
                     nout = len(node.meta["tensor_meta"])
                     names, _n = [], node
                     for _ in range(nout):
@@ -874,7 +897,9 @@ def dump(
                             Dependency(
                                 operation="const",
                                 result=(
-                                    _make_var_name(node.name.replace("truediv", "const")),
+                                    _make_var_name(
+                                        node.name.replace("truediv", "const")
+                                    ),
                                 ),
                                 attribute=(
                                     Attribute(
@@ -887,14 +912,21 @@ def dump(
                         )
                         intermediate.append(
                             Tensor(
-                                name=_make_var_name(node.name.replace("truediv", "const")),
-                                value=_make_value_for_dumping(torch.tensor(node.args[1])),
+                                name=_make_var_name(
+                                    node.name.replace("truediv", "const")
+                                ),
+                                value=_make_value_for_dumping(
+                                    torch.tensor(node.args[1])
+                                ),
                                 shape=(),
                                 format=_legal_format(torch.float32),
                                 qscheme="",
                             ),
                         )
-                        node.args = (node.args[0], node.name.replace("truediv", "const"))
+                        node.args = (
+                            node.args[0],
+                            node.name.replace("truediv", "const"),
+                        )
                     if node.target == torch.flatten:
                         start_dim = node.args[1] if len(node.args) > 1 else 0
                         end_dim = node.args[2] if len(node.args) > 2 else -1
@@ -1213,12 +1245,14 @@ def dump(
                                         Attribute(
                                             kind=Attribute.INT,
                                             name="start",
-                                            integer_value=int(i*node.args[1]),
+                                            integer_value=int(i * node.args[1]),
                                         ),
                                         Attribute(
                                             kind=Attribute.INT,
                                             name="size",
-                                            integer_value=int(node.args[1]),  # NOTE: only a single chunk size is supported--beware!
+                                            integer_value=int(
+                                                node.args[1]
+                                            ),  # NOTE: only a single chunk size is supported--beware!
                                         ),
                                     ),
                                 )
