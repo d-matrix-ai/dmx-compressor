@@ -11,13 +11,11 @@ from mltools import corsair, dmir, numerical
 from mltools.utils import load_config_file, graph_utils, save_config_file, print_model_tree
 from sol.src.sys.corsair_hw import *
 from sol.src.sol_sim import *
-import torch.fx as fx
-from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
-from torch.fx.proxy import Proxy
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 from ..numerical import CastTo
-import ipdb
+from ..fx import QuantTracer, InputOutputTransformer
+from torch.fx import GraphModule
 
 
 def aware():
@@ -40,62 +38,32 @@ def aware():
     torch.nn.GELU = GELU
 
 
-class InputOutputTransformer(fx.Transformer):
-    def placeholder(
-        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
-    ) -> Proxy:
-        assert isinstance(target, str)
-        # TODO for newer versions of fx you can pass in default values
-        # default_value = next(iter(args)) if args else inspect.Signature.empty
-
-        placeholder_node = self.new_graph.placeholder(target)
-        placeholder_node_cast = self.new_graph.create_node(
-            "call_module", "input_cast", args=(placeholder_node,)
-        )
-        return Proxy(placeholder_node_cast, self.tracer)
-
-    def output(
-        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
-    ) -> Any:
-        output_node = self.new_graph.output(target)
-        self.new_graph.inserting_before(output_node)
-        output_node_cast = self.new_graph.create_node(
-            "call_module", "output_cast", args=(output_node.prev,)
-        )
-        self.new_graph.erase_node(output_node)
-        return Proxy(output_node_cast, self.tracer)
-
-    def get_attr(
-        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
-    ) -> Proxy:
-        get_attr_node = self.new_graph.get_attr(target)
-        get_attr_node_cast = self.new_graph.create_node(
-            "call_module", "weight_cast", args=(get_attr_node,)
-        )
-        return Proxy(get_attr_node_cast, self.tracer)
-
-
 def cast_input_output_transform(
-    module: nn.Module,
+    root: torch.nn.Module,
     input_fn: nn.Module = CastTo(),
     output_fn: nn.Module = CastTo(),
     weight_fn: nn.Module = CastTo(),
+    concrete_args: Optional[Dict[str, Any]] = None,
 ) -> nn.Module:
-    gm = fx.symbolic_trace(module)
-    nodeList = []
-    for i in gm.graph.nodes:
-        nodeList.append(i)
+    tracer = QuantTracer()
+    graph = tracer.trace(root, concrete_args)
+    name = (
+        root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    )
+    gm = GraphModule(tracer.root, graph, name)
 
+    # TODO assertions
     assert gm.add_submodule("input_cast", input_fn), True
     assert gm.add_submodule("output_cast", output_fn), True
     assert gm.add_submodule("weight_cast", weight_fn), True
     transformed = InputOutputTransformer(gm).transform()
 
-    for i in nodeList:
-        if i.op == "call_module":
-            transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
-            transformed.delete_submodule(i.target), True
-            transformed.add_submodule(i.target, transformed_gm), True
+    # TODO These lines not tested
+    # for i in nodeList:
+    #     if i.op == "call_module":
+    #         transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
+    #         transformed.delete_submodule(i.target), True
+    #         transformed.add_submodule(i.target, transformed_gm), True
 
     return transformed
 

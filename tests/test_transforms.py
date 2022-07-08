@@ -10,8 +10,6 @@ from mltools.models import BERTStyleFFN
 from mltools.corsair.transform import cast_input_output_transform
 import torch.fx as fx
 
-import ipdb
-
 RANDOM_SEED = 0
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -10,6 +10,7 @@ from . import (
     sparse,
     approximate,
     functions,
+    fx,
     corsair,
     data,
     models,
