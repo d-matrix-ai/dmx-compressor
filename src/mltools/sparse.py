@@ -281,3 +281,11 @@ class WeightSparseMixin:
             if self.weight_sparsifier is None
             else self.weight_sparsifier(self.weight)
         )
+
+    @property
+    def weight_sparseness(self):
+        return (
+            repr(self.weight_sparsifier.sparseness)
+            if self.weight_sparsifier is not None
+            else None
+        )

@@ -15,6 +15,7 @@ numpy = "^1.22.3"
 ortools = "^9.3.10497"
 parse = "^1.19.0"
 plotly = "^5.7.0"
+pptree = "^3.1"
 pytest = "^7.1.1"
 python = ">=3.8,<3.11"
 qtorch = {git = "git@git.d-matrix.ai:ml-team/qtorch.git", rev = "dm"}

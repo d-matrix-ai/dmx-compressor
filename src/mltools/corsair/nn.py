@@ -1,7 +1,9 @@
 from functools import reduce
+from turtle import forward
 from typing import Union, List, Tuple
 from collections import OrderedDict
 import sys
+from types import SimpleNamespace
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
@@ -35,6 +37,35 @@ from mltools.approximate import (
     LowRankWeight,
 )
 from mltools import dmir
+
+
+class Cast(torch.nn.Module):
+    r"""
+    A container of Corsair-specific tensor numeric conversions,
+    to be used as a stand-alone numerical conversion op by the user
+    TODO: make this a true fake-quantization layer
+    """
+
+    def __init__(self, format="SAME") -> None:
+        super().__init__()
+        self.cast = CastTo(format=format)
+
+    @property
+    def format(self):
+        return repr(self.cast.format)
+
+    @format.setter
+    def format(self, fmt):
+        self.cast.set_format(fmt)
+  
+    def _transform(self, config):
+        self.cast.format = Format.from_shorthand(config["format"])
+
+    def _corsair_config(self, freeze=False):
+        return CorsairModuleConfig.from_module(self, freeze)
+
+    def forward(self, x):
+        return self.cast(x)
 
 
 class CorsairModule(
@@ -72,6 +103,9 @@ class CorsairModule(
             self.approximator.function = ApproximationFunction.from_shorthand(
                 config["approximation_function"]
             )
+
+    def _corsair_config(self, freeze=False):
+        return CorsairModuleConfig.from_module(self, freeze)
 
     @property
     def _weight(self):
@@ -141,6 +175,53 @@ class CorsairModule(
         _output = self._forward(_input)
         output = self.output_cast(_output)
         return output
+
+
+class CorsairModuleConfig(dict):
+    @classmethod
+    def from_module(cls, module: Union[CorsairModule, Cast], freeze=False):
+        cc = SimpleNamespace()
+        cc.instance = module.__class__.__name__
+        if isinstance(module, Cast):
+            if module.format is not None and (freeze or module.format != "SAME"):
+                cc.format = module.format
+        elif isinstance(module, CorsairModule):
+            if module.input_format is not None and (
+                freeze or module.input_format != "SAME"
+            ):
+                cc.input_format = module.input_format
+            if module.output_format is not None and (
+                freeze or module.output_format != "SAME"
+            ):
+                cc.output_format = module.output_format
+            if module.accum_format is not None and (
+                freeze or module.accum_format != "SAME"
+            ):
+                cc.accum_format = module.accum_format
+            if module.weight_format is not None and (
+                freeze or module.weight_format != "SAME"
+            ):
+                cc.weight_format = module.weight_format
+            if module.bias_format is not None and (
+                freeze or module.bias_format != "SAME"
+            ):
+                cc.bias_format = module.bias_format
+            if module.weight_sparseness is not None and (
+                freeze or module.weight_sparseness != "DENSE"
+            ):
+                cc.weight_sparseness = module.weight_sparseness
+            if freeze or module.approximation_function != "NONE":
+                cc.approximation_function = module.approximation_function
+        return cc.__dict__
+
+
+is_configurable = lambda m: isinstance(
+    m,
+    (
+        CorsairModule,
+        Cast,
+    ),
+)
 
 
 class Linear(CorsairModule, torch.nn.Linear):
