@@ -9,7 +9,6 @@ from mltools.models import LeNet
 from mltools.models import BERTStyleFFN
 from mltools.corsair.transform import cast_input_output_transform
 import torch.fx as fx
-import inspect
 
 import ipdb
 
@@ -42,9 +41,23 @@ def checkTransform(gm:nn.Module) -> bool:
 
 def test_corsair_transform():
     net = Net()
+    cnet = CorsairNet()
     gm_before = fx.symbolic_trace(net)
     assert not checkTransform(gm_before),True
     gm = cast_input_output_transform(net)
+    input = torch.rand(1,64)
+
+    # Initialize bias and weight
+    weight = torch.rand(64,64)
+    bias = torch.zeros(1,64)
+    cnet.linear.bias.data  = bias
+    gm.linear.bias.data = bias
+    cnet.linear.weight.data = weight
+    gm.linear.weight.data = weight
+
+    coutput =cnet(input)
+    output = gm(input)
+    assert (coutput-output).abs().sum()==0,True
     assert checkTransform(gm),True
 
 
@@ -64,7 +77,7 @@ class weightCast(nn.Module):
     def __init__(self, format="SAME", dump_to=None):
         super().__init__()
     def forward(self, x):
-        return x+1
+        return x
 
 def test_fakecast_transform():
     net = Net()
@@ -93,7 +106,19 @@ def test_lenet_5hid_fakecast_transform():
 
 def test_conv2D_fakecast_transform():
     net = torch.nn.Conv2d(16,8,2)
+    cnet = corsair.nn.Conv2d(16,8,2)
+    input = torch.rand(1,16,16,16)
+    weight = torch.rand(8,16,2,2)
+    bias = torch.rand(8)
+    net.weight.data = weight
+    cnet.weight.data = weight
+    net.bias.data = bias
+    cnet.bias.data = bias
+    coutput = cnet(input)
+    
     gm = cast_input_output_transform(net,downcast(),upcast())
+    output = gm(input)
+    assert (coutput-output).abs().sum()==0,True
     assert checkTransform(gm),True 
 
 def test_Dropout_transform():
@@ -157,23 +182,8 @@ class Net(torch.nn.Module):
 class CorsairNet(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.linear = nn.Linear(64, 64)
+        self.linear = corsair.nn.Linear(64, 64)
 
     def forward(self, input):
-        input_1 = input
-        clone = input_1.clone()
-        linear = self.linear(clone)
-        clone_1 = linear.clone()
-        return clone_1
+        return self.linear(input)
 
-class FakecastNet(torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.linear = nn.Linear(64, 64)
-
-    def forward(self, input):
-        input_1 = input
-        downcast1 = downcast(input_1)
-        linear = self.linear(downcast1)
-        upcast1 = upcast(linear)
-        return upcast1

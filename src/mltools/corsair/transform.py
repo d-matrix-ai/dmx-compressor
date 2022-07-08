@@ -1,5 +1,6 @@
 from ast import Str
 from logging import PlaceHolder
+from modulefinder import Module
 import sys
 import yaml
 import re
@@ -60,7 +61,7 @@ class InputOutputTransformer(fx.Transformer):
         return Proxy(get_attr_node_cast,self.tracer) 
 
 
-def cast_input_output_transform(module: nn.Module,input_fn=CastTo(),output_fn=CastTo(),weight_fn=CastTo()) -> nn.Module:
+def cast_input_output_transform(module: nn.Module,input_fn: nn.Module =CastTo(),output_fn: nn.Module=CastTo(),weight_fn: nn.Module=CastTo()) -> nn.Module:
     gm = fx.symbolic_trace(module)
     nodeList = []
     for i in gm.graph.nodes:
