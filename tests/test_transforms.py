@@ -92,26 +92,28 @@ def test_fakecast_transform():
     assert checkTransform(gm), True
 
 
-def test_lenet_1hid_corsair_transform():
-    net = LeNet([10, 10])
+@pytest.mark.parametrize(
+    "layers",
+    (
+        [10, 10],
+        [10, 10, 10, 10, 10, 10],
+    ),
+)
+def test_lenet_1hid_corsair_transform(layers):
+    net = LeNet(layers)
     gm = cast_input_output_transform(net)
     assert checkTransform(gm), True
 
 
-def test_lenet_5hid_corsiar_transform():
-    net = LeNet([10, 10, 10, 10, 10, 10])
-    gm = cast_input_output_transform(net)
-    assert checkTransform(gm), True
-
-
-def test_lenet_1hid_fakecast_transform():
-    net = LeNet([10, 10])
-    gm = cast_input_output_transform(net, downcast(), upcast())
-    assert checkTransform(gm), True
-
-
-def test_lenet_5hid_fakecast_transform():
-    net = LeNet([10, 10, 10, 10, 10, 10])
+@pytest.mark.parametrize(
+    "layers",
+    (
+        [10, 10],
+        [10, 10, 10, 10, 10, 10],
+    ),
+)
+def test_lenet_fakecast_transform(layers):
+    net = LeNet(layers)
     gm = cast_input_output_transform(net, downcast(), upcast())
     assert checkTransform(gm), True
 
