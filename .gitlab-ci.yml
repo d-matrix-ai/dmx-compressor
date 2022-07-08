@@ -10,7 +10,6 @@ cache:
     - .venv
 
 test:
-  cache: []
   before_script:
     - export PYENV_ROOT=$HOME/.pyenv
     - export PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
@@ -26,7 +25,6 @@ test:
     - python -m venv .venv
     - source .venv/bin/activate
     - pip install .
-    - pip install ipdb
     - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python build-dmir-proto
     - pytest -vv ./tests/*.py
 
