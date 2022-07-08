@@ -19,6 +19,7 @@ import torch.nn as nn
 from ..numerical import CastTo
 import ipdb
 
+
 def aware():
     # add new torch.nn modules for corsair
     torch.nn.CastTo = CastTo
@@ -38,46 +39,64 @@ def aware():
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
 
+
 class InputOutputTransformer(fx.Transformer):
-    def placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Proxy:
+    def placeholder(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Proxy:
         assert isinstance(target, str)
         # TODO for newer versions of fx you can pass in default values
         # default_value = next(iter(args)) if args else inspect.Signature.empty
 
         placeholder_node = self.new_graph.placeholder(target)
-        placeholder_node_cast = self.new_graph.create_node('call_module','input_cast',args=(placeholder_node,))
+        placeholder_node_cast = self.new_graph.create_node(
+            "call_module", "input_cast", args=(placeholder_node,)
+        )
         return Proxy(placeholder_node_cast, self.tracer)
 
-    def output(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+    def output(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Any:
         output_node = self.new_graph.output(target)
         self.new_graph.inserting_before(output_node)
-        output_node_cast = self.new_graph.create_node('call_module','output_cast',args=(output_node.prev,))
+        output_node_cast = self.new_graph.create_node(
+            "call_module", "output_cast", args=(output_node.prev,)
+        )
         self.new_graph.erase_node(output_node)
-        return Proxy(output_node_cast,self.tracer)
-   
-    def get_attr(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Proxy:
+        return Proxy(output_node_cast, self.tracer)
+
+    def get_attr(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Proxy:
         get_attr_node = self.new_graph.get_attr(target)
-        get_attr_node_cast = self.new_graph.create_node('call_module','weight_cast',args = (get_attr_node,))
-        return Proxy(get_attr_node_cast,self.tracer) 
+        get_attr_node_cast = self.new_graph.create_node(
+            "call_module", "weight_cast", args=(get_attr_node,)
+        )
+        return Proxy(get_attr_node_cast, self.tracer)
 
 
-def cast_input_output_transform(module: nn.Module,input_fn: nn.Module =CastTo(),output_fn: nn.Module=CastTo(),weight_fn: nn.Module=CastTo()) -> nn.Module:
+def cast_input_output_transform(
+    module: nn.Module,
+    input_fn: nn.Module = CastTo(),
+    output_fn: nn.Module = CastTo(),
+    weight_fn: nn.Module = CastTo(),
+) -> nn.Module:
     gm = fx.symbolic_trace(module)
     nodeList = []
     for i in gm.graph.nodes:
         nodeList.append(i)
-    
-    assert gm.add_submodule('input_cast', input_fn),True
-    assert gm.add_submodule('output_cast', output_fn),True 
-    assert gm.add_submodule('weight_cast',weight_fn),True
+
+    assert gm.add_submodule("input_cast", input_fn), True
+    assert gm.add_submodule("output_cast", output_fn), True
+    assert gm.add_submodule("weight_cast", weight_fn), True
     transformed = InputOutputTransformer(gm).transform()
 
     for i in nodeList:
-        if i.op=="call_module":
+        if i.op == "call_module":
             transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
-            transformed.delete_submodule(i.target),True
-            transformed.add_submodule(i.target,transformed_gm),True
- 
+            transformed.delete_submodule(i.target), True
+            transformed.add_submodule(i.target, transformed_gm), True
+
     return transformed
 
 
