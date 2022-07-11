@@ -21,8 +21,5 @@ class QuantTracer(fx.Tracer):
         return (
             (
                 is_leaf
-                # or m.__module__.startswith("torch.nn")
             )
-            and not isinstance(m, torch.nn.Sequential)
-            # or super().is_leaf_module(m, module_qualified_name)
         )

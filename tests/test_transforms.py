@@ -137,6 +137,7 @@ def test_conv2D_fakecast_transform():
     coutput = cnet(input)
 
     gm = cast_input_output_transform(net, downcast(), upcast())
+    output = gm(input)
     assert (coutput - output).abs().sum() == 0, True
     assert checkTransform(gm), True
 
