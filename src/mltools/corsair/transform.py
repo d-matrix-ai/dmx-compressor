@@ -8,7 +8,12 @@ import torch
 from types import SimpleNamespace
 from .nn import *
 from mltools import corsair, dmir, numerical
-from mltools.utils import load_config_file, graph_utils, save_config_file, print_model_tree
+from mltools.utils import (
+    load_config_file,
+    graph_utils,
+    save_config_file,
+    print_model_tree,
+)
 from sol.src.sys.corsair_hw import *
 from sol.src.sol_sim import *
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
@@ -16,6 +21,7 @@ import torch.nn as nn
 from ..numerical import CastTo
 from ..fx import QuantTracer, InputOutputTransformer
 from torch.fx import GraphModule
+import warnings
 
 
 def aware():
@@ -96,19 +102,15 @@ def cast_input_output_transform(
         root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
     )
     gm = GraphModule(tracer.root, graph, name)
+    cast_module_names = ["input_cast", "output_cast", "weight_cast"]
+    cast_module_functions = [input_fn, output_fn, weight_fn]
 
-    # TODO assertions
-    assert gm.add_submodule("input_cast", input_fn), True
-    assert gm.add_submodule("output_cast", output_fn), True
-    assert gm.add_submodule("weight_cast", weight_fn), True
+    for mn, mf in zip(cast_module_names, cast_module_functions):
+        add_successful = gm.add_submodule(mn, mf)
+        if not add_successful:
+            warnings.warn("Error adding modue {}".format(mn), Warning)
+
     transformed = InputOutputTransformer(gm).transform()
-
-    # TODO These lines not tested
-    # for i in nodeList:
-    #     if i.op == "call_module":
-    #         transformed_gm = cast_input_output_transform(gm.get_submodule(i.target))
-    #         transformed.delete_submodule(i.target), True
-    #         transformed.add_submodule(i.target, transformed_gm), True
 
     return transformed
 

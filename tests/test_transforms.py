@@ -44,6 +44,7 @@ def test_corsair_transform():
     gm_before = fx.symbolic_trace(net)
     assert not checkTransform(gm_before), True
     gm = cast_input_output_transform(net)
+    print(gm.code)
     input = torch.rand(1, 64)
 
     # Initialize bias and weight
@@ -59,6 +60,12 @@ def test_corsair_transform():
     assert (coutput - output).abs().sum() == 0, True
     assert checkTransform(gm), True
 
+@pytest.mark.skip()
+def test_double_transform():
+    net = Net()
+    with pytest.raises(Warning):
+        gm = cast_input_output_transform(net)
+        gm2t = cast_input_output_transform(gm)
 
 class downcast(nn.Module):
     def __init__(self, format="SAME", dump_to=None):
@@ -100,6 +107,7 @@ def test_fakecast_transform():
 def test_lenet_1hid_corsair_transform(layers):
     net = LeNet(layers)
     gm = cast_input_output_transform(net)
+    print(gm.code)
     assert checkTransform(gm), True
 
 
@@ -129,7 +137,6 @@ def test_conv2D_fakecast_transform():
     coutput = cnet(input)
 
     gm = cast_input_output_transform(net, downcast(), upcast())
-    output = gm(input)
     assert (coutput - output).abs().sum() == 0, True
     assert checkTransform(gm), True
 
