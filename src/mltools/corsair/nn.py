@@ -18,7 +18,6 @@ from mltools.numerical import (
 )
 from mltools.sparse import (
     Sparseness,
-    Sparsifier,
     WeightSparseMixin,
     Dense,
     TopK,

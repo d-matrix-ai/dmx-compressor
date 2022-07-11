@@ -1,10 +1,8 @@
 from typing import Any
-from parse import parse
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Function
-
+from parse import parse
 
 __ALL__ = [
     "Sparseness",
@@ -113,7 +111,7 @@ class BlockTopK(Sparseness):
 
     def get_mask(self, score):
         assert (
-            score.shape[self.block_dim] % self.block_size == 0
+                score.shape[self.block_dim] % self.block_size == 0
         ), f"score has size {score.shape[self.block_dim]} at dimension {self.block_dim}, not a multiple of block size {self.block_size}"
         _score = score.transpose(self.block_dim, -1)
         score_shape = _score.shape
@@ -153,6 +151,7 @@ class Bernoulli(Sparseness):
 
     def get_mask(self, score):
         # return torch.sign(x) * torch.bernoulli(torch.abs(x))
+        return torch.sigmoid(score)
         return torch.bernoulli(score)
 
     @classmethod
@@ -166,79 +165,51 @@ class Bernoulli(Sparseness):
         return f"BERN"
 
 
-class Sparsifier(Function):
-    r"""
-    Sparsifier class
-    """
-
-    @staticmethod
-    def do_backward(x, score, mask, g_x, g_score, mode):
-        # TODO: refactor this
-        if mode == "STE":
-            return g_x, None
-        elif mode == "supermask":
-            return None, g_score
-        elif mode == "joint":
-            return g_x, g_score
-        elif mode == "NM":
-            return (
-                g_x + 2e-4 * (1 - mask) * x,
-                None,
-            )  # https://github.com/NM-sparsity/NM-sparsity
-        else:
-            raise ValueError(f"unsupported backward mode: {mode}")
-
-    @staticmethod
-    def forward(ctx, x, score, sp, mode="STE"):
-        ctx.set_materialize_grads(False)
-        ctx.mode = mode
-        mask = sp.get_mask(score)
-        ctx.save_for_backward(x, score, mask)
-        return x * mask, score
-
-    @staticmethod
-    def backward(ctx, g_x, g_score):
-        x, score, mask = ctx.saved_variables
-        _g_x, _g_score = Sparsifier.do_backward(x, score, mask, g_x, g_score, ctx.mode)
-        return _g_x, _g_score, None, None
-
-
 class Sparsify(nn.Module):
     r"""
     Sparsification module
     """
 
-    def __init__(
-        self, tensor_shape, sparseness="DENSE", backward_mode="STE", dump_to=None
-    ):
+    def __init__(self, tensor_shape, sparseness="DENSE", backward_mode="STE", dump_to=None):
         super().__init__()
-        self.score = nn.Parameter(torch.Tensor(tensor_shape))
+        self.set_sparseness(sparseness)
+
+        # Score is set to equal to absolute value of weight (or other deterministic function).
+        # Mask is a deterministic function of score.
+        self.score = nn.Parameter(torch.Tensor(tensor_shape), requires_grad=True)
+        self.score_initialized = False
+        self.score_func = torch.abs
+        self.mask = torch.ones(tensor_shape)
+
+        self.dump_to = dump_to
+        self.backward_mode = backward_mode
+
+    def set_sparseness(self, sparseness="DENSE"):
         if not isinstance(sparseness, Sparseness):
             sparseness = Sparseness.from_shorthand(sparseness)
         self.sparseness = sparseness
-        self.backward_mode = backward_mode
-        self.dump_to = dump_to
-        self.mask = torch.ones(tensor_shape)
-        self.score_func = None  # torch.abs
 
-    def set_score(self, x):
-        if self.score_func is not None:
-            with torch.no_grad():
-                score_value = self.score_func(x)
-                self.score.data = score_value
-                self.mask = self.sparseness.get_mask(score_value)
+    def set_score_func(self, score_func):
+        self.score_func = score_func
+
+    def set_score(self, x=None):
+        # Only sets the scores once; we don't allow joint training of score and mask for now.
+        if self.score_initialized: return
+        if self.score_func is None: return
+        with torch.no_grad():
+            score = self.score_func(x)
+            self.score.copy_(score)
+            self.score_initialized = True
 
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
-            if self.training:
+            if not self.score_initialized:
                 self.set_score(x)
+            if self.training:
                 self.mask = self.sparseness.get_mask(self.score)
-                x, _ = Sparsifier.apply(
-                    x, self.score, self.sparseness, self.backward_mode
-                )
-            else:
-                x = x * self.mask
+            x = x * self.mask
         if self.dump_to is not None:
+            # TODO
             pass
         return x
 
@@ -257,22 +228,36 @@ class WeightSparseMixin:
 
     def init_sparsifier(self):
         if isinstance(
-            self,
-            (
-                nn.Linear,
-                nn.Bilinear,
-                nn.Embedding,
-                nn.EmbeddingBag,
-                nn.modules.conv._ConvNd,
-            ),
+                self,
+                (
+                        nn.Linear,
+                        nn.Bilinear,
+                        nn.Embedding,
+                        nn.EmbeddingBag,
+                        nn.modules.conv._ConvNd,
+                ),
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
         else:
             self.weight_sparsifier = None
 
-    @property
-    def weight_mask(self):
-        return None if self.weight_sparsifier is None else self.weight_sparsifier.mask
+    def configure_sparsifier(self, sparseness, backward_mode, score_func):
+        """
+        Configures the specific parameters of the sparsifier, such as sparseness and backward method.
+        If this function is not called, the sparsifier will default to "dense".
+        """
+        if self.weight_sparsifier is None: return
+        self.weight_sparsifier.set_sparseness(sparseness)
+        self.weight_sparsifier.set_score_func(score_func)
+        if backward_mode == "STE":
+            # TODO Check this
+            self.weight_sparsifier.eval()
+        elif backward_mode == "supermask":
+            self.weight.requires_grad = False
+            self.bias.requires_grad = False
+        else:
+            # TODO Verify other backward modes
+            pass
 
     @property
     def effective_weight(self):
