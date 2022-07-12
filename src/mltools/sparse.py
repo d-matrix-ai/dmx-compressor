@@ -1,8 +1,7 @@
-from typing import Any
-
 import torch
 import torch.nn as nn
 from parse import parse
+from torch.autograd import Function
 
 __ALL__ = [
     "Sparseness",
@@ -14,23 +13,30 @@ __ALL__ = [
 ]
 
 
-class Sparseness:
+class Sparseness(Function):
     r"""
-    This is an abstract class of tensor sparseness.
-    Child classes to implement `get_mask()` and `from_shorthand()` method.
+    This is an abstract class for the (super)masking mechanism for network sparsification.
+    Child classes to implement `forward()`, `backward()` and `from_shorthand()` method.
+    This class inherits from Function, since when we use masking operations, we may have different
+        forward and backward passes.
+    For example, in Bernoulli, we sample the masks to 0/1 during the forward direction, while using
+        the gradients of the sigmoid function in the backward pass.
     """
-
-    def __init__(self):
-        pass
 
     def __str__(self) -> str:
         raise NotImplementedError
 
-    def get_mask(self, *input: Any):
+    @staticmethod
+    def forward(ctx, score):
+        # Equivalent to the deprecated `get_mask` method.
         raise NotImplementedError
 
     @staticmethod
-    def from_shorthand(sh: str):
+    def backward(ctx, grad_output):
+        raise NotImplementedError
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
         if sh.startswith("DENSE"):
             return Dense.from_shorthand(sh)
         elif sh.startswith("TOPK"):
@@ -45,14 +51,16 @@ class Sparseness:
 
 class Dense(Sparseness):
     r"""
-    This is a dummy sparsity whose `get_mask()` returns ones.
+    This is a dummy sparsity whose `forward` and `backward` are equivalent to an identity function.
     """
 
-    def __init__(self):
-        super().__init__()
+    @staticmethod
+    def forward(ctx, score):
+        return score
 
-    def get_mask(self, score):
-        return torch.ones_like(score, device=score.device)
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -67,6 +75,7 @@ class Dense(Sparseness):
 
 class TopK(Sparseness):
     r"""
+    TODO Change to autograd.Function
     Fine-grain unstructured sparsity with top-K scored entries non-zero
     """
 
@@ -99,6 +108,7 @@ class TopK(Sparseness):
 
 class BlockTopK(Sparseness):
     r"""
+    TODO Change to autograd.Function
     Fine-grain structured sparsity with K non-zeros out of `block_size` elements along `block_dim`.
     """
 
@@ -143,16 +153,20 @@ class BlockTopK(Sparseness):
 
 class Bernoulli(Sparseness):
     r"""
-    Bernoulli sampler for supermasking
+    Bernoulli sampler for supermasking.
     """
 
-    def __init__(self):
-        super().__init__()
+    @staticmethod
+    def forward(ctx, score):
+        sigmoid_score = torch.sigmoid(score)
+        ctx.save_for_backward(sigmoid_score)
+        return torch.bernoulli(sigmoid_score)
 
-    def get_mask(self, score):
-        # return torch.sign(x) * torch.bernoulli(torch.abs(x))
-        return torch.sigmoid(score)
-        return torch.bernoulli(score)
+    @staticmethod
+    def backward(ctx, grad_output):
+        sigmoid_score, = ctx.saved_tensors
+        grad = sigmoid_score * (1 - sigmoid_score)
+        return grad_output * grad
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -206,7 +220,7 @@ class Sparsify(nn.Module):
             if not self.score_initialized:
                 self.set_score(x)
             if self.training:
-                self.mask = self.sparseness.get_mask(self.score)
+                self.mask = self.sparseness.apply(self.score)
             x = x * self.mask
         if self.dump_to is not None:
             # TODO
@@ -242,7 +256,7 @@ class WeightSparseMixin:
             self.weight_sparsifier = None
 
     def configure_sparsifier(self, sparseness, backward_mode, score_func):
-        """
+        r"""
         Configures the specific parameters of the sparsifier, such as sparseness and backward method.
         If this function is not called, the sparsifier will default to "dense".
         """
