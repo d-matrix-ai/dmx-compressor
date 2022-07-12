@@ -251,13 +251,16 @@ class WeightSparseMixin:
         self.weight_sparsifier.set_score_func(score_func)
         if backward_mode == "STE":
             # TODO Check this
-            self.weight_sparsifier.eval()
+            self.weight_sparsifier.score.requires_grad = False
         elif backward_mode == "supermask":
+            self.weight_sparsifier.score.requires_grad = True
             self.weight.requires_grad = False
             self.bias.requires_grad = False
-        else:
+        elif backward_mode == "joint":
             # TODO Verify other backward modes
-            pass
+            self.weight_sparsifier.score.requires_grad = True
+            self.weight.requires_grad = True
+            self.bias.requires_grad = True
 
     @property
     def effective_weight(self):

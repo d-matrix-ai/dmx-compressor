@@ -8,7 +8,6 @@ def test_sigmoid_gradients():
     mask = torch.sigmoid(score)
     loss = torch.sum(mask)
     loss.backward()
-    print("score.grad", score.grad)
     assert score.grad is not None
 
 
