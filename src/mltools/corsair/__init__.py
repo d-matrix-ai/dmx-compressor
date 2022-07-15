@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 import torch
 from ..numerical import CastTo, Format
-from ..sparse import Sparsify
-from ..approximate import Approximate
+from ..sparse import Sparsify, Sparseness
+from ..approximate import Approximate, ApproximationFunction
 from .transform import Model, aware, CorsairConfig, CorsairTransformation
 from . import nn
 from sol.src.sys import corsair_hw
@@ -45,6 +45,22 @@ format = SimpleNamespace(
     BFP12_128_LD=Format.from_shorthand("BFP[4|8]{128,-1}(N)"),
     BFP12_128_FD=Format.from_shorthand("BFP[4|8]{128,1}(N)"),
 )
+
+# Sparseness aliases
+sparseness = SimpleNamespace(
+    BTK8_4_LD=Sparseness.from_shorthand("BTOPK{4:8,-1}"),
+    BTK8_4_FD=Sparseness.from_shorthand("BTOPK{4:8,1}"),
+    BTK8_2_LD=Sparseness.from_shorthand("BTOPK{2:8,-1}"),
+    BTK8_2_FD=Sparseness.from_shorthand("BTOPK{2:8,1}"),
+)
+
+# Default approximation function aliases
+default_approx = SimpleNamespace(
+    SOFTMAX=ApproximationFunction.from_shorthand("SOFTMAX(base2,float16)"),
+    GELU="GELU(poly2,float16)",
+    LAYERNORM="LAYERNORM(quake3,float16)",
+)
+
 
 counterpart = {
     torch.nn.Linear: nn.Linear,
