@@ -41,8 +41,8 @@ def test_sparsify(tensor_shape, sparseness, backward_mode):
     as evidenced by gradients of weights and scores."""
     sp = Sparsify(tensor_shape, sparseness, backward_mode).to(device)
     x = torch.randn(tensor_shape, requires_grad=True, device=device)
-    y = sp(x).sum()
-    y.backward()
+    y = sp(x)
+    y.backward(torch.ones_like(y))
 
     if backward_mode == "STE":
         assert isinstance(x.grad, torch.Tensor) and sp.score.grad is None
