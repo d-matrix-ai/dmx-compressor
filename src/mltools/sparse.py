@@ -75,16 +75,28 @@ class TopK(Sparseness):
         assert 0 <= density <= 1.0, "density has to be between 0 and 1"
         self.density = density
 
-    def get_mask(self, score):
-        # TODO Change to autograd.Function
+    @staticmethod
+    def forward(ctx, score, params):
+        density, = params
         _score = score.view(-1)
-        idx = torch.argsort(_score, dim=0)[: int(score.numel() * (1.0 - self.density))]
+        idx = torch.argsort(_score, dim=0)[: int(score.numel() * (1.0 - density))]
         mask = (
             torch.ones_like(_score, device=score.device)
             .scatter_(dim=0, index=idx, value=0)
             .view_as(score)
         )
+        ctx.save_for_backward(mask)
         return mask
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # Propagrate None gradients to the parameters.
+        mask, = ctx.saved_tensors
+        return grad_output * mask, None
+
+    def get_mask(self, score):
+        params = (self.density,)
+        return TopK.apply(score, params)
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -110,22 +122,33 @@ class BlockTopK(Sparseness):
         self.block_size = block_size
         self.block_dim = block_dim
 
-    def get_mask(self, score):
-        # TODO Change to autograd.Function
+    @staticmethod
+    def forward(ctx, score, params):
+        K, block_size, block_dim = params
         assert (
-                score.shape[self.block_dim] % self.block_size == 0
-        ), f"score has size {score.shape[self.block_dim]} at dimension {self.block_dim}, not a multiple of block size {self.block_size}"
-        _score = score.transpose(self.block_dim, -1)
+                score.shape[block_dim] % block_size == 0
+        ), f"score has size {score.shape[block_dim]} at dimension {block_dim}, not a multiple of block size {block_size}"
+        _score = score.transpose(block_dim, -1)
         score_shape = _score.shape
-        _score = _score.reshape(-1, self.block_size)
-        idx = torch.argsort(_score, dim=1)[:, : int(self.block_size - self.K)]
+        _score = _score.reshape(-1, block_size)
+        idx = torch.argsort(_score, dim=1)[:, : int(block_size - K)]
         mask = (
             torch.ones_like(_score, device=score.device)
             .scatter_(dim=1, index=idx, value=0)
             .reshape(score_shape)
-            .transpose_(self.block_dim, -1)
+            .transpose_(block_dim, -1)
         )
+        ctx.save_for_backward(mask)
         return mask
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        mask, = ctx.saved_tensors
+        return grad_output * mask, None
+
+    def get_mask(self, score):
+        params = (self.K, self.block_size, self.block_dim)
+        return BlockTopK.apply(score, params)
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -186,11 +209,12 @@ class Sparsify(nn.Module):
 
         # Score is set to equal to absolute value of weight (or other deterministic function).
         # Mask is a deterministic function of score.
+        # TODO Check this.
         self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
         self.score_func = lambda x: torch.abs(x)
         self.mask = torch.ones(tensor_shape)
 
-        # Configures the backward patterns according to the mode chosen
+        # Configures the backward gradient patterns according to the mode chosen
         self.backward_mode = backward_mode
         self.enable_weight_gradient = backward_mode.lower() in {"ste", "joint"}
         self.enable_mask_gradient = backward_mode.lower() in {"supermask", "joint"}
@@ -229,27 +253,6 @@ class WeightSparseMixin:
             self.weight_sparsifier = Sparsify(self.weight.shape)
         else:
             self.weight_sparsifier = None
-
-    def configure_sparsifier(self, sparseness, backward_mode, score_func):
-        r"""
-        Configures the specific parameters of the sparsifier, such as sparseness and backward method.
-        If this function is not called, the sparsifier will default to "dense".
-        """
-        if self.weight_sparsifier is None: return
-        self.weight_sparsifier.set_sparseness(sparseness)
-        self.weight_sparsifier.set_score_func(score_func)
-        if backward_mode == "STE":
-            # TODO Check this
-            self.weight_sparsifier.score.requires_grad = False
-        elif backward_mode == "supermask":
-            self.weight_sparsifier.score.requires_grad = True
-            self.weight.requires_grad = False
-            self.bias.requires_grad = False
-        elif backward_mode == "joint":
-            # TODO Verify other backward modes
-            self.weight_sparsifier.score.requires_grad = True
-            self.weight.requires_grad = True
-            self.bias.requires_grad = True
 
     @property
     def effective_weight(self):
