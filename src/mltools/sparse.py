@@ -15,21 +15,15 @@ __ALL__ = [
 ]
 
 
-class Mask(Function):
-    """
+class Sparseness(Function):
+    r"""
     This class inherits from Function, since when we use masking operations, we may have different
         forward and backward passes.
     For example, in Bernoulli, we sample the masks to 0/1 during the forward direction, while using
         the gradients of the sigmoid function in the backward pass.
     This class is to be inherited for specific masking implementations.
-    """
-    pass
-
-
-class Sparseness:
-    r"""
-    This is an abstract class for the (super)masking mechanism for network sparsification.
-    Child classes to implement `get_mask()` and `from_shorthand()` method.
+    Moreover, this is an abstract class for the (super)masking mechanism for network sparsification.
+        Child classes to implement `get_mask()` and `from_shorthand()` method.
     """
 
     def __str__(self) -> str:
@@ -149,7 +143,9 @@ class BlockTopK(Sparseness):
         return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}"
 
 
-class BernoulliMask(Mask):
+class Bernoulli(Sparseness):
+    r"""Bernoulli sampler for supermasking."""
+
     @staticmethod
     def forward(ctx, score):
         sigmoid_score = torch.sigmoid(score)
@@ -162,12 +158,8 @@ class BernoulliMask(Mask):
         grad = sigmoid_score * (1 - sigmoid_score)
         return grad_output * grad
 
-
-class Bernoulli(Sparseness):
-    r"""Bernoulli sampler for supermasking."""
-
     def get_mask(self, score):
-        return BernoulliMask.apply(score)
+        return Bernoulli.apply(score)
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -185,47 +177,31 @@ class Sparsify(nn.Module):
     Sparsification module
     """
 
-    def __init__(self, tensor_shape, sparseness="DENSE", backward_mode="STE", dump_to=None):
+    def __init__(self, tensor_shape, sparseness="DENSE", backward_mode="STE"):
+        """TODO Add dump_to."""
         super().__init__()
-        self.set_sparseness(sparseness)
-
-        # Score is set to equal to absolute value of weight (or other deterministic function).
-        # Mask is a deterministic function of score.
-        self.score = nn.Parameter(torch.empty(tensor_shape), requires_grad=True)
-        self.score_initialized = False
-        self.score_func = lambda x: torch.ones_like(x) * 5.
-        self.mask = torch.ones(tensor_shape)
-
-        self.dump_to = dump_to
-        self.backward_mode = backward_mode
-
-    def set_sparseness(self, sparseness="DENSE"):
         if not isinstance(sparseness, Sparseness):
             sparseness = Sparseness.from_shorthand(sparseness)
         self.sparseness = sparseness
 
-    def set_score_func(self, score_func):
-        self.score_func = score_func
+        # Score is set to equal to absolute value of weight (or other deterministic function).
+        # Mask is a deterministic function of score.
+        self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
+        self.score_func = lambda x: torch.abs(x)
+        self.mask = torch.ones(tensor_shape)
 
-    def set_score(self, x=None):
-        # Only sets the scores once; we don't allow joint training of score and mask for now.
-        if self.score_initialized: return
-        if self.score_func is None: return
-        with torch.no_grad():
-            score = self.score_func(x)
-            self.score.copy_(score)
-            self.score_initialized = True
+        # Configures the backward patterns according to the mode chosen
+        self.backward_mode = backward_mode
+        self.enable_weight_gradient = backward_mode.lower() in {"ste", "joint"}
+        self.enable_mask_gradient = backward_mode.lower() in {"supermask", "joint"}
 
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
-            if not self.score_initialized:
-                self.set_score(x)
             if self.training:
-                self.mask = self.sparseness.get_mask(self.score)
-            x = x * self.mask
-        if self.dump_to is not None:
-            # TODO
-            pass
+                mask = self.sparseness.get_mask(self.score)
+                x = x if self.enable_weight_gradient else x.detach()
+                mask = mask if self.enable_mask_gradient else mask.detach()
+            x = x * mask
         return x
 
     def extra_repr(self):
