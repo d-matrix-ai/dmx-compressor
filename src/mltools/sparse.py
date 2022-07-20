@@ -226,8 +226,8 @@ class Sparsify(nn.Module):
 
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
+            mask = self.sparseness.get_mask(self.score)
             if self.training:
-                mask = self.sparseness.get_mask(self.score)
                 x = x if self.enable_weight_gradient else x.detach()
                 mask = mask if self.enable_mask_gradient else mask.detach()
             x = x * mask
