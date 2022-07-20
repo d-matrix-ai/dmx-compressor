@@ -203,9 +203,6 @@ class Sparsify(nn.Module):
     def __init__(self, tensor_shape, sparseness="DENSE", backward_mode="STE"):
         """TODO Add dump_to."""
         super().__init__()
-        if not isinstance(sparseness, Sparseness):
-            sparseness = Sparseness.from_shorthand(sparseness)
-        self.sparseness = sparseness
 
         # Score is set to equal to absolute value of weight (or other deterministic function).
         # Mask is a deterministic function of score.
@@ -213,6 +210,14 @@ class Sparsify(nn.Module):
         self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
         self.score_func = lambda x: torch.abs(x)
         self.mask = torch.ones(tensor_shape)
+
+        self.configure(sparseness, backward_mode)
+
+    def configure(self, sparseness, backward_mode):
+        """Configures the sparseness object and the backward propagation mode."""
+        if not isinstance(sparseness, Sparseness):
+            sparseness = Sparseness.from_shorthand(sparseness)
+        self.sparseness = sparseness
 
         # Configures the backward gradient patterns according to the mode chosen
         self.backward_mode = backward_mode
