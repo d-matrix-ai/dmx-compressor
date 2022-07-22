@@ -26,11 +26,24 @@ class Sparseness(Function):
         Child classes to implement `get_mask()` and `from_shorthand()` method.
     """
 
+    def __init__(self, mask_gradient=False):
+        super().__init__()
+        self.mask_gradient = mask_gradient
+
     def __str__(self) -> str:
         raise NotImplementedError
 
     def get_mask(self, *input: Any):
         raise NotImplementedError
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # Propagrate None gradients to the parameters.
+        mask_gradient, mask = ctx.saved_tensors[:2]
+        if mask_gradient:
+            return grad_output * mask, None
+        else:
+            return grad_output, None
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -77,7 +90,7 @@ class TopK(Sparseness):
 
     @staticmethod
     def forward(ctx, score, params):
-        density, = params
+        mask_gradient, density, = params
         _score = score.view(-1)
         idx = torch.argsort(_score, dim=0)[: int(score.numel() * (1.0 - density))]
         mask = (
@@ -85,17 +98,11 @@ class TopK(Sparseness):
             .scatter_(dim=0, index=idx, value=0)
             .view_as(score)
         )
-        ctx.save_for_backward(mask)
+        ctx.save_for_backward(mask_gradient, mask)
         return mask
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        # Propagrate None gradients to the parameters.
-        mask, = ctx.saved_tensors
-        return grad_output * mask, None
-
     def get_mask(self, score):
-        params = (self.density,)
+        params = (self.mask_gradient, self.density,)
         return TopK.apply(score, params)
 
     @classmethod
@@ -124,7 +131,7 @@ class BlockTopK(Sparseness):
 
     @staticmethod
     def forward(ctx, score, params):
-        K, block_size, block_dim = params
+        mask_gradient, K, block_size, block_dim = params
         assert (
                 score.shape[block_dim] % block_size == 0
         ), f"score has size {score.shape[block_dim]} at dimension {block_dim}, not a multiple of block size {block_size}"
@@ -138,16 +145,15 @@ class BlockTopK(Sparseness):
             .reshape(score_shape)
             .transpose_(block_dim, -1)
         )
-        ctx.save_for_backward(mask)
+        ctx.save_for_backward(mask_gradient, mask)
         return mask
 
     @staticmethod
     def backward(ctx, grad_output):
-        mask, = ctx.saved_tensors
-        return grad_output * mask, None
+        return grad_output, None
 
     def get_mask(self, score):
-        params = (self.K, self.block_size, self.block_dim)
+        params = (self.mask_gradient, self.K, self.block_size, self.block_dim)
         return BlockTopK.apply(score, params)
 
     @classmethod
@@ -170,19 +176,19 @@ class Bernoulli(Sparseness):
     r"""Bernoulli sampler for supermasking."""
 
     @staticmethod
-    def forward(ctx, score):
-        sigmoid_score = torch.sigmoid(score)
-        ctx.save_for_backward(sigmoid_score)
-        return torch.bernoulli(sigmoid_score)
+    def forward(ctx, score, params):
+        mask_gradient = params[0]
+        mask = torch.bernoulli(score)
+        ctx.save_for_backward(mask_gradient, mask)
+        return mask
 
     @staticmethod
     def backward(ctx, grad_output):
-        sigmoid_score, = ctx.saved_tensors
-        grad = sigmoid_score * (1 - sigmoid_score)
-        return grad_output * grad
+        return grad_output, None
 
     def get_mask(self, score):
-        return Bernoulli.apply(score)
+        params = (self.mask_gradient,)
+        return Bernoulli.apply(score, params)
 
     @classmethod
     def from_shorthand(cls, sh: str):
