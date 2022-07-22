@@ -10,21 +10,17 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 @pytest.mark.parametrize(
     "from_format,to_format,dimension",
     (
-                # passed tests
                 ("BFP16_64", "FP16", None),
                 ("BFP12_128", "FP16", None),
                 ("BFP32_1", "BFP16_64", 'row'),
                 ("FP16", "BFP12_128", 'row'),
-            
-                # xfails: lack of test data, issue 171
-                pytest.param("BFP24_64", "FP16", None,marks=pytest.mark.xfail),
-                pytest.param("FP16", "BFP24_64", None,marks=pytest.mark.xfail),
+                ("BFP24_64", "FP16", None),
                 
-                # xfails: qtorch bug, issue 169
-                pytest.param("BFP32_1", "FP16", None,marks=pytest.mark.xfail),
-                pytest.param("FP16", "BFP16_64", 'row',marks=pytest.mark.xfail),
-                pytest.param("FP16", "BFP16_64", 'col',marks=pytest.mark.xfail),
-                pytest.param("FP16", "BFP12_128", 'col',marks=pytest.mark.xfail),
+                pytest.param("FP16", "BFP24_64", None, marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
+                pytest.param("BFP32_1", "FP16", None, marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
+                pytest.param("FP16", "BFP16_64", 'row', marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
+                pytest.param("FP16", "BFP16_64", 'col', marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
+                pytest.param("FP16", "BFP12_128", 'col', marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
     ),
 )
 
