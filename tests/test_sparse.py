@@ -2,7 +2,7 @@ import pytest
 
 import torch
 from mltools import corsair
-from mltools.sparse import Sparsify
+from mltools.sparse import Sparsify, Sparseness
 
 RANDOM_SEED = 0
 
@@ -50,3 +50,39 @@ def test_sparsify(tensor_shape, sparseness, backward_mode):
         assert x.grad is None and isinstance(sp.score.grad, torch.Tensor)
     elif backward_mode == "joint":
         assert isinstance(x.grad, torch.Tensor) and isinstance(sp.score.grad, torch.Tensor)
+
+
+@pytest.mark.parametrize(
+    "tensor_shape",
+    (
+            (1024, 1024),
+            (256, 256, 32, 32),
+            (8, 256, 256),
+    ),
+)
+def test_transformation(tensor_shape):
+    """Test updating of sparseness and backward mode."""
+    sp = Sparsify(tensor_shape).to(device)
+    assert repr(sp.sparseness) == "DENSE"
+    assert sp.backward_mode == "STE"
+
+    # Old API: directly sets sparseness and backward mode.
+    # New API: uses configure.
+    # Tests that these two APIs are the same.
+    sp.configure(sparseness="BERN", backward_mode="supermask")
+    assert repr(sp.sparseness) == "BERN"
+    assert sp.backward_mode == "supermask"
+
+    sp.sparseness = Sparseness.from_shorthand("DENSE")
+    sp.backward_mode = "STE"
+    assert repr(sp.sparseness) == "DENSE"
+    assert sp.backward_mode == "STE"
+
+    sp.configure(sparseness="TOPK{0.5}", backward_mode="joint")
+    assert repr(sp.sparseness) == "TOPK{0.5}"
+    assert sp.backward_mode == "joint"
+
+    sp.sparseness = Sparseness.from_shorthand("BTOPK{4:8,-1}")
+    sp.backward_mode = "STE"
+    assert repr(sp.sparseness) == "BTOPK{4:8,-1}"
+    assert sp.backward_mode == "STE"
