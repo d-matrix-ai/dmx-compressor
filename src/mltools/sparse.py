@@ -28,7 +28,7 @@ class Sparseness(Function):
 
     def __init__(self, mask_gradient=False):
         super().__init__()
-        self.mask_gradient = mask_gradient
+        self.mask_gradient = torch.as_tensor(mask_gradient)
 
     def __str__(self) -> str:
         raise NotImplementedError
@@ -39,7 +39,9 @@ class Sparseness(Function):
     @staticmethod
     def backward(ctx, grad_output):
         # Propagrate None gradients to the parameters.
+        # We'll need to run ctx.save_for_backward to save the two variables mask_gradient and mask during the forward pass.
         mask_gradient, mask = ctx.saved_tensors[:2]
+        mask_gradient = mask_gradient.item()
         if mask_gradient:
             return grad_output * mask, None
         else:
