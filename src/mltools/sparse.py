@@ -179,6 +179,9 @@ class Bernoulli(Sparseness):
 
     @staticmethod
     def forward(ctx, score, params):
+        # The scores need to be within [0, 1], otherwise there are bugs
+        assert score.max() <= 1
+        assert score.min() >= 0
         mask_gradient = params[0]
         mask = torch.bernoulli(score)
         ctx.save_for_backward(mask_gradient, mask)
@@ -216,7 +219,7 @@ class Sparsify(nn.Module):
         # Mask is a deterministic function of score.
         # TODO Check this.
         self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
-        self.score_func = lambda x: torch.abs(x)
+        self.score_func = torch.sigmoid
         self.mask = torch.ones(tensor_shape)
 
         self.configure(sparseness, backward_mode)
@@ -234,7 +237,8 @@ class Sparsify(nn.Module):
 
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
-            mask = self.sparseness.get_mask(self.score)
+            score = self.score_func(self.score)
+            mask = self.sparseness.get_mask(score)
             if self.training:
                 x = x if self.enable_weight_gradient else x.detach()
                 mask = mask if self.enable_mask_gradient else mask.detach()
