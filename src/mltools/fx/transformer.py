@@ -1,22 +1,45 @@
 #!/usr/bin/env python3
 
+import torch
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from mltools.numerical import CastTo
+from mltools.utils import load_config_file
+from mltools.sparse import Sparsify
+from mltools.corsair import CorsairConfig
+
 
 
 class InputOutputTransformer(fx.Transformer):
+    def __init__(self,module:fx.GraphModule,scopeDict:dict = None,cfg = None):
+        super().__init__(module)
+        self.scopeDict = scopeDict
+        self.config=None
+        if cfg:
+            self.config = CorsairConfig().from_yaml(cfg)
+        self.module = module
+
     def placeholder(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Proxy:
         assert isinstance(target, str)
-        # TODO for newer versions of fx you can pass in default values
-        # default_value = next(iter(args)) if args else inspect.Signature.empty
-
+ 
         placeholder_node = self.new_graph.placeholder(target)
+        # Default input cast
+        layer = self.scopeDict[placeholder_node.name][0]
+        cast_name = layer+"_input_cast"
+        cast_format = "SAME"
+        # Find input_cast format in cfg if exists
+        if self.config:
+            layer_key = layer.split('__')[-1]
+            if layer_key:
+                cast_format = self.config[layer_key]['input_format']
+                
+        self.module.add_submodule(cast_name,CastTo(format=cast_format))
         placeholder_node_cast = self.new_graph.create_node(
-            "call_module", "input_cast", args=(placeholder_node,)
+            "call_module", cast_name, args=(placeholder_node,)
         )
         return Proxy(placeholder_node_cast, self.tracer)
 
@@ -24,18 +47,72 @@ class InputOutputTransformer(fx.Transformer):
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
         output_node = self.new_graph.output(target)
+         # Default output cast
+        layer = self.scopeDict[output_node.name][0]
+        cast_name = layer+"_output_cast"
+        cast_format = "SAME"
+        # Find output_cast format in cfg if exists
+        if self.config:
+            layer_key = layer.split('__')[-1]
+            if layer_key:
+                cast_format = self.config[layer_key]['output_format']
+                
+        self.module.add_submodule(cast_name,CastTo(format=cast_format))
         self.new_graph.inserting_before(output_node)
         output_node_cast = self.new_graph.create_node(
-            "call_module", "output_cast", args=(output_node.prev,)
+            "call_module", cast_name, args=(output_node.prev,)
         )
+       
         self.new_graph.erase_node(output_node)
         return Proxy(output_node_cast, self.tracer)
 
     def get_attr(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Proxy:
-        get_attr_node = self.new_graph.get_attr(target)
+        get_attr_node = self.new_graph.get_attr(target)    
+        prev_node = get_attr_node
+        # Default cast
+        layer = self.scopeDict[get_attr_node.name][0]
+        cast_name = layer+"_weight_cast" if "weight" in target else layer+"_bias_cast"
+        cast_format = "SAME"
+        # Default sparsifier
+        sparsify_format = "DENSE"
+        sparsify_name = layer+"_sparsifier"
+        layer_key = layer.split('__')[-1]
+        # Find casting and sparsifier format in config if exists
+        if self.config:
+            if layer_key:
+                if "weight" in target:
+                    cast_format = self.config[layer_key]['weight_format']
+                    #Add sparsifier
+                    sparsify_format = self.config[layer_key]['weight_sparseness']
+                               
+                else:
+                    cast_format = self.config[layer_key]['bias_format']
+
+        self.module.add_submodule(cast_name,CastTo(format=cast_format))
+
+        # Add sparsifier and approximator for weight nodes if needed
+        if "weight" in target:
+            # Sparsifier submodules needed to be added separately even for default as tensor size 
+            # is not the same for every layer
+            tensor_size = self.module.get_submodule(layer.split('__')[-1]).weight.size()
+            self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness=sparsify_format))
+            self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness="DENSE"))
+            prev_node = self.new_graph.create_node(
+            "call_module", sparsify_name, args=(prev_node,)
+            )
+            
+            if self.submodules.get('approximator'):
+                prev_node = self.new_graph.create_node(
+                    "call_module", "approximator", args=(prev_node,)
+                )
+        
         get_attr_node_cast = self.new_graph.create_node(
-            "call_module", "weight_cast", args=(get_attr_node,)
+            "call_module", cast_name, args=(prev_node,)
         )
         return Proxy(get_attr_node_cast, self.tracer)
+
+  
+
+        

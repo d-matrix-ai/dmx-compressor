@@ -2,7 +2,6 @@ from ast import Str
 from logging import PlaceHolder
 from modulefinder import Module
 import sys
-import yaml
 import re
 import torch
 from types import SimpleNamespace
