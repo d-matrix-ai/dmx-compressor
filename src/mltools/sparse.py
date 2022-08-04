@@ -17,13 +17,8 @@ __ALL__ = [
 
 class Sparseness(Function):
     r"""
-    This class inherits from Function, since when we use masking operations, we may have different
-        forward and backward passes.
-    For example, in Bernoulli, we sample the masks to 0/1 during the forward direction, while using
-        the gradients of the sigmoid function in the backward pass.
-    This class is to be inherited for specific masking implementations.
-    Moreover, this is an abstract class for the (super)masking mechanism for network sparsification.
-        Child classes to implement `get_mask()` and `from_shorthand()` method.
+    This class inherits from torch.autograd.Function, since when we use masking operations, we may have different forward and backward passes.
+    Child classes to implement `get_mask()` and `from_shorthand()` method.
     """
 
     def __init__(self, mask_gradient=False):
@@ -41,8 +36,7 @@ class Sparseness(Function):
         # Propagrate None gradients to the parameters.
         # We'll need to run ctx.save_for_backward to save the two variables mask_gradient and mask during the forward pass.
         mask_gradient, mask = ctx.saved_tensors[:2]
-        mask_gradient = mask_gradient.item()
-        if mask_gradient:
+        if mask_gradient.item():
             return grad_output * mask, None
         else:
             return grad_output, None
@@ -92,7 +86,10 @@ class TopK(Sparseness):
 
     @staticmethod
     def forward(ctx, score, params):
-        mask_gradient, density, = params
+        (
+            mask_gradient,
+            density,
+        ) = params
         _score = score.view(-1)
         idx = torch.argsort(_score, dim=0)[: int(score.numel() * (1.0 - density))]
         mask = (
@@ -104,7 +101,10 @@ class TopK(Sparseness):
         return mask
 
     def get_mask(self, score):
-        params = (self.mask_gradient, self.density,)
+        params = (
+            self.mask_gradient,
+            self.density,
+        )
         return TopK.apply(score, params)
 
     @classmethod
@@ -135,7 +135,7 @@ class BlockTopK(Sparseness):
     def forward(ctx, score, params):
         mask_gradient, K, block_size, block_dim = params
         assert (
-                score.shape[block_dim] % block_size == 0
+            score.shape[block_dim] % block_size == 0
         ), f"score has size {score.shape[block_dim]} at dimension {block_dim}, not a multiple of block size {block_size}"
         _score = score.transpose(block_dim, -1)
         score_shape = _score.shape
@@ -211,33 +211,39 @@ class Sparsify(nn.Module):
     Sparsification module
     """
 
-    def __init__(self, tensor_shape, sparseness="DENSE", backward_mode="STE"):
-        """TODO Add dump_to."""
+    def __init__(
+        self,
+        tensor_shape,
+        sparseness="DENSE",
+        backward_mode="STE",
+        score_func=lambda score, input: score,
+    ):
         super().__init__()
 
-        # Score is set to equal to absolute value of weight (or other deterministic function).
-        # Mask is a deterministic function of score.
-        # TODO Check this.
         self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
-        self.score_func = torch.sigmoid
         self.mask = torch.ones(tensor_shape)
+        self.configure(sparseness, backward_mode, score_func)
+        self.sparsifying = False
 
-        self.configure(sparseness, backward_mode)
-
-    def configure(self, sparseness, backward_mode):
+    def configure(self, sparseness, backward_mode, score_func):
         """Configures the sparseness object and the backward propagation mode."""
         if not isinstance(sparseness, Sparseness):
             sparseness = Sparseness.from_shorthand(sparseness)
         self.sparseness = sparseness
 
-        # Configures the backward gradient patterns according to the mode chosen
         self.backward_mode = backward_mode
         self.enable_weight_gradient = backward_mode.lower() in {"ste", "joint"}
         self.enable_mask_gradient = backward_mode.lower() in {"supermask", "joint"}
 
+        self.score_func = score_func
+
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
-            score = self.score_func(self.score)
+            if self.sparsifying:
+                score = self.score_func(self.score, x)
+                self.sparsifying = False
+            else:
+                score = self.score
             mask = self.sparseness.get_mask(score)
             if self.training:
                 x = x if self.enable_weight_gradient else x.detach()
@@ -249,6 +255,21 @@ class Sparsify(nn.Module):
         return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}"
 
 
+class Sparsifier:
+    r"""
+    This is a sparsification management class
+    Similar to Optimizer that manages parameters through optimizer.step(),
+    one can call Sparsifier.step() to update underlying score.
+    """
+
+    def __init__(self, sparsify_modules, score_func=lambda score, input: score):
+        self.sparsify_modules = sparsify_modules
+        self.score_func = score_func
+
+    def step(self):
+        pass
+
+
 class WeightSparseMixin:
     """Mixin for weight-sparse modules."""
 
@@ -258,14 +279,14 @@ class WeightSparseMixin:
 
     def init_sparsifier(self):
         if isinstance(
-                self,
-                (
-                        nn.Linear,
-                        nn.Bilinear,
-                        nn.Embedding,
-                        nn.EmbeddingBag,
-                        nn.modules.conv._ConvNd,
-                ),
+            self,
+            (
+                nn.Linear,
+                nn.Bilinear,
+                nn.Embedding,
+                nn.EmbeddingBag,
+                nn.modules.conv._ConvNd,
+            ),
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)
         else:
