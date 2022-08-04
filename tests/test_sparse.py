@@ -14,30 +14,30 @@ torch.manual_seed(RANDOM_SEED)
 @pytest.mark.parametrize(
     "tensor_shape",
     (
-            (1024, 1024),
-            (256, 256, 32, 32),
-            (8, 256, 256),
+        (1024, 1024),
+        (256, 256, 32, 32),
+        (8, 256, 256),
     ),
 )
 @pytest.mark.parametrize(
     "sparseness",
     (
-            "TOPK{0.5}",
-            "BTOPK{4:8,-1}",
-            "BTOPK{2:8,-1}",
-            "BERN",
+        "TOPK{0.5}(U)",
+        "BTOPK{4:8,-1}(U)",
+        "BTOPK{2:8,-1}(U)",
+        "BERN",
     ),
 )
 @pytest.mark.parametrize(
     "backward_mode",
     (
-            "STE",
-            "supermask",
-            "joint",
+        "STE",
+        "supermask",
+        "joint",
     ),
 )
 def test_sparsify(tensor_shape, sparseness, backward_mode):
-    """Test that `Sparsify` produces a correct sparseness pattern, 
+    """Test that `Sparsify` produces a correct sparseness pattern,
     as evidenced by gradients of weights and scores."""
     sp = Sparsify(tensor_shape, sparseness, backward_mode).to(device)
     x = torch.randn(tensor_shape, requires_grad=True, device=device)
@@ -49,15 +49,17 @@ def test_sparsify(tensor_shape, sparseness, backward_mode):
     elif backward_mode == "supermask":
         assert x.grad is None and isinstance(sp.score.grad, torch.Tensor)
     elif backward_mode == "joint":
-        assert isinstance(x.grad, torch.Tensor) and isinstance(sp.score.grad, torch.Tensor)
+        assert isinstance(x.grad, torch.Tensor) and isinstance(
+            sp.score.grad, torch.Tensor
+        )
 
 
 @pytest.mark.parametrize(
     "tensor_shape",
     (
-            (1024, 1024),
-            (256, 256, 32, 32),
-            (8, 256, 256),
+        (1024, 1024),
+        (256, 256, 32, 32),
+        (8, 256, 256),
     ),
 )
 def test_transformation(tensor_shape):
@@ -66,10 +68,11 @@ def test_transformation(tensor_shape):
     assert repr(sp.sparseness) == "DENSE"
     assert sp.backward_mode == "STE"
 
-    # Old API: directly sets sparseness and backward mode.
-    # New API: uses configure.
-    # Tests that these two APIs are the same.
-    sp.configure(sparseness="BERN", backward_mode="supermask")
+    sp.configure(
+        sparseness="BERN",
+        backward_mode="supermask",
+        score_func=lambda score, input: score,
+    )
     assert repr(sp.sparseness) == "BERN"
     assert sp.backward_mode == "supermask"
 
@@ -78,11 +81,15 @@ def test_transformation(tensor_shape):
     assert repr(sp.sparseness) == "DENSE"
     assert sp.backward_mode == "STE"
 
-    sp.configure(sparseness="TOPK{0.5}", backward_mode="joint")
-    assert repr(sp.sparseness) == "TOPK{0.5}"
+    sp.configure(
+        sparseness="TOPK{0.5}(U)",
+        backward_mode="joint",
+        score_func=lambda score, input: torch.abs(input),
+    )
+    assert repr(sp.sparseness) == "TOPK{0.5}(U)"
     assert sp.backward_mode == "joint"
 
-    sp.sparseness = Sparseness.from_shorthand("BTOPK{4:8,-1}")
+    sp.sparseness = Sparseness.from_shorthand("BTOPK{4:8,-1}(U)")
     sp.backward_mode = "STE"
-    assert repr(sp.sparseness) == "BTOPK{4:8,-1}"
+    assert repr(sp.sparseness) == "BTOPK{4:8,-1}(U)"
     assert sp.backward_mode == "STE"

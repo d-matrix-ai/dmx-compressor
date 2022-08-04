@@ -79,8 +79,8 @@ class TopK(Sparseness):
     Fine-grain unstructured sparsity with top-K scored entries non-zero
     """
 
-    def __init__(self, density=0.5):
-        super().__init__()
+    def __init__(self, density=0.5, mask_gradient=False):
+        super().__init__(mask_gradient)
         assert 0 <= density <= 1.0, "density has to be between 0 and 1"
         self.density = density
 
@@ -109,14 +109,17 @@ class TopK(Sparseness):
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        conf = parse("TOPK{{{density:f}}}", sh)
-        return cls(density=conf["density"])
+        conf = parse("TOPK{{{density:f}}}({mask_grad:l})", sh)
+        return cls(
+            density=conf["density"],
+            mask_gradient=conf["mask_grad"] == "M",
+        )
 
     def __str__(self) -> str:
         return f"Global TopK sparseness: density = {self.density}"
 
     def __repr__(self) -> str:
-        return f"TOPK{{{self.density}}}"
+        return f"TOPK{{{self.density}}}({'M' if self.mask_gradient else 'U'})"
 
 
 class BlockTopK(Sparseness):
@@ -124,8 +127,8 @@ class BlockTopK(Sparseness):
     Fine-grain structured sparsity with K non-zeros out of `block_size` elements along `block_dim`.
     """
 
-    def __init__(self, K=4, block_size=8, block_dim=-1):
-        super().__init__()
+    def __init__(self, K=4, block_size=8, block_dim=-1, mask_gradient=False):
+        super().__init__(mask_gradient)
         assert 0 < K <= block_size, "N and M must be positive and N no greater than M"
         self.K = K
         self.block_size = block_size
@@ -160,18 +163,19 @@ class BlockTopK(Sparseness):
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        conf = parse("BTOPK{{{K:d}:{block_size:d},{block_dim:d}}}", sh)
+        conf = parse("BTOPK{{{K:d}:{block_size:d},{block_dim:d}}}({mask_grad:l})", sh)
         return cls(
             K=conf["K"],
             block_size=conf["block_size"],
             block_dim=conf["block_dim"],
+            mask_gradient=conf["mask_grad"] == "M",
         )
 
     def __str__(self) -> str:
         return f"Block TopK sparseness: pattern = {self.K}:{self.block_size}, block dimension = {self.block_dim}"
 
     def __repr__(self) -> str:
-        return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}"
+        return f"BTOPK{{{self.K}:{self.block_size},{self.block_dim}}}({'M' if self.mask_gradient else 'U'})"
 
 
 class Bernoulli(Sparseness):
