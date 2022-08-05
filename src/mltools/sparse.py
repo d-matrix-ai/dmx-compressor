@@ -273,7 +273,7 @@ class Sparsify(nn.Module):
         return mask2braille(self.mask, dims, max_elems)
 
     def extra_repr(self):
-        return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}, mask = \n{self.mask_str(dims=(-1, -2), max_elems=64)}"
+        return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}, mask = \n{self.mask_str(dims=(self.mask.ndim-2, self.mask.ndim-1), max_elems=32)}"
 
 
 class Sparsifier:
