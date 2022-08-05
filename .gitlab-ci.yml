@@ -1,4 +1,4 @@
-image: "dmatrix.azurecr.io/test-mlteam:v3"
+image: "dmatrix.azurecr.io/test-mlteam:v5"
 
 stages:
   - test
