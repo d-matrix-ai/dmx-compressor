@@ -39,8 +39,8 @@ def test_conversion(from_format,to_format,dimension):
     x,y = torch.Tensor(x).to(DEVICE),torch.Tensor(y).to(DEVICE)
     
     if to_format == 'FP16': 
-        shorthand = 'FP[1|5|10](N)'
-            
+        shorthand = 'FP[1|5|10]{15}(N)'
+    
     elif to_format.startswith('BFP'):
         nbits = int(to_format.split('_')[0][3:]) # number of bits
         block_size, mantissa = int(to_format.split('_')[1]), nbits - 8
