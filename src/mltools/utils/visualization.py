@@ -14,7 +14,7 @@ def mask2braille(m, dims=(0, 1), max_elems=None):
     if max_elems is not None:
         truncate_h = max_elems < m.size(0)
         truncate_w = max_elems < m.size(1)
-        m = m[:max_elems, :max_elems, ...] 
+        m = m[:max_elems, :max_elems, ...]
     # reduce mask
     _h, _w = m.size(0), m.size(1)
     # m = m.reshape(_h, _w, -1).sum(-1) > 0
@@ -35,11 +35,30 @@ def mask2braille(m, dims=(0, 1), max_elems=None):
         .int()
         + 10240
     )
-    sep = " ⋯\n" if truncate_w else "\n"
-    x = sep.join(["".join([chr(_x) for _x in row]) for row in x])
-    if truncate_h: 
-        x += " ⋯\n\n" + "⋮" * (max_elems//2) + "  ⋱"
+    sep = "╳\n" if truncate_w else "\n"
+    x = sep.join(["".join([chr(_x) for _x in row]) for row in x]) + sep
+    if truncate_h:
+        x += "" + "╳" * (max_elems // 2) + "╳"
     return x
+
+
+def _box_wrap(
+    mls: str,
+    pad_left: bool = False,
+    pad_right: bool = False,
+    pad_top: bool = False,
+    pad_bottom: bool = False,
+) -> str:
+    lines = mls.split("\n")
+    if pad_left:
+        lines = [" " + ln for ln in lines]
+    if pad_right:
+        lines = [ln + " " for ln in lines]
+    if pad_top:
+        lines = " " * len(lines[0]) + lines
+    if pad_bottom:
+        lines = lines + " " * len(lines[-1])
+    
 
 
 def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
