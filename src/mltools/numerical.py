@@ -1,5 +1,6 @@
 from typing import Any
 from parse import parse
+from bidict import bidict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +17,16 @@ __ALL__ = [
     "BlockFloatingPoint",
     "CastTo",
 ]
+
+
+ROUNDING_MODE = bidict(
+    {
+        "U": "up",
+        "D": "down",
+        "N": "nearest",
+        "S": "stochastic",
+    }
+)
 
 
 class Format:
@@ -110,14 +121,14 @@ class FixedPoint(Format):
             fraction=conf["fraction"],
             clamp=conf["clamp"] == "C",
             symmetric=conf["symmetric"] == "S",
-            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
+            rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"XP[{self.precision}{self.fraction:+d}]({'C' if self.clamp else 'U'}{'S' if self.symmetric else 'A'}{'S' if self.rounding=='stochastic' else 'N'})"
+        return f"XP[{self.precision},{'0' if self.fraction==0 else f'{self.fraction:+d}'}]({'C' if self.clamp else 'U'}{'S' if self.symmetric else 'A'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class FloatingPoint(Format):
@@ -125,7 +136,7 @@ class FloatingPoint(Format):
     This is a floating point format simulated in FP32, using QPyTorch.
     """
 
-    def __init__(self, mantissa=23, exponent=8, rounding="nearest"):
+    def __init__(self, mantissa=23, exponent=8, bias=None, rounding="nearest"):
         super().__init__()
         # check validity of format configuration
         assert (
@@ -134,37 +145,47 @@ class FloatingPoint(Format):
         assert (
             0 < exponent <= 8
         ), f"number of exponent bits simulatable by FP32 is between 1 and 8, got {exponent}"
+        _bias_min = 127 if exponent == 8 else -128 + 2**exponent
+        assert (
+            _bias_min <= bias <= 127
+        ), f"exponent bias simulatable by FP32 for {exponent}-bit exponent is constrained between {_bias_min} and 127, got {bias}"
 
         self.mantissa = mantissa
         self.exponent = exponent
+        self.bias = bias if bias is not None else 2 ** (exponent - 1) - 1
         self.rounding = rounding
 
     def cast(self, x):
         return (
             x
-            if self.mantissa == 23 and self.exponent == 8
+            if self.mantissa == 23
+            and self.exponent == 8
+            and self.bias == 127
+            and self.rounding == "nearest"
             else float_quantize(
                 x,
                 man=self.mantissa,
                 exp=self.exponent,
+                bias=self.bias,
                 rounding=self.rounding,
             )
         )
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        conf = parse("FP[1|{exponent:d}|{mantissa:d}]({rounding:l})", sh)
+        conf = parse("FP[1|{exponent:d}|{mantissa:d}]{{{bias:d}}}({rounding:l})", sh)
         return cls(
             mantissa=conf["mantissa"],
             exponent=conf["exponent"],
-            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
+            bias=conf["bias"],
+            rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
-        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, \ncasting behavior: rounding = {self.rounding}"
+        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, \ncasting behavior: rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"FP[1|{self.exponent}|{self.mantissa}]({'S' if self.rounding=='stochastic' else 'N'})"
+        return f"FP[1|{self.exponent}|{self.mantissa}]{{{self.bias}}}({ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class BlockFloatingPoint(Format):
@@ -217,14 +238,14 @@ class BlockFloatingPoint(Format):
             precision=conf["precision"],
             block_size=conf["block_size"],
             block_dim=conf["block_dim"],
-            rounding="stochastic" if conf["rounding"] == "S" else "nearest",
+            rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
         return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({'S' if self.rounding=='stochastic' else 'N'})"
+        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class CastToFormat(Function):
