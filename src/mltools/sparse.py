@@ -1,9 +1,9 @@
 from typing import Any
-
 import torch
 import torch.nn as nn
 from parse import parse
 from torch.autograd import Function
+from mltools.utils.visualization import mask2braille
 
 __ALL__ = [
     "Sparseness",
@@ -225,7 +225,7 @@ class Sparsify(nn.Module):
     ):
         super().__init__()
 
-        self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
+        self.score = nn.Parameter(torch.rand(tensor_shape), requires_grad=True)
         self.mask = torch.ones(tensor_shape)
         self.configure(sparseness, backward_mode, score_func)
         self.plastic = False
@@ -250,6 +250,9 @@ class Sparsify(nn.Module):
             # mark the module as plastic for rewiring in the next forward() call
             self.plastic = True
 
+    def update_mask(self, score):
+        self.mask = self.sparseness.get_mask(score)
+
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
             if self.plastic:
@@ -257,7 +260,7 @@ class Sparsify(nn.Module):
                 self.plastic = False
             else:
                 score = self.score
-            self.mask = self.sparseness.get_mask(score)
+            self.update_mask(score)
             if self.training:
                 x = x if self.enable_weight_gradient else x.detach()
                 self.mask = (
@@ -266,8 +269,11 @@ class Sparsify(nn.Module):
             x = x * self.mask
         return x
 
+    def mask_str(self, dims, max_elems):
+        return mask2braille(self.mask, dims, max_elems)
+
     def extra_repr(self):
-        return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}"
+        return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}, mask = \n{self.mask_str(dims=(-1, -2), max_elems=64)}"
 
 
 class Sparsifier:
