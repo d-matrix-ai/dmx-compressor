@@ -7,8 +7,13 @@ import torch.nn as nn
 from mltools import corsair
 from mltools.models import LeNet
 from mltools.models import BERTStyleFFN
-from mltools.corsair.transform import cast_input_output_transform
+from mltools.fx.transform import cast_input_output_transform
+from mltools.sparse import Sparsify
+from mltools.approximate import Approximate
 import torch.fx as fx
+from transformers.pytorch_utils import Conv1D
+from transformers.models.gpt2.modeling_gpt2 import GPT2Attention,GPT2MLP,GPT2Model
+from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
 RANDOM_SEED = 0
 
@@ -24,19 +29,23 @@ def checkTransform(gm: nn.Module) -> bool:
         nodeList.append(i)
     for i in nodeList:
         if i.op == "placeholder":
-            if i.next.target != "input_cast":
+            if not "input_cast" in i.next.target:
                 return False
         elif i.op == "output":
-            if i.prev.target != "output_cast":
+            if not "output_cast" in i.prev.target:
                 return False
-        elif i.op == "get_attr":
-            if i.next.target != "weight_cast":
+        elif i.op == "get_attr" and "weight" in i.target:
+            if not ("weight_cast" in i.next.target
+                or (("sparsifier" in i.next.target or "approximator" in i.next.target) and "weight_cast" in i.next.next.target) 
+                or ("sparsifier" in i.next.target and "approximator" in i.next.next.target and "weight_cast" in i.next.next.next.target)):
+                return False
+        elif i.op == "get_attr" and "bias" in i.target:
+            if not "weight_cast" in i.next.target and not "bias_cast" in i.next.target:
                 return False
         elif i.op == "call_module":
             if not checkTransform(gm.get_submodule(i.target)):
                 return False
     return True
-
 
 def test_corsair_transform():
     net = Net()
@@ -54,10 +63,27 @@ def test_corsair_transform():
     gm.linear.bias.data = bias
     cnet.linear.weight.data = weight
     gm.linear.weight.data = weight
-
     coutput = cnet(input)
     output = gm(input)
     assert (coutput - output).abs().sum() == 0, True
+    assert checkTransform(gm), True
+
+def test_conv1D():
+    net = Conv1D(32,32)
+    gm = cast_input_output_transform(net)
+    
+
+# def test_gpt2_attention():
+#     import ipdb
+#     ipdb.set_trace()
+#     net = GPT2Model(GPT2Config())
+#     gm = cast_input_output_transform(net)
+#     ipdb.set_trace()
+#     assert checkTransform(gm),True
+
+def test_corsiar_transform_sparsify_approximate():
+    net = Net()
+    gm = cast_input_output_transform(net,approximate_fn=Approximate(),)
     assert checkTransform(gm), True
 
 @pytest.mark.skip()
@@ -104,12 +130,21 @@ def test_fakecast_transform():
         [10, 10, 10, 10, 10, 10],
     ),
 )
-def test_lenet_1hid_corsair_transform(layers):
+def test_lenet_1hid_corsair_transform_without_cfg(layers):
     net = LeNet(layers)
     gm = cast_input_output_transform(net)
-    print(gm.code)
     assert checkTransform(gm), True
 
+@pytest.mark.parametrize(
+    "layers",
+    (
+        [10, 10],
+    ),
+)
+def test_lenet_1hid_corsair_transform_with_test_cfg(layers):
+    net = LeNet(layers)
+    gm = cast_input_output_transform(net,cfg="configs/lenet_test.yaml")
+    assert checkTransform(gm), True
 
 @pytest.mark.parametrize(
     "layers",
