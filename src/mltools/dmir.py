@@ -33,6 +33,7 @@ __ALL__ = [
     "lower",
     "executor",
     "cpsim_executor",
+    "discard_values",
 ]
 
 FORMAT_DICT = {
@@ -1290,6 +1291,19 @@ def list_ops(graph: Graph) -> List[str]:
     for sg in graph.subgraph:
         lot += list_ops(sg)
     return set(lot)
+
+
+def discard_values(graph: Graph) -> Graph:
+    """
+    Post hoc removal of intermediate values
+    for sol_analyze only, to be deprecated
+    """
+    for tsr in graph.intermediate:
+        if tsr.value:
+            tsr.value[:] = []
+    for sg in graph.subgraph:
+        discard_values(sg)
+    return graph
 
 
 def save_to_file(model: Graph, filename: str, format="binary") -> None:

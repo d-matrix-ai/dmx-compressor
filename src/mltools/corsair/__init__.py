@@ -3,6 +3,7 @@ import torch
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..approximate import Approximate, ApproximationFunction
+from ..dmir import discard_values
 from .transform import Model, aware, CorsairConfig, CorsairTransformation
 from . import nn
 from sol.src.sys import corsair_hw
@@ -27,7 +28,9 @@ def sol_analyze(dmir_graph, corsair_hw=hw.Slice(), **kwargs):
 
         return perf_data, power_data
 
-    perf_data, power_data = analyze(dmir_graph, corsair_hw=corsair_hw, **kwargs)
+    perf_data, power_data = analyze(
+        discard_values(dmir_graph), corsair_hw=corsair_hw, **kwargs
+    )
     perf_data, power_data = filter_sol_output(perf_data, power_data)
 
     return perf_data, power_data
