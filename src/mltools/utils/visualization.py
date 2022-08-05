@@ -4,12 +4,17 @@ import pptree
 import mltools
 
 
-def mask2braille(m, dims=(0, 1)):
+def mask2braille(m, dims=(0, 1), max_elems=None):
     # permute dimensions
     ds = list(range(m.dim()))
     ds[0], ds[dims[0]] = dims[0], ds[0]
     ds[1], ds[dims[1]] = dims[1], ds[1]
     m = m.permute(*ds)
+    truncate_h = truncate_w = False
+    if max_elems is not None:
+        truncate_h = max_elems < m.size(0)
+        truncate_w = max_elems < m.size(1)
+        m = m[:max_elems, :max_elems, ...] 
     # reduce mask
     _h, _w = m.size(0), m.size(1)
     # m = m.reshape(_h, _w, -1).sum(-1) > 0
@@ -30,7 +35,10 @@ def mask2braille(m, dims=(0, 1)):
         .int()
         + 10240
     )
-    x = "\n".join(["".join([chr(_x) for _x in row]) for row in x])
+    sep = " ⋯\n" if truncate_w else "\n"
+    x = sep.join(["".join([chr(_x) for _x in row]) for row in x])
+    if truncate_h: 
+        x += " ⋯\n\n" + "⋮" * (max_elems//2) + "  ⋱"
     return x
 
 

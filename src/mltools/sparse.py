@@ -12,6 +12,7 @@ __ALL__ = [
     "TopK",
     "BlockTopK",
     "Sparsify",
+    "Sparsifier",
 ]
 
 
@@ -220,39 +221,49 @@ class Sparsify(nn.Module):
         tensor_shape,
         sparseness="DENSE",
         backward_mode="STE",
-        score_func=lambda score, input: score,
+        score_func=None,
     ):
         super().__init__()
 
         self.score = nn.Parameter(torch.ones(tensor_shape), requires_grad=True)
         self.mask = torch.ones(tensor_shape)
         self.configure(sparseness, backward_mode, score_func)
-        self.sparsifying = False
+        self.plastic = False
 
-    def configure(self, sparseness, backward_mode, score_func):
-        """Configures the sparseness object and the backward propagation mode."""
-        if not isinstance(sparseness, Sparseness):
-            sparseness = Sparseness.from_shorthand(sparseness)
-        self.sparseness = sparseness
-
-        self.backward_mode = backward_mode
-        self.enable_weight_gradient = backward_mode.lower() in {"ste", "joint"}
-        self.enable_mask_gradient = backward_mode.lower() in {"supermask", "joint"}
-
-        self.score_func = score_func
+    def configure(self, sparseness=None, backward_mode=None, score_func=None):
+        # sparseness pattern
+        if sparseness is not None:
+            if not isinstance(sparseness, Sparseness):
+                sparseness = Sparseness.from_shorthand(sparseness)
+            if not hasattr(self, "sparseness") or repr(sparseness) != repr(
+                self.sparseness
+            ):
+                self.sparseness = sparseness
+        # backward mode
+        if backward_mode is not None:
+            self.backward_mode = backward_mode
+            self.enable_weight_gradient = backward_mode.lower() in {"ste", "joint"}
+            self.enable_mask_gradient = backward_mode.lower() in {"supermask", "joint"}
+        # score function: importance <- score_func(score, input)
+        if score_func is not None:
+            self.score_func = score_func
+            # mark the module as plastic for rewiring in the next forward() call
+            self.plastic = True
 
     def forward(self, x):
         if not isinstance(self.sparseness, Dense):
-            if self.sparsifying:
+            if self.plastic:
                 score = self.score_func(self.score, x)
-                self.sparsifying = False
+                self.plastic = False
             else:
                 score = self.score
-            mask = self.sparseness.get_mask(score)
+            self.mask = self.sparseness.get_mask(score)
             if self.training:
                 x = x if self.enable_weight_gradient else x.detach()
-                mask = mask if self.enable_mask_gradient else mask.detach()
-            x = x * mask
+                self.mask = (
+                    self.mask if self.enable_mask_gradient else self.mask.detach()
+                )
+            x = x * self.mask
         return x
 
     def extra_repr(self):
@@ -266,12 +277,16 @@ class Sparsifier:
     one can call Sparsifier.step() to update underlying score.
     """
 
-    def __init__(self, sparsify_modules, score_func=lambda score, input: score):
+    def __init__(
+        self,
+        sparsify_modules,
+        **kwargs,
+    ):
         self.sparsify_modules = sparsify_modules
-        self.score_func = score_func
 
-    def step(self):
-        pass
+    def step(self, **kwargs):
+        for sm in self.sparsify_modules:
+            sm.configure(**kwargs)
 
 
 class WeightSparseMixin:

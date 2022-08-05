@@ -23,8 +23,11 @@ torch.manual_seed(RANDOM_SEED)
     "sparseness",
     (
         "TOPK{0.5}(U)",
+        "TOPK{0.5}(M)",
         "BTOPK{4:8,-1}(U)",
+        "BTOPK{4:8,-1}(M)",
         "BTOPK{2:8,-1}(U)",
+        "BTOPK{2:8,-1}(M)",
         "BERN",
     ),
 )
