@@ -35,11 +35,10 @@ def mask2braille(m, dims=(0, 1), max_elems=None):
         .int()
         + 10240
     )
-    sep = "╳\n" if truncate_w else "\n"
-    x = sep.join(["".join([chr(_x) for _x in row]) for row in x]) + sep
-    if truncate_h:
-        x += "" + "╳" * (max_elems // 2) + "╳"
-    return x
+    x = "\n".join(["".join([chr(_x) for _x in row]) for row in x])
+    return _box_wrap(
+        x, pad_left=False, pad_right=truncate_w, pad_top=False, pad_bottom=truncate_h
+    )
 
 
 def _box_wrap(
@@ -50,15 +49,23 @@ def _box_wrap(
     pad_bottom: bool = False,
 ) -> str:
     lines = mls.split("\n")
+    pad_char = "\u2592"
     if pad_left:
-        lines = [" " + ln for ln in lines]
+        lines = [pad_char + ln for ln in lines]
     if pad_right:
-        lines = [ln + " " for ln in lines]
+        lines = [ln + pad_char for ln in lines]
     if pad_top:
-        lines = " " * len(lines[0]) + lines
+        lines = [pad_char * len(lines[0])] + lines
     if pad_bottom:
-        lines = lines + " " * len(lines[-1])
-    
+        lines = lines + [pad_char * len(lines[-1])]
+    nchar = len(lines[0])
+    lines = ["\u2502" + ln + "\u2502" for ln in lines]
+    lines = (
+        ["\u256d" + "\u2500" * nchar + "\u256e"]
+        + lines
+        + ["\u2570" + "\u2500" * nchar + "\u256f"]
+    )
+    return "\n".join(lines)
 
 
 def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
