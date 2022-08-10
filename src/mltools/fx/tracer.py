@@ -125,7 +125,6 @@ class QuantTracer(fx.Tracer):
         name: Optional[str] = None,
         type_expr: Optional[Any] = None,
     ) -> Node:
-        print("create_node called",target)
         node = super().create_node(kind, target, args, kwargs, name, type_expr)
         self.node_name_to_scope[node.name] = (
             self.scope.module_path,
