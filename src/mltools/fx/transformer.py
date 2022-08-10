@@ -16,7 +16,6 @@ class InputOutputTransformer(fx.Transformer):
     def __init__(self,module:fx.GraphModule,scopeDict:dict = None,cfg = None):
         super().__init__(module)
         self.scopeDict = scopeDict
-        print(self.scopeDict)
         self.config=None
         if cfg:
             self.config = CorsairConfig().from_yaml(cfg)
