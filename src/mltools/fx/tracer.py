@@ -9,6 +9,15 @@ from .. import sparse
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from torch.fx._compatibility import compatibility
+from torch._C import ScriptObject
+from types import CodeType, FunctionType, ModuleType
+from typing import Any, Dict, NamedTuple, Optional, Set, Tuple, Type, List, Callable, Union
+import functools
+from torch.fx._symbolic_trace import _autowrap_check,Graph,_CPatchManager,_Patcher,_patch_wrapped_functions
+
+_orig_module_call : Callable = torch.nn.Module.__call__
+_orig_module_getattr : Callable = torch.nn.Module.__getattr__
 
 # Referenced from https://pytorch.org/docs/stable/_modules/torch/ao/quantization/quantize_fx.html#convert_fx
 class Scope(object):
@@ -77,6 +86,7 @@ class QuantTracer(fx.Tracer):
         self.record_stack_traces = True
 
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
+        
         is_leaf = isinstance(
             m,
             (
@@ -104,7 +114,7 @@ class QuantTracer(fx.Tracer):
             logger = logging.getLogger(__name__)
             logger.info("path:",self.scope.module_path)
             logger.info("type:",self.scope.module_type)
-            return super().call_module(m, forward, args, kwargs)
+            return super().call_module(m,forward,args,kwargs)
 
     def create_node(
         self,
@@ -121,3 +131,98 @@ class QuantTracer(fx.Tracer):
             self.scope.module_type,
         )
         return node
+    
+    def create_arg(self, a: Any) -> 'Argument':
+        return super().create_arg(a)
+    
+    def create_args_for_root(self, root_fn, is_module, concrete_args=None):
+        return super().create_args_for_root(root_fn, is_module, concrete_args)
+
+    @compatibility(is_backward_compatible=True)
+    def trace(self, root: Union[torch.nn.Module, Callable[..., Any]], concrete_args: Optional[Dict[str, Any]] = None) -> Graph:
+        """
+        Trace ``root`` and return the corresponding FX ``Graph`` representation. ``root``
+        can either be an ``nn.Module`` instance or a Python callable.
+
+        Note that after this call, ``self.root`` may be different from the ``root`` passed
+        in here. For example, when a free function is passed to ``trace()``, we will
+        create an ``nn.Module`` instance to use as the root and add embedded constants
+        to.
+
+
+        Args:
+
+            root (Union[Module, Callable]): Either a ``Module`` or a function to be
+                traced through. Backwards-compatibility for this parameter is
+                guaranteed.
+            concrete_args (Optional[Dict[str, any]]): Concrete arguments that should
+                not be treated as Proxies. This parameter is experimental and
+                its backwards-compatibility is *NOT* guaranteed.
+
+        Returns:
+
+            A ``Graph`` representing the semantics of the passed-in ``root``.
+        """
+        if isinstance(root, torch.nn.Module):
+            self.root = root
+            fn = type(root).forward
+            self.submodule_paths = {mod: name for name, mod in root.named_modules()}
+        else:
+            self.root = torch.nn.Module()
+            fn = root
+
+        tracer_cls: Optional[Type['fx.Tracer']] = getattr(self, '__class__', None)
+        self.graph = Graph(tracer_cls=tracer_cls)
+
+        # When we encounter a Tensor value that's not a parameter, we look if it
+        # is some other attribute on the model. Construct a dict mapping Tensor
+        # values to the qualified name here for efficiency. This is used downstream
+        # in create_arg
+        self.tensor_attrs : Dict[Union[torch.Tensor, ScriptObject], str] = {}
+
+        def collect_tensor_attrs(m : torch.nn.Module, prefix_atoms : List[str]):
+            for k, v in m.__dict__.items():
+                if isinstance(v, (torch.Tensor, ScriptObject)):
+                    self.tensor_attrs[v] = '.'.join(prefix_atoms + [k])
+            for k, v in m.named_children():
+                collect_tensor_attrs(v, prefix_atoms + [k])
+
+        collect_tensor_attrs(self.root, [])
+        assert isinstance(fn, FunctionType)
+
+        fn_globals = fn.__globals__  # run before it gets patched
+        fn, args = self.create_args_for_root(fn, isinstance(root, torch.nn.Module), concrete_args)
+
+        parameter_proxy_cache : Dict[str, Proxy] = {}  # Reduce number of get_attr calls
+
+        # Method dispatch on parameters is not recorded unless it's directly used.
+        # Thus, we need to insert a proxy when __getattr__ requests a parameter.
+        @functools.wraps(_orig_module_getattr)
+        def module_getattr_wrapper(mod, attr):
+            attr_val = _orig_module_getattr(mod, attr)
+            return self._module_getattr(attr, attr_val, parameter_proxy_cache)
+
+        @functools.wraps(_orig_module_call)
+        def module_call_wrapper(mod, *args, **kwargs):
+            def forward(*args, **kwargs):
+                return _orig_module_call(mod, *args, **kwargs)
+
+            _autowrap_check(patcher, getattr(getattr(mod, "forward", mod), "__globals__", {}),
+                            self._autowrap_function_ids)
+            return self.call_module(mod, forward, args, kwargs)
+
+        with _CPatchManager(self):
+            with _Patcher() as patcher:
+                # allow duplicate patches to support the case of nested calls
+                patcher.patch_method(torch.nn.Module, "__getattr__", module_getattr_wrapper, deduplicate=False)
+                patcher.patch_method(torch.nn.Module, "__call__", module_call_wrapper, deduplicate=False)
+                _patch_wrapped_functions(patcher)
+                _autowrap_check(patcher, fn_globals, self._autowrap_function_ids)
+                for module in self._autowrap_search:
+                    _autowrap_check(patcher, module.__dict__, self._autowrap_function_ids)
+                self.create_node('output', 'output', (self.create_arg(fn(*args)),), {},
+                                 type_expr=fn.__annotations__.get('return', None))
+
+        self.submodule_paths = None
+
+        return self.graph

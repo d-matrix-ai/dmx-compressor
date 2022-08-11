@@ -18,8 +18,6 @@ from sol.src.sol_sim import *
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 from ..numerical import CastTo
-from torch.fx import GraphModule
-import warnings
 
 
 def aware():
