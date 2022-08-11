@@ -279,7 +279,7 @@ class Sparsify(nn.Module):
 class Sparsifier:
     r"""
     This is a sparsification management class
-    Similar to Optimizer that manages parameters through optimizer.step(),
+    Similar to Scheduler that manages parameter optimization through scheduler.step(),
     one can call Sparsifier.step() to update underlying score.
     """
 
