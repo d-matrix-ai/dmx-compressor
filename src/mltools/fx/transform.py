@@ -4,7 +4,6 @@ from ..numerical import CastTo
 from ..fx import QuantTracer, InputOutputTransformer
 from torch.fx import GraphModule
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-import warnings
 
 def cast_input_output_transform(
     root: torch.nn.Module,
@@ -27,18 +26,6 @@ def cast_input_output_transform(
         root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
     )
     gm = GraphModule(tracer.root, graph, name)
-    
-    cast_module_names = ["input_cast", "output_cast", "weight_cast"]
-    cast_module_functions = [input_fn, output_fn, weight_fn]
-    if approximate_fn:
-        cast_module_names.append("approximator")
-        cast_module_functions.append(approximate_fn)
-
-    for mn, mf in zip(cast_module_names, cast_module_functions):
-        add_successful = gm.add_submodule(mn, mf)
-        if not add_successful:
-            warnings.warn("Error adding modue {}".format(mn), Warning)
     transformer = InputOutputTransformer(gm,tracer.node_name_to_scope,cfg)
     transformed = transformer.transform()
-
     return transformed

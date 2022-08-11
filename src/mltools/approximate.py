@@ -12,6 +12,7 @@ __ALL__ = [
     "GELUApproximation",
     "LayerNormApproximation",
     "Approximate",
+    "Approximator"
 ]
 
 
@@ -66,6 +67,32 @@ class NoApproximation(ApproximationFunction):
 
     def __repr__(self) -> str:
         return f"NONE"
+
+class Identity(ApproximationFunction):
+    r"""
+    This is a identity function that does no approximation and just returns the original value
+    """
+
+    def __init__(self,algorithm="identity"):
+        super().__init__()
+        self.algorithm = algorithm
+
+    def execute(self, *args, **kwargs):
+        return args
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse("Identity({algorithm:w})", sh)
+        return cls(
+            algorithm=conf["algorithm"],
+        )
+
+    def __str__(self) -> str:
+        return f"Identity: return itself"
+
+    def __repr__(self) -> str:
+        return f"Identity"
+
 
 
 class SoftmaxApproximation(ApproximationFunction):
@@ -226,6 +253,37 @@ class Approximate(nn.Module):
 
     def extra_repr(self):
         return f"function = {self.function.__repr__()}"
+
+class Approximator(nn.Module):
+    r"""
+    A nn.Module subclass that mimics the behavior of ApproximationMixin
+    """
+    def __init__(self, function=Identity()):
+        super().__init__()
+        if not isinstance(function, ApproximationFunction):
+            function = ApproximationFunction.from_shorthand(function)
+        self.function = function
+
+    def forward(self, input):
+        _output = self.function.execute(input)[0]
+        if not isinstance(
+            self.function,
+            (
+                NoApproximation,
+                LowRankWeight,
+            ),
+        ):
+            with torch.no_grad():
+                self.approximation_error = _output-input
+        return _output
+
+    def extra_repr(self):
+        return f"function = {self.function.__repr__()}"
+    
+    def approximation_function(self):
+        return repr(self.function)
+
+
 
 
 class ApproximationMixin:

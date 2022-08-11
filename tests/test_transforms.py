@@ -29,7 +29,7 @@ def checkTransform(gm: nn.Module) -> bool:
         nodeList.append(i)
     for i in nodeList:
         if i.op == "placeholder":
-            if not "input_cast" in i.next.target:
+            if not i.target+"_cast" in i.next.target:
                 return False
         elif i.op == "output":
             if not "output_cast" in i.prev.target:
@@ -47,13 +47,13 @@ def checkTransform(gm: nn.Module) -> bool:
                 return False
     return True
 
+
 def test_corsair_transform():
     net = Net()
     cnet = CorsairNet()
     gm_before = fx.symbolic_trace(net)
     assert not checkTransform(gm_before), True
     gm = cast_input_output_transform(net)
-    print(gm.code)
     input = torch.rand(1, 64)
 
     # Initialize bias and weight
@@ -68,10 +68,11 @@ def test_corsair_transform():
     assert (coutput - output).abs().sum() == 0, True
     assert checkTransform(gm), True
 
+    
 def test_conv1D():
     net = Conv1D(32,32)
     gm = cast_input_output_transform(net)
-    
+ 
 
 # def test_gpt2_attention():
 #     import ipdb
@@ -81,10 +82,12 @@ def test_conv1D():
 #     ipdb.set_trace()
 #     assert checkTransform(gm),True
 
+
 def test_corsiar_transform_sparsify_approximate():
     net = Net()
     gm = cast_input_output_transform(net,approximate_fn=Approximate(),)
     assert checkTransform(gm), True
+
 
 @pytest.mark.skip()
 def test_double_transform():
@@ -92,6 +95,7 @@ def test_double_transform():
     with pytest.raises(Warning):
         gm = cast_input_output_transform(net)
         gm2t = cast_input_output_transform(gm)
+
 
 class downcast(nn.Module):
     def __init__(self, format="SAME", dump_to=None):
@@ -135,6 +139,7 @@ def test_lenet_1hid_corsair_transform_without_cfg(layers):
     gm = cast_input_output_transform(net)
     assert checkTransform(gm), True
 
+
 @pytest.mark.parametrize(
     "layers",
     (
@@ -145,6 +150,7 @@ def test_lenet_1hid_corsair_transform_with_test_cfg(layers):
     net = LeNet(layers)
     gm = cast_input_output_transform(net,cfg="configs/lenet_test.yaml")
     assert checkTransform(gm), True
+
 
 @pytest.mark.parametrize(
     "layers",
