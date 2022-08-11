@@ -53,10 +53,10 @@ format = SimpleNamespace(
 
 # Sparseness aliases
 sparseness = SimpleNamespace(
-    BTK8_4_LD=Sparseness.from_shorthand("BTOPK{4:8,-1}"),
-    BTK8_4_FD=Sparseness.from_shorthand("BTOPK{4:8,1}"),
-    BTK8_2_LD=Sparseness.from_shorthand("BTOPK{2:8,-1}"),
-    BTK8_2_FD=Sparseness.from_shorthand("BTOPK{2:8,1}"),
+    BTK8_4_LD=Sparseness.from_shorthand("BTOPK{4:8,-1}(U)"),
+    BTK8_4_FD=Sparseness.from_shorthand("BTOPK{4:8,1}(U)"),
+    BTK8_2_LD=Sparseness.from_shorthand("BTOPK{2:8,-1}(U)"),
+    BTK8_2_FD=Sparseness.from_shorthand("BTOPK{2:8,1}(U)"),
 )
 
 # Default approximation function aliases
