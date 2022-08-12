@@ -18,7 +18,6 @@ from mltools.numerical import (
 )
 from mltools.sparse import (
     Sparseness,
-    Sparsifier,
     WeightSparseMixin,
     Dense,
     TopK,
@@ -57,7 +56,7 @@ class Cast(torch.nn.Module):
     @format.setter
     def format(self, fmt):
         self.cast.set_format(fmt)
-  
+
     def _transform(self, config):
         self.cast.format = Format.from_shorthand(config["format"])
 
@@ -92,12 +91,7 @@ class CorsairModule(
             self.bias_cast.format = Format.from_shorthand(config["bias_format"])
         # sparsity transformation
         if self.weight_sparsifier is not None and "weight_sparseness" in config:
-            self.weight_sparsifier.sparseness = Sparseness.from_shorthand(
-                config["weight_sparseness"]
-            )
-            ### TODO: need to figure out a better way of handling score setting
-            self.weight_sparsifier.set_score(torch.abs(self.weight))
-            ###
+            self.weight_sparsifier.configure(sparseness=config["weight_sparseness"])
         # custom logic transformation
         if "approximation_function" in config:
             self.approximator.function = ApproximationFunction.from_shorthand(

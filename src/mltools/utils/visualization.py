@@ -4,12 +4,17 @@ import pptree
 import mltools
 
 
-def mask2braille(m, dims=(0, 1)):
+def mask2braille(m, dims=(0, 1), max_elems=None):
     # permute dimensions
     ds = list(range(m.dim()))
     ds[0], ds[dims[0]] = dims[0], ds[0]
     ds[1], ds[dims[1]] = dims[1], ds[1]
     m = m.permute(*ds)
+    truncate_h = truncate_w = False
+    if max_elems is not None:
+        truncate_h = max_elems < m.size(0)
+        truncate_w = max_elems < m.size(1)
+        m = m[:max_elems, :max_elems, ...]
     # reduce mask
     _h, _w = m.size(0), m.size(1)
     # m = m.reshape(_h, _w, -1).sum(-1) > 0
@@ -31,7 +36,36 @@ def mask2braille(m, dims=(0, 1)):
         + 10240
     )
     x = "\n".join(["".join([chr(_x) for _x in row]) for row in x])
-    return x
+    return _box_wrap(
+        x, pad_left=False, pad_right=truncate_w, pad_top=False, pad_bottom=truncate_h
+    )
+
+
+def _box_wrap(
+    mls: str,
+    pad_left: bool = False,
+    pad_right: bool = False,
+    pad_top: bool = False,
+    pad_bottom: bool = False,
+) -> str:
+    lines = mls.split("\n")
+    pad_char = "\u2592"
+    if pad_left:
+        lines = [pad_char + ln for ln in lines]
+    if pad_right:
+        lines = [ln + pad_char for ln in lines]
+    if pad_top:
+        lines = [pad_char * len(lines[0])] + lines
+    if pad_bottom:
+        lines = lines + [pad_char * len(lines[-1])]
+    nchar = len(lines[0])
+    lines = ["\u2502" + ln + "\u2502" for ln in lines]
+    lines = (
+        ["\u256d" + "\u2500" * nchar + "\u256e"]
+        + lines
+        + ["\u2570" + "\u2500" * nchar + "\u256f"]
+    )
+    return "\n".join(lines)
 
 
 def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
