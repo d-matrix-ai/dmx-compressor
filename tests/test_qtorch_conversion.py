@@ -16,6 +16,11 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 ("FP16", "BFP12_128", 'row'),
                 ("BFP24_64", "FP16", None),
                 
+                ("CFP[1|5|2|15](N)", "FP32", None),
+                ("CFP[1|5|2|20](N)", "FP32", None),
+                ("CFP[1|4|3|7](N)", "FP32", None),
+                ("CFP[1|4|3|10](N)", "FP32", None),
+
                 pytest.param("FP16", "BFP24_64", None, marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
                 pytest.param("BFP32_1", "FP16", None, marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
                 pytest.param("FP16", "BFP16_64", 'row', marks=pytest.mark.xfail(reason='qtorch bug, issue 171')),
@@ -40,13 +45,15 @@ def test_conversion(from_format,to_format,dimension):
     
     if to_format == 'FP16': 
         shorthand = 'FP[1|5|10]{15}(N)'
-    
+
+    elif to_format == 'FP32':
+        shorthand = 'FP[1|8|23]{127}(N)'
+            
     elif to_format.startswith('BFP'):
         nbits = int(to_format.split('_')[0][3:]) # number of bits
         block_size, mantissa = int(to_format.split('_')[1]), nbits - 8
         dim_arg = 1 if dimension == 'row' else '0' 
         shorthand = f'BFP[{mantissa}|8]' + '{'+f'{block_size},{dim_arg}'+'}' + '(N)'
-    
     qtorch_y = corsair.CastTo(shorthand)(x)
     mismatch = ((qtorch_y - y)!=0) # mismatch is a boolean arrary of the same size as that of x and y
     
