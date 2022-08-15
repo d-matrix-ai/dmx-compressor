@@ -228,6 +228,7 @@ class Sparsify(nn.Module):
         self.score = nn.Parameter(torch.rand(tensor_shape), requires_grad=True)
         self.mask = torch.ones(tensor_shape)
         self.configure(sparseness, backward_mode, score_func)
+        self.update_mask(self.score)
         self.plastic = False
 
     def configure(self, sparseness=None, backward_mode=None, score_func=None):
