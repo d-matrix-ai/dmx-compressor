@@ -25,7 +25,6 @@ class InputOutputTransformer(fx.Transformer):
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Proxy:
         assert isinstance(target, str)
- 
         placeholder_node = self.new_graph.placeholder(target)
         # Default input cast
         layer = self.scopeDict[placeholder_node.name][0]
@@ -34,7 +33,7 @@ class InputOutputTransformer(fx.Transformer):
         # Find input_cast format in cfg if exists
         if self.config:
             layer_key = layer.split('__')[-1]
-            if layer_key:
+            if layer_key and layer_key in self.config:
                 cast_format = self.config[layer_key]['input_format']
                 
         self.module.add_submodule(cast_name,CastTo(format=cast_format))
@@ -54,7 +53,7 @@ class InputOutputTransformer(fx.Transformer):
         # Find output_cast format in cfg if exists
         if self.config:
             layer_key = layer.split('__')[-1]
-            if layer_key:
+            if layer_key and layer_key in self.config:
                 cast_format = self.config[layer_key]['output_format']
                 
         self.module.add_submodule(cast_name,CastTo(format=cast_format))
@@ -81,7 +80,7 @@ class InputOutputTransformer(fx.Transformer):
         layer_key = layer.split('__')[-1]
         # Find casting and sparsifier format in config if exists
         if self.config:
-            if layer_key:
+            if layer_key and layer_key in self.config:
                 if "weight" in target:
                     cast_format = self.config[layer_key]['weight_format']
                     #Add sparsifier
@@ -96,7 +95,10 @@ class InputOutputTransformer(fx.Transformer):
         if "weight" in target:
             # Sparsifier submodules needed to be added separately even for default as tensor size 
             # is not the same for every layer
-            tensor_size = self.module.get_submodule(layer.split('__')[-1]).weight.size()
+            if layer.split('__')[-1]=='model':
+                tensor_size = self.module.weight.size()
+            else:
+                tensor_size = self.module.get_submodule(layer.split('__')[-1]).weight.size()
             self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness=sparsify_format))
             self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness="DENSE"))
             prev_node = self.new_graph.create_node(
@@ -138,7 +140,19 @@ class InputOutputTransformer(fx.Transformer):
         call_fnc_node_approx = self.new_graph.create_node(
             "call_module", approx_name, args=(call_fnc_node,)
         )
-        return Proxy(call_fnc_node_approx, self.tracer)
+        result_node = call_fnc_node_approx
+        layer = self.scopeDict[call_fnc_node.name][0]
+        if self.config:
+            cast_name = call_fnc_node.name+"_cast"
+            layer_key = layer.split('__')[-1]
+            if layer_key and layer_key in self.config and self.config[layer_key]["instance"].lower() in call_fnc_node.name.lower():
+                cast_format = self.config[layer_key]['output_format']
+                self.module.add_submodule(cast_name,CastTo(format=cast_format))
+                result_node = self.new_graph.create_node(
+                    "call_module", cast_name, args=(call_fnc_node_approx,)
+                )
+        
+        return Proxy(result_node, self.tracer)
 
 
         
