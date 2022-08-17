@@ -12,7 +12,7 @@ __ALL__ = [
     "TopK",
     "BlockTopK",
     "Sparsify",
-    "Sparsifier",
+    "SparsificationManager",
 ]
 
 
@@ -228,6 +228,7 @@ class Sparsify(nn.Module):
         self.score = nn.Parameter(torch.rand(tensor_shape), requires_grad=True)
         self.mask = torch.ones(tensor_shape)
         self.configure(sparseness, backward_mode, score_func)
+        self.update_mask(self.score)
         self.plastic = False
 
     def configure(self, sparseness=None, backward_mode=None, score_func=None):
@@ -276,11 +277,11 @@ class Sparsify(nn.Module):
         return f"sparseness = {self.sparseness.__repr__()}, backward_mode = {self.backward_mode}, mask = \n{self.mask_str(dims=(self.mask.ndim-2, self.mask.ndim-1), max_elems=32)}"
 
 
-class Sparsifier:
+class SparsificationManager:
     r"""
     This is a sparsification management class
     Similar to Scheduler that manages parameter optimization through scheduler.step(),
-    one can call Sparsifier.step() to update underlying score.
+    one can call sparsification_manager.step() to update underlying score.
     """
 
     def __init__(
