@@ -81,7 +81,7 @@ class QuantTracer(fx.Tracer):
     """
     def __init__(self) -> None:
         super().__init__()
-        self.scope = Scope("", None)
+        self.scope = Scope("model", None)
         self.node_name_to_scope: Dict[str, Tuple[str, type]] = {}
         self.record_stack_traces = True
 
