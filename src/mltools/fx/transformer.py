@@ -83,12 +83,14 @@ class InputOutputTransformer(fx.Transformer):
         if self.config:
             if layer_key and layer_key in self.config:
                 if "weight" in target:
-                    cast_format = self.config[layer_key]['weight_format']
-                    #Add sparsifier
-                    sparsify_format = self.config[layer_key]['weight_sparseness']
-                               
+                    if "weight_format" in self.config[layer_key]:
+                        cast_format = self.config[layer_key]['weight_format']
+                    if "weight_sparseness" in self.config[layer_key]:
+                        #Add sparsifier
+                        sparsify_format = self.config[layer_key]['weight_sparseness']               
                 else:
-                    cast_format = self.config[layer_key]['bias_format']
+                    if "bias_format" in self.config[layer_key]:
+                        cast_format = self.config[layer_key]['bias_format']
 
         self.module.add_submodule(cast_name,CastTo(format=cast_format))
 
