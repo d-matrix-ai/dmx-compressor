@@ -80,3 +80,4 @@ counterpart = {
     torch.nn.ReLU6: nn.ReLU6,
     torch.nn.Tanh: nn.Tanh,
 }
+
