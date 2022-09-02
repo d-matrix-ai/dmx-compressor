@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Function
-from .qtorch.quant import fixed_point_quantize, block_quantize, float_quantize
+from .quant import fixed_point_quantize, block_quantize, float_quantize
 
 
 __ALL__ = [
