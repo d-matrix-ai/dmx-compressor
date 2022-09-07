@@ -74,15 +74,6 @@ def test_conv1D():
     gm = cast_input_output_transform(net)
  
 
-# def test_gpt2_attention():
-#     import ipdb
-#     ipdb.set_trace()
-#     net = GPT2Model(GPT2Config())
-#     gm = cast_input_output_transform(net)
-#     ipdb.set_trace()
-#     assert checkTransform(gm),True
-
-
 def test_corsiar_transform_sparsify_approximate():
     net = Net()
     gm = cast_input_output_transform(net,approximate_fn=Approximate(),)

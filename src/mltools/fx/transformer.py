@@ -61,14 +61,15 @@ class InputOutputTransformer(fx.Transformer):
         output_node_cast = self.new_graph.create_node(
             "call_module", cast_name, args=(output_node.prev,)
         )
-       
+        output_node.args = (output_node_cast,)
         self.new_graph.erase_node(output_node)
         return Proxy(output_node_cast, self.tracer)
 
     def get_attr(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Proxy:
-        get_attr_node = self.new_graph.get_attr(target)    
+        assert isinstance(target, str)
+        get_attr_node = self.new_graph.get_attr(target)   
         prev_node = get_attr_node
         # Default cast
         layer = self.scopeDict[get_attr_node.name][0]
@@ -151,8 +152,151 @@ class InputOutputTransformer(fx.Transformer):
                 result_node = self.new_graph.create_node(
                     "call_module", cast_name, args=(call_fnc_node_approx,)
                 )
-        
         return Proxy(result_node, self.tracer)
-
+    
+    def call_method(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        assert isinstance(target, str)
+        call_method_node = self.new_graph.call_method(target)
+        # Observed that inputs to the functions will be wrapped in proxies, parameters of 
+        # functions is not wrapped in proxies. We need to do a unwrap for proxies before passing to new node. 
+        new_kwargs=dict()
+        for k in kwargs.keys():
+            if isinstance(kwargs[k],Proxy):
+                new_kwargs[k] = kwargs[k].node
+            else:
+                new_kwargs[k] = kwargs[k]
+        new_args = ()
+        for arg in args:
+            if isinstance(arg,Proxy):
+                new_args+=(arg.node,)
+            else:
+                new_args+=(arg,)
+        call_method_node.args = new_args
+        call_method_node.kwargs = new_kwargs
 
         
+        # cast_name = target+"_cast"
+        # cast_format = "SAME"
+        # # Not so sure about this part as no cfgs seen for call_method yet
+        # # if self.config:
+        # #     layer = self.scopeDict[call_method_node.name][0]
+        # #     layer_key = layer.split('__')[-1]
+        # #     if layer_key and layer_key in self.config:
+        # #         cast_format = self.config[layer_key]['output_format']
+        # self.module.add_submodule(cast_name,CastTo(format=cast_format))
+        # call_method_cast_node = self.new_graph.create_node(
+        #     "call_module", cast_name, args=(call_method_node,)
+        # )
+        # self.nodeDict[call_method_cast_node.target] = call_method_cast_node
+        return Proxy(call_method_node,self.tracer)
+
+
+class NodeDictTransformer(fx.Transformer):
+    def __init__(self,module:fx.GraphModule):
+        super().__init__(module)
+        self.module = module
+        # A dictionary to map node.target to node instance
+        self.nodeDict = dict()
+        self.nodeDict["function"] = list()
+        self.nodeDict["method"] = list()
+    
+    def placeholder(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Proxy:
+        assert isinstance(target, str)
+        placeholder_node = self.new_graph.placeholder(target)
+        self.nodeDict[placeholder_node.target] = placeholder_node
+        return Proxy(placeholder_node, self.tracer)
+    
+    def output(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Any:
+        assert isinstance(target, str)
+        output_node = self.new_graph.output(target)
+        output_node.args = (output_node.prev,)
+        self.nodeDict[output_node.target] = output_node
+        return Proxy(output_node, self.tracer)
+    
+    def get_attr(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Proxy:
+        assert isinstance(target, str)
+        get_attr_node = self.new_graph.get_attr(target)   
+        self.nodeDict[get_attr_node.target] = get_attr_node  
+        return Proxy(get_attr_node, self.tracer)
+    
+    def call_function(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        assert callable(target)
+        call_fnc_node = self.new_graph.call_function(target)
+        new_kwargs=dict()
+        for k in kwargs.keys():
+            if isinstance(kwargs[k],Proxy):
+                new_kwargs[k] = kwargs[k].node
+            else:
+                new_kwargs[k] = kwargs[k]
+        new_args = ()
+        for arg in args:
+            if isinstance(arg,Proxy):
+                new_args+=(arg.node,)
+            else:
+                new_args+=(arg,)
+        call_fnc_node.args = new_args
+        call_fnc_node.kwargs = new_kwargs
+        self.nodeDict["function"].append(call_fnc_node)
+        return Proxy(call_fnc_node, self.tracer)
+    
+    def call_method(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        assert isinstance(target, str)
+        call_method_node = self.new_graph.call_method(target)
+        new_kwargs=dict()
+        for k in kwargs.keys():
+            if isinstance(kwargs[k],Proxy):
+                new_kwargs[k] = kwargs[k].node
+            else:
+                new_kwargs[k] = kwargs[k]
+        new_args = ()
+        for arg in args:
+            if isinstance(arg,Proxy):
+                new_args+=(arg.node,)
+            else:
+                new_args+=(arg,)
+        call_method_node.args = new_args
+        call_method_node.kwargs = new_kwargs
+        self.nodeDict["method"].append(call_method_node)
+        return Proxy(call_method_node,self.tracer)
+    
+    def call_module(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        assert isinstance(target, str)
+        call_module_node = self.new_graph.call_module(target)
+        new_kwargs=dict()
+        for k in kwargs.keys():
+            if isinstance(kwargs[k],Proxy):
+                new_kwargs[k] = kwargs[k].node
+            else:
+                new_kwargs[k] = kwargs[k]
+        new_args = ()
+        for arg in args:
+            if isinstance(arg,Proxy):
+                new_args+=(arg.node,)
+            else:
+                new_args+=(arg,)
+        call_module_node.args = new_args
+        call_module_node.kwargs = new_kwargs
+        self.nodeDict[target] = call_module_node
+        return Proxy(call_module_node,self.tracer)
+    
+    def transform(self) -> dict:
+        result = super().run()
+        if result is not None:
+            def strip_proxy(a : Union[Argument, Proxy]) -> Any:
+                return a.node if isinstance(a, Proxy) else a
+            self.new_graph.output(map_aggregate(result, strip_proxy))
+        return self.nodeDict
+
+
+    
+
+    
+
+
+
