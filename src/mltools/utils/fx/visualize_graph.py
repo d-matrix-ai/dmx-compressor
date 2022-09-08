@@ -65,8 +65,7 @@ class GraphvizInterpreter(fx.Interpreter):
     # Main Node running APIs
     def placeholder(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
         # Green edge, target could be name
-        n_name = self.nodeDict[target].name
-        self.edges[n_name] = ([str(id("start")),"input: "],{"fillcolor":"green","arrowsize":"2"})
+        self.input_name = self.nodeDict[target].name
         return super().placeholder(target,args,kwargs)
 
     def get_attr(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
@@ -87,8 +86,12 @@ class GraphvizInterpreter(fx.Interpreter):
         self.edges[target_name] = ([str(id(target_name)),""],{"arrowhead":"open"})
         for i, argNode in enumerate(call_func_node.args):
             if isinstance(argNode,Node):
+                # argNode is input
+                if argNode.name == self.input_name:
+                    self.edges[self.input_name+target_name] = ([str(id("start")),str(id(target_name)),"input: "],{"fillcolor":"green","arrowsize":"2"})
+                    name = argNode.name+target_name
                 # argNode is input to multiple nodes
-                if len(self.edges[argNode.name][0])>2:
+                elif len(self.edges[argNode.name][0])>2:
                     self.edges[argNode.name+target_name] = ([str(id(argNode.name)),str(id(target_name)),""],{"arrowhead":"open"})
                     name = argNode.name+target_name
                 else:
@@ -124,8 +127,12 @@ class GraphvizInterpreter(fx.Interpreter):
         self.edges[target_name] = ([str(id(target_name)),""],{"arrowhead":"open"})
         for i,argNode in enumerate(call_method_node.args):
             if isinstance(argNode,Node):
+                # argNode is input
+                if argNode.name == self.input_name:
+                    self.edges[self.input_name+target_name] = ([str(id("start")),str(id(target_name)),"input: "],{"fillcolor":"green","arrowsize":"2"})
+                    name = argNode.name+target_name
                 # argNode is input to multiple nodes
-                if len(self.edges[argNode.name][0])>2:
+                elif len(self.edges[argNode.name][0])>2:
                     self.edges[argNode.name+target_name] = ([str(id(argNode.name)),str(id(target_name)),""],{"arrowhead":"open"})
                     name = argNode.name+target_name
                 else:
@@ -172,10 +179,36 @@ class GraphvizInterpreter(fx.Interpreter):
         
         self.nodes.append(([(str(id(call_module_node.name))),call_module_node.name+format],{"fillcolor":color,"shape":"circle"}))
         self.edges[call_module_node.name] = ([str(id(call_module_node.name)),""],{"arrowhead":"open"})
-        for argNode in call_module_node.args:
-            self.edges[str(argNode.name)][0].insert(1,str(id(call_module_node.name)))
-            if argNode.name in self.sizes:
-                    self.edges[argNode.name][0][-1]+=str(self.sizes[argNode.name])
+        for i, argNode in enumerate(call_module_node.args):
+            if isinstance(argNode,Node):
+                # argNode is input
+                if argNode.name == self.input_name:
+                    self.edges[self.input_name+target_name] = ([str(id("start")),str(id(target_name)),"input: "],{"fillcolor":"green","arrowsize":"2"})
+                    name = argNode.name+target_name
+                # argNode is input to multiple nodes
+                elif len(self.edges[argNode.name][0])>2:
+                    self.edges[argNode.name+target_name] = ([str(id(argNode.name)),str(id(target_name)),""],{"arrowhead":"open"})
+                    name = argNode.name+target_name
+                else:
+                    self.edges[argNode.name][0].insert(1,str(id(target_name)))
+                    name = argNode.name
+                if argNode.name in self.sizes:
+                    self.edges[name][0][-1]+=str(self.sizes[argNode.name])
+            else:
+                nodeName = repr(argNode)+target_name
+                self.nodes.append(([str(id(nodeName))+str(i),repr(argNode)],{"fillcolor":"#D9E3DA","shape":"oval"}))
+                self.edges[nodeName+str(i)] = ([str(id(nodeName))+str(i),str(id(target_name)),""],{"arrowhead":"open"})
+        for kwargNode in call_module_node.kwargs.values():
+            if isinstance(kwargNode,Node):
+                # kwargNode is input to multiple nodes
+                if len(self.edges[kwargNode.name][0])>2:
+                    self.edges[kwargNode.name+target_name] = ([str(id(kwargNode.name)),str(id(target_name)),""],{"arrowhead":"open"})
+                    name = kwargNode.name+target_name
+                else:
+                    self.edges[kwargNode.name][0].insert(1,str(id(target_name)))
+                    name = kwargNode.name
+                if kwargNode.name in self.sizes:
+                    self.edges[name][0][-1]+=str(self.sizes[kwargNode.name])
         return super().call_module(target,args,kwargs)
 
     def output(self, target : 'Target', args : Tuple[Argument, ...], kwargs : Dict[str, Any]) -> Any:
@@ -190,6 +223,7 @@ class GraphvizInterpreter(fx.Interpreter):
         for nargs,nkwargs in self.nodes:
             self.pygraph.node(*nargs,**nkwargs)
         for eargs,ekwargs in self.edges.values():
-            self.pygraph.edge(*eargs,**ekwargs)
+            if len(eargs)==3:
+                self.pygraph.edge(*eargs,**ekwargs)
         return super().output(target,args,kwargs)
 
