@@ -176,7 +176,7 @@ class GraphvizInterpreter(fx.Interpreter):
         else:
             color = "#D5D6EA"
         call_module_node = self.nodeDict[target]
-        
+        target_name = call_module_node.name
         self.nodes.append(([(str(id(call_module_node.name))),call_module_node.name+format],{"fillcolor":color,"shape":"circle"}))
         self.edges[call_module_node.name] = ([str(id(call_module_node.name)),""],{"arrowhead":"open"})
         for i, argNode in enumerate(call_module_node.args):
