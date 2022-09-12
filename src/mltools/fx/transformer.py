@@ -368,7 +368,7 @@ class ConfigurationTransformer(fx.Transformer):
         Transform ``self.module`` and return the transformed
         ``GraphModule``.
         """
-        result = super().run(enable_io_processing=False)
+        result = super().run()
         if result is not None:
             def strip_proxy(a : Union[Argument, Proxy]) -> Any:
                 return a.node if isinstance(a, Proxy) else a
