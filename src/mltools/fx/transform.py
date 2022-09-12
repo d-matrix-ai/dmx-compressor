@@ -31,6 +31,7 @@ def cast_input_output_transform(
     gm = GraphModule(tracer.root, graph, name)
     transformer = InputOutputTransformer(gm,tracer.node_name_to_scope,cfg)
     transformed = transformer.transform()
+    transformed.scopeDict = transformer.scopeDict
     return transformed
 
 def configure_transform(gm:torch.fx.GraphModule,scopeDict: dict, cfg:str):
