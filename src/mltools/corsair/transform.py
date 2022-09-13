@@ -37,7 +37,6 @@ def aware():
     torch.nn.ReLU6 = ReLU6
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
-    # pass
 
 
 class Model(torch.nn.Module):

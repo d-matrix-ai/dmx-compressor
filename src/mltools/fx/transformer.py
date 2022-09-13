@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
-from webbrowser import get
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
-from mltools.corsair.nn import Cast
 from mltools.numerical import CastTo
-from mltools.utils import load_config_file
 from mltools.sparse import Sparsify, Sparseness
 from mltools.approximate import Approximator
 from mltools.corsair import CorsairConfig
