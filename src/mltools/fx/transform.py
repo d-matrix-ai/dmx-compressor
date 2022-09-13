@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 def cast_input_output_transform(
     root: torch.nn.Module,
-    tracer: Union[QuantTracer,HFQuantTracer],
+    tracer: Union[QuantTracer,HFQuantTracer] = QuantTracer(),
     input_fn: nn.Module = CastTo(),
     output_fn: nn.Module = CastTo(),
     weight_fn: nn.Module = CastTo(),
