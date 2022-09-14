@@ -78,7 +78,7 @@ def test_conv1D():
 
 def test_corsiar_transform_sparsify_approximate():
     net = Net()
-    gm = cast_input_output_transform(net,QuantTracer(),approximate_fn=Approximate(),)
+    gm = cast_input_output_transform(net,QuantTracer())
     assert checkTransform(gm), True
 
 
@@ -116,7 +116,7 @@ class weightCast(nn.Module):
 
 def test_fakecast_transform():
     net = Net()
-    gm = cast_input_output_transform(net,QuantTracer(), downcast(), upcast(), weightCast())
+    gm = cast_input_output_transform(net,QuantTracer())
     assert checkTransform(gm), True
 
 
@@ -154,7 +154,7 @@ def test_lenet_1hid_corsair_transform_with_test_cfg(layers):
 )
 def test_lenet_fakecast_transform(layers):
     net = LeNet(layers)
-    gm = cast_input_output_transform(net,QuantTracer(), downcast(), upcast())
+    gm = cast_input_output_transform(net,QuantTracer())
     assert checkTransform(gm), True
 
 
@@ -170,7 +170,7 @@ def test_conv2D_fakecast_transform():
     cnet.bias.data = bias
     coutput = cnet(input)
 
-    gm = cast_input_output_transform(net,QuantTracer(), downcast(), upcast())
+    gm = cast_input_output_transform(net,QuantTracer())
     output = gm(input)
     assert (coutput - output).abs().sum() == 0, True
     assert checkTransform(gm), True
