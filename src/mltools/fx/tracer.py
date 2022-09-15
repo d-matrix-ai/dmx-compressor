@@ -79,7 +79,7 @@ class ScopeContextManager(object):
 
 class QuantTracer(fx.Tracer):
     """
-    Customed tracer with scope manager
+    Customed tracer with scope manager and returns a flat GraphModule
     """
     def __init__(self) -> None:
         super().__init__()
@@ -136,7 +136,7 @@ class QuantTracer(fx.Tracer):
 
 class HFQuantTracer(fx_hf.Tracer):
     """
-    Customed tracer with scope manager
+    Customed tracer with scope manager for HuggingFace
     """
     def __init__(self) -> None:
         super().__init__()

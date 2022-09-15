@@ -31,6 +31,11 @@ def cast_input_output_transform(
     return transformed
 
 def configure_transform(gm:torch.fx.GraphModule,scopeDict: dict, cfg:str):
+    """
+    A function that changes the format of the ops according to the cfg file
+    Note that configure_transform will only change existing ops and will not add any additional ops.
+    Hence it is recommened to pass in a cfg file for cast_input_output_transform to make sure all necessary ops are added.
+    """
     transformer = ConfigurationTransformer(gm,scopeDict,cfg)
     transformer.transform()
     return gm

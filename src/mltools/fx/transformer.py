@@ -12,6 +12,12 @@ from mltools.corsair import CorsairConfig
 
 
 class InputOutputTransformer(fx.Transformer):
+    """
+    A transformer that transforms the module by adding additional ops, which includes:
+    - casting
+    - approximator
+    - sparsifier
+    """
     def __init__(self,module:fx.GraphModule,scopeDict:dict = None,cfg = None):
         super().__init__(module)
         self.scopeDict = scopeDict
@@ -192,6 +198,9 @@ class InputOutputTransformer(fx.Transformer):
 
 
 class NodeDictTransformer(fx.Transformer):
+    """
+    A transformer that creates a dict contaning mapping between target of node and the node itself
+    """
     def __init__(self,module:fx.GraphModule):
         super().__init__(module)
         self.module = module
@@ -296,6 +305,9 @@ class NodeDictTransformer(fx.Transformer):
 
 
 class ConfigurationTransformer(fx.Transformer):
+    """
+    A transformer that changes the format of the ops according to the cfg file
+    """
     def __init__(self,module:fx.GraphModule,scopeDict:dict,cfg = None):
         super().__init__(module)
         self.config=None
