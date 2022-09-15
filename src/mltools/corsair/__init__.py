@@ -6,35 +6,6 @@ from ..approximate import Approximate, ApproximationFunction
 from ..dmir import discard_values
 from .transform import Model, aware, CorsairConfig, CorsairTransformation
 from . import nn
-from sol.src.sys import corsair_hw
-from sol.src.sol_sim import analyze
-
-# Expose corsair_hw through mltools.corsair
-hw = SimpleNamespace(
-    Slice=corsair_hw.Slice,
-    Quad=corsair_hw.Quad,
-    Chiplet=corsair_hw.Chiplet,
-)
-
-
-def sol_analyze(dmir_graph, corsair_hw=hw.Slice(), **kwargs):
-    def filter_sol_output(perf_data, power_data):
-        perf_data = perf_data["SOL_Performance_Analysis"]
-        power_data = power_data["On-Chip_Dynamic_Power"]
-
-        # remove derived utilization percentages from power_data:
-        for k in power_data:
-            power_data[k] = power_data[k]["power(mW)"]
-
-        return perf_data, power_data
-
-    perf_data, power_data = analyze(
-        discard_values(dmir_graph), corsair_hw=corsair_hw, **kwargs
-    )
-    perf_data, power_data = filter_sol_output(perf_data, power_data)
-
-    return perf_data, power_data
-
 
 # Numerical format aliases
 format = SimpleNamespace(
