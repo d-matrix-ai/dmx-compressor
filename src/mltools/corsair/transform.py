@@ -13,8 +13,7 @@ from mltools.utils import (
     save_config_file,
     print_model_tree,
 )
-from sol.src.sys.corsair_hw import *
-from sol.src.sol_sim import *
+
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 from ..numerical import CastTo
@@ -115,24 +114,6 @@ class Model(torch.nn.Module):
             graph_dict=dict(),
             **kwargs,
         )
-
-    def sol_analyze(self, sample_input, corsair_hw=Slice(), **kwargs):
-        def filter_sol_output(perf_data, power_data):
-            perf_data = perf_data["SOL_Performance_Analysis"]
-            power_data = power_data["On-Chip_Dynamic_Power"]
-
-            # remove derived utilization percentages from power_data:
-            for k in power_data:
-                power_data[k] = power_data[k]["power(mW)"]
-
-            return perf_data, power_data
-
-        graph = self.dmir_graph(sample_input)
-
-        perf_data, power_data = analyze(graph, corsair_hw=corsair_hw, **kwargs)
-        perf_data, power_data = filter_sol_output(perf_data, power_data)
-
-        return perf_data, power_data
 
 
 class CorsairConfig(dict):

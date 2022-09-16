@@ -4,19 +4,14 @@ stages:
   - test
   - deploy
 
-cache:
-  key: $CI_PIPELINE_ID
-  paths:
-    - .venv
-
 test:
   cache: []
   before_script:
     - export PYENV_ROOT=$HOME/.pyenv
     - export PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
-    - mc alias set minio http://10.10.6.184:9000 rootuser rootpass123
-    - mc cp minio/creds/gitlab_runner_ed25519 ~/.ssh/id_rsa
-    - mc cp minio/creds/git.d-matrix.ai.crt /usr/local/share/ca-certificates
+    - mc --insecure alias set minio https://minio.minio:443 minio minio123
+    - mc --insecure cp minio/creds/gitlab_runner_ed25519 ~/.ssh/id_rsa
+    - mc --insecure cp minio/creds/git.d-matrix.ai.crt /usr/local/share/ca-certificates
     - update-ca-certificates
     - chmod 400 ~/.ssh/id_rsa
     - eval $(ssh-agent -s)
