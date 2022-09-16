@@ -4,11 +4,6 @@ stages:
   - test
   - deploy
 
-cache:
-  key: $CI_PIPELINE_ID
-  paths:
-    - .venv
-
 test:
   cache: []
   before_script:
