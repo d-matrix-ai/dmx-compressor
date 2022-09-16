@@ -5,14 +5,19 @@ from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 from mltools.numerical import CastTo
-from mltools.utils import load_config_file
-from mltools.sparse import Sparsify
+from mltools.sparse import Sparsify, Sparseness
 from mltools.approximate import Approximator
 from mltools.corsair import CorsairConfig
 
 
 
 class InputOutputTransformer(fx.Transformer):
+    """
+    A transformer that transforms the module by adding additional ops, which includes:
+    - casting
+    - approximator
+    - sparsifier
+    """
     def __init__(self,module:fx.GraphModule,scopeDict:dict = None,cfg = None):
         super().__init__(module)
         self.scopeDict = scopeDict
@@ -83,12 +88,14 @@ class InputOutputTransformer(fx.Transformer):
         if self.config:
             if layer_key and layer_key in self.config:
                 if "weight" in target:
-                    cast_format = self.config[layer_key]['weight_format']
-                    #Add sparsifier
-                    sparsify_format = self.config[layer_key]['weight_sparseness']
-                               
+                    if "weight_format" in self.config[layer_key]:
+                        cast_format = self.config[layer_key]['weight_format']
+                    if "weight_sparseness" in self.config[layer_key]:
+                        #Add sparsifier
+                        sparsify_format = self.config[layer_key]['weight_sparseness']               
                 else:
-                    cast_format = self.config[layer_key]['bias_format']
+                    if "bias_format" in self.config[layer_key]:
+                        cast_format = self.config[layer_key]['bias_format']
 
         self.module.add_submodule(cast_name,CastTo(format=cast_format))
 
@@ -101,7 +108,6 @@ class InputOutputTransformer(fx.Transformer):
             else:
                 tensor_size = self.module.get_submodule(layer.split('__')[-1]).weight.size()
             self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness=sparsify_format))
-            self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness="DENSE"))
             prev_node = self.new_graph.create_node(
             "call_module", sparsify_name, args=(prev_node,)
             )
@@ -192,6 +198,9 @@ class InputOutputTransformer(fx.Transformer):
 
 
 class NodeDictTransformer(fx.Transformer):
+    """
+    A transformer that creates a dict contaning mapping between target of node and the node itself
+    """
     def __init__(self,module:fx.GraphModule):
         super().__init__(module)
         self.module = module
@@ -294,9 +303,93 @@ class NodeDictTransformer(fx.Transformer):
         return self.nodeDict
 
 
+
+class ConfigurationTransformer(fx.Transformer):
+    """
+    A transformer that changes the format of the ops according to the cfg file
+    """
+    def __init__(self,module:fx.GraphModule,scopeDict:dict,cfg = None):
+        super().__init__(module)
+        self.config=None
+        if cfg:
+            self.config = CorsairConfig().from_yaml(cfg)
+        self.module = module
+        self.scopeDict = scopeDict
+    
+    def placeholder(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Proxy:
+        placeholder_node = self.new_graph.placeholder(target)
+        layer = self.scopeDict[placeholder_node.name][0]
+        cast_name = target+"_cast"
+        if self.config and self.has_module(cast_name):
+            layer_key = layer.split('__')[-1]
+            if layer_key and layer_key in self.config:
+                cast_format = self.config[layer_key]['input_format']
+                self.module.get_submodule(cast_name).set_format(cast_format)
+        return super().placeholder(target, args, kwargs)
+    
+    def output(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        output_node = self.new_graph.output(target)
+        layer = self.scopeDict[output_node.name][0]
+        cast_name = target+"_cast"
+        if self.config and self.has_module(cast_name):
+            layer_key = layer.split('__')[-1]
+            if layer_key and layer_key in self.config:
+                cast_format = self.config[layer_key]['output_format']  
+                self.module.get_submodule(cast_name).set_format(cast_format)
+        return super().output(target, args, kwargs)
+    
+    def get_attr(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Proxy:
+        get_attr_node = self.new_graph.get_attr(target)    
+        if get_attr_node.name in self.scopeDict:
+            layer = self.scopeDict[get_attr_node.name][0]
+            cast_name = target+"_cast"
+            sparsify_name = target+"_sparsifier"
+            layer_key = layer.split('__')[-1]
+            if self.config:
+                if layer_key and layer_key in self.config:
+                    if "weight" in target:
+                        if "weight_format" in self.config[layer_key] and self.has_module(cast_name):
+                            cast_format = self.config[layer_key]['weight_format']
+                            self.module.get_submodule(cast_name).set_format(cast_format)
+                        if "weight_sparseness" in self.config[layer_key] and self.has_module(sparsify_name):
+                            sparsify_format = self.config[layer_key]['weight_sparseness']
+                            self.module.get_submodule(sparsify_name).sparseness = Sparseness.from_shorthand(sparsify_format)         
+                    else:
+                        if "bias_format" in self.config[layer_key] and self.has_module(cast_name):
+                            cast_format = self.config[layer_key]['bias_format']
+                            self.module.get_submodule(cast_name).set_format(cast_format)
+        return super().get_attr(target, args, kwargs)
+    
+    def call_function(self, target: 'Target', args: Tuple[Argument, ...], kwargs: Dict[str, Any]) -> Any:
+        call_fnc_node = self.new_graph.call_function(target)
+        if self.config and call_fnc_node.name in self.scopeDict:
+            layer = self.scopeDict[call_fnc_node.name][0]
+            cast_name = call_fnc_node.name+"_cast"
+            layer_key = layer.split('__')[-1]
+            if layer_key and layer_key in self.config and self.config[layer_key]["instance"].lower() in call_fnc_node.name.lower() and self.has_module(cast_name):
+                cast_format = self.config[layer_key]['output_format']
+                self.module.get_submodule(cast_name).set_format(cast_format)
+        return super().call_function(target, args, kwargs)
     
 
+    def transform(self):
+        """
+        Transform ``self.module`` and return the transformed
+        ``GraphModule``.
+        """
+        result = super().run()
+        if result is not None:
+            def strip_proxy(a : Union[Argument, Proxy]) -> Any:
+                return a.node if isinstance(a, Proxy) else a
+            self.new_graph.output(map_aggregate(result, strip_proxy))
+        return self.module
+    
+    def has_module(self,target: str) -> bool:
+        for name,_ in self.module.named_modules():
+            if name == target:
+                return True
+        return False
     
 
 
-
+        

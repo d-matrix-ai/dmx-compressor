@@ -4,9 +4,12 @@ import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 from graphviz import Digraph
+from mltools.fx.transformer import NodeDictTransformer
+from mltools.fx.tracer import QuantTracer
 
 
 class GraphvizInterpreter(fx.Interpreter):
+    """Interpreter that draws the graph of a GraphModule"""
     def __init__(self,module:fx.GraphModule,nodeDict:Dict):
         super().__init__(module)
         node_attr = dict(style='filled',
@@ -226,4 +229,22 @@ class GraphvizInterpreter(fx.Interpreter):
             if len(eargs)==3:
                 self.pygraph.edge(*eargs,**ekwargs)
         return super().output(target,args,kwargs)
+
+def visualize_graph(model : torch.nn.Module, input : torch.Tensor, file_name = 'graph', tracer = QuantTracer()) -> Any:
+    """ Saves the graph to file_name if given and returns the pygraph object
+        Example use cases:
+        visualizing non fx transformed:
+            visualize_graph(torch.nn.Linear(64,64),torch.rand(1,64)) 
+        visualizing fx transformed:
+            net = torch.nn.Linear(64,64)
+            gm = cast_input_output_transform(net)
+            visualize_graph(gm,torch.rand(1,64))
+    """
+    if not isinstance(model,fx.GraphModule):
+        graph = tracer.trace(model)
+        model = fx.GraphModule(tracer.root,graph)
+    nodeDict = NodeDictTransformer(model).transform()
+    gi = GraphvizInterpreter(model,nodeDict)
+    gi.run(input)
+    gi.pygraph.render(filename = file_name)
 

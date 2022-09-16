@@ -52,3 +52,14 @@ counterpart = {
     torch.nn.Tanh: nn.Tanh,
 }
 
+class Chiplet():
+    def __init__(self):
+        pass
+
+class Quad():
+    def __init__(self):
+        pass
+
+class Slice():
+    def __init__(self):
+        pass
