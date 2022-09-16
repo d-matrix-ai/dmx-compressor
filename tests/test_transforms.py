@@ -141,7 +141,7 @@ def test_lenet_1hid_corsair_transform_without_cfg(layers):
 )
 def test_lenet_1hid_corsair_transform_with_test_cfg(layers):
     net = LeNet(layers)
-    gm = cast_input_output_transform(net,QuantTracer(),cfg="../configs/lenet_test.yaml")
+    gm = cast_input_output_transform(net,QuantTracer(),cfg="./configs/lenet_test.yaml")
     assert checkTransform(gm), True
 
 
