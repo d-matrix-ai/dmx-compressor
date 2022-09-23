@@ -205,6 +205,7 @@ class BlockFloatingPoint(Format):
         self.block_size = block_size
         self.block_dim = block_dim
         self.rounding = rounding
+        self.bfp_id = -1
 
     def cast(self, x: torch.Tensor):
         # input of Linear: [B, ..., Cin], dim=-1
@@ -262,6 +263,19 @@ class CastToFormat(Function):
     def backward(ctx, g):
         return g, None
 
+    @staticmethod
+    def symbolic(g: torch._C.Graph, input: torch._C.Value, fmt: torch._C.Value) -> torch._C.Value:
+        if isinstance(fmt, Same):
+            return g.op("Identity", input)
+        elif isinstance(fmt, BlockFloatingPoint):
+
+            # TODO with dtype for torch > 1.11
+            return g.op("com.microsoft::DequantizeBFP", *g.op("com.microsoft::QuantizeBFP", input, \
+                bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"), outputs=3), \
+                        bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"),\
+                            dtype_i=1, outputs=1)
+        else:
+            return None
 
 class CastTo(nn.Module):
     r"""
