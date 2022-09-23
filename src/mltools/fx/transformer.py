@@ -104,9 +104,9 @@ class InputOutputTransformer(fx.Transformer):
             # Sparsifier submodules needed to be added separately even for default as tensor size 
             # is not the same for every layer
             if layer.split('__')[-1]=='model':
-                tensor_size = self.module.weight.size()
+                tensor_size = self.module.get_parameter(target).size()
             else:
-                tensor_size = self.module.get_submodule(layer.split('__')[-1]).weight.size()
+                tensor_size = self.module.get_submodule(layer.split('__')[-1]).get_parameter(target.split('.')[-1]).size()
             self.module.add_submodule(sparsify_name,Sparsify(tensor_size,sparseness=sparsify_format))
             prev_node = self.new_graph.create_node(
             "call_module", sparsify_name, args=(prev_node,)
