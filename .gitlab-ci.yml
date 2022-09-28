@@ -22,7 +22,6 @@ test:
     - source .venv/bin/activate
     - pip install .
     - pip install ipdb
-    - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python build-dmir-proto
     - pytest -vv ./tests/*.py
 
 triger-mlreferences:

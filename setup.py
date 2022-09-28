@@ -3,9 +3,6 @@ from setuptools import find_packages, setup
 
 VERSION = "0.0.3.dev"
 
-DMIR_PROTO_DIR = os.path.join(os.path.dirname(__file__), "src/mltools/utils/")
-DMIR_PROTO_FILE = "dmir.proto"
-
 setup(
     name="mltools",
     version=VERSION,

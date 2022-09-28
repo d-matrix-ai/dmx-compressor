@@ -2,7 +2,7 @@ import torch
 from mltools import *
 from mlreferences import lenet_512_512 as ref
 
-dmir_dir = "/tools/d-matrix/ml/models/"
+# dmir_dir = "/tools/d-matrix/ml/models/"
 model_name = "lenet_512_512"
 
 RANDOM_SEED = 0

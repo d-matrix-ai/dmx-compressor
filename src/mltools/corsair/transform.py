@@ -6,7 +6,7 @@ import re
 import torch
 from types import SimpleNamespace
 from .nn import *
-from mltools import corsair, dmir, numerical
+from mltools import corsair, numerical
 from mltools.utils import (
     load_config_file,
     graph_utils,
@@ -17,26 +17,6 @@ from mltools.utils import (
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import torch.nn as nn
 from ..numerical import CastTo
-
-
-def aware():
-    # add new torch.nn modules for corsair
-    torch.nn.CastTo = CastTo
-    torch.nn.Sparsify = Sparsify
-    torch.nn.Approximate = Approximate
-    # overload existing torch.nn modules for corsair
-    torch.nn.Linear = Linear
-    torch.nn.Conv2d = Conv2d
-    torch.nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
-    torch.nn.MaxPool2d = MaxPool2d
-    torch.nn.BatchNorm2d = BatchNorm2d
-    torch.nn.LayerNorm = LayerNorm
-    torch.nn.Dropout = Dropout
-    torch.nn.Softmax = Softmax
-    torch.nn.ReLU = ReLU
-    torch.nn.ReLU6 = ReLU6
-    torch.nn.Tanh = Tanh
-    torch.nn.GELU = GELU
 
 
 class Model(torch.nn.Module):
@@ -99,13 +79,6 @@ class Model(torch.nn.Module):
 
     def print_model_tree(self, include_type=False):
         print_model_tree(self, include_type)
-
-    def dmir_graph(self, subgraph: str, sample_input, **kwargs):
-        return dmir.dump(
-            eval(f"self.body.{subgraph}" if subgraph else "self.body"),
-            sample_input,
-            **kwargs,
-        )
 
     def fx_graph(self, sample_input, **kwargs):
         return dmir.parse_fx(
