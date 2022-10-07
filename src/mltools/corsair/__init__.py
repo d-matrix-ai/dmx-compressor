@@ -3,7 +3,6 @@ import torch
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..approximate import Approximate, ApproximationFunction
-from ..dmir import discard_values
 from .transform import Model, aware, CorsairConfig, CorsairTransformation
 from . import nn
 

@@ -6,7 +6,7 @@ import re
 import torch
 from types import SimpleNamespace
 from .nn import *
-from mltools import corsair, dmir, numerical
+from mltools import corsair, numerical
 from mltools.utils import (
     load_config_file,
     graph_utils,
@@ -99,13 +99,6 @@ class Model(torch.nn.Module):
 
     def print_model_tree(self, include_type=False):
         print_model_tree(self, include_type)
-
-    def dmir_graph(self, subgraph: str, sample_input, **kwargs):
-        return dmir.dump(
-            eval(f"self.body.{subgraph}" if subgraph else "self.body"),
-            sample_input,
-            **kwargs,
-        )
 
     def fx_graph(self, sample_input, **kwargs):
         return dmir.parse_fx(

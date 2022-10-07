@@ -12,18 +12,34 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 from torch.fx._compatibility import compatibility
 from torch._C import ScriptObject
 from types import CodeType, FunctionType, ModuleType
-from typing import Any, Dict, NamedTuple, Optional, Set, Tuple, Type, List, Callable, Union
+from typing import (
+    Any,
+    Dict,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    List,
+    Callable,
+    Union,
+)
 import functools
-from torch.fx._symbolic_trace import _autowrap_check,Graph,_Patcher,_patch_wrapped_functions
+from torch.fx._symbolic_trace import (
+    _autowrap_check,
+    Graph,
+    _Patcher,
+    _patch_wrapped_functions,
+)
 
 import transformers.utils.fx as fx_hf
 
-_orig_module_call : Callable = torch.nn.Module.__call__
-_orig_module_getattr : Callable = torch.nn.Module.__getattr__
+_orig_module_call: Callable = torch.nn.Module.__call__
+_orig_module_getattr: Callable = torch.nn.Module.__getattr__
 
 # Referenced from https://pytorch.org/docs/stable/_modules/torch/ao/quantization/quantize_fx.html#convert_fx
 class Scope(object):
-    """ Scope object that records the module path and the module type
+    """Scope object that records the module path and the module type
     of a module. Scope is used to track the information of the module
     that contains a Node in a Graph of GraphModule. For example::
 
@@ -53,7 +69,7 @@ class Scope(object):
 
 
 class ScopeContextManager(object):
-    """ A context manager to track the Scope of Node during symbolic tracing.
+    """A context manager to track the Scope of Node during symbolic tracing.
     When entering a forward function of a Module, we'll update the scope information of
     the current module, and when we exit, we'll restore the previous scope information.
     """
@@ -81,6 +97,7 @@ class QuantTracer(fx.Tracer):
     """
     Customed tracer with scope manager and returns a flat GraphModule
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.scope = Scope("model", None)
@@ -88,7 +105,7 @@ class QuantTracer(fx.Tracer):
         self.record_stack_traces = True
 
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
-        
+
         is_leaf = isinstance(
             m,
             (
@@ -96,12 +113,8 @@ class QuantTracer(fx.Tracer):
                 sparse.Sparsify,
             ),
         )
-        return (
-            (
-                is_leaf
-            )
-        )
-    
+        return is_leaf
+
     def call_module(
         self,
         m: torch.nn.Module,
@@ -114,9 +127,9 @@ class QuantTracer(fx.Tracer):
         # scope will be restored automatically upon exit
         with ScopeContextManager(self.scope, m, module_qualified_name):
             logger = logging.getLogger(__name__)
-            logger.info("path:",self.scope.module_path)
-            logger.info("type:",self.scope.module_type)
-            return super().call_module(m,forward,args,kwargs)
+            logger.info("path:", self.scope.module_path)
+            logger.info("type:", self.scope.module_type)
+            return super().call_module(m, forward, args, kwargs)
 
     def create_node(
         self,
@@ -133,11 +146,13 @@ class QuantTracer(fx.Tracer):
             self.scope.module_type,
         )
         return node
+
 
 class HFQuantTracer(fx_hf.Tracer):
     """
     Customed tracer with scope manager for HuggingFace
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.scope = Scope("model", None)
@@ -145,7 +160,7 @@ class HFQuantTracer(fx_hf.Tracer):
         self.record_stack_traces = True
 
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
-        
+
         is_leaf = isinstance(
             m,
             (
@@ -153,12 +168,8 @@ class HFQuantTracer(fx_hf.Tracer):
                 sparse.Sparsify,
             ),
         )
-        return (
-            (
-                is_leaf
-            )
-        )
-    
+        return is_leaf
+
     def call_module(
         self,
         m: torch.nn.Module,
@@ -171,9 +182,9 @@ class HFQuantTracer(fx_hf.Tracer):
         # scope will be restored automatically upon exit
         with ScopeContextManager(self.scope, m, module_qualified_name):
             logger = logging.getLogger(__name__)
-            logger.info("path:",self.scope.module_path)
-            logger.info("type:",self.scope.module_type)
-            return super().call_module(m,forward,args,kwargs)
+            logger.info("path:", self.scope.module_path)
+            logger.info("type:", self.scope.module_type)
+            return super().call_module(m, forward, args, kwargs)
 
     def create_node(
         self,
@@ -190,4 +201,3 @@ class HFQuantTracer(fx_hf.Tracer):
             self.scope.module_type,
         )
         return node
-    

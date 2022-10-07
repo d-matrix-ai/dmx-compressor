@@ -8,9 +8,10 @@ from mltools.fx.transformer import ConfigurationTransformer
 from torch.fx import GraphModule
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
+
 def cast_input_output_transform(
     root: torch.nn.Module,
-    tracer: Union[QuantTracer,HFQuantTracer] = QuantTracer(),
+    tracer: Union[QuantTracer, HFQuantTracer] = QuantTracer(),
     concrete_args: Optional[Dict[str, Any]] = None,
     cfg: Optional[str] = None,
 ) -> nn.Module:
@@ -25,17 +26,18 @@ def cast_input_output_transform(
         root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
     )
     gm = GraphModule(tracer.root, graph, name)
-    transformer = InputOutputTransformer(gm,tracer.node_name_to_scope,cfg)
+    transformer = InputOutputTransformer(gm, tracer.node_name_to_scope, cfg)
     transformed = transformer.transform()
     transformed.scopeDict = transformer.scopeDict
     return transformed
 
-def configure_transform(gm:torch.fx.GraphModule,scopeDict: dict, cfg:str):
+
+def configure_transform(gm: torch.fx.GraphModule, scopeDict: dict, cfg: str):
     """
     A function that changes the format of the ops according to the cfg file
     Note that configure_transform will only change existing ops and will not add any additional ops.
     Hence it is recommened to pass in a cfg file for cast_input_output_transform to make sure all necessary ops are added.
     """
-    transformer = ConfigurationTransformer(gm,scopeDict,cfg)
+    transformer = ConfigurationTransformer(gm, scopeDict, cfg)
     transformer.transform()
     return gm

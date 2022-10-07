@@ -58,17 +58,6 @@ Follow these steps to set up as a d-MATRiX internal developer (not for external 
     echo "MODEL_PATH=/tools/d-matrix/ml/models" >> .env
     ```
     
-## Compiling DMIR protobuf files
-
-You may encounter a similar error if the protoc libraries in your environment differ from the precompiled version in the git repository:
-
-``` sh
-If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 3.19.0.
-If you cannot immediately regenerate your protos, some other possible workarounds are:
-```
-
-To correct this problem install the Google protobuf compiler, and then run the `build-dmir-proto` script that was installed with this project. This will regenerate the correct protobuf files for your system.
-
 ## API in a nutshell
 
 Given a customer workload training/evaluation Python script, use the high-level API through two steps.
@@ -152,7 +141,7 @@ For more detailed information, go over the following documents on specific topic
 - Custom logic
 - Configurations for Corsair-specific transformation
 - List of supported modules and models
-- DMIR
+- torch-mlir
 
 ### Examples
 
