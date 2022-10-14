@@ -1,12 +1,13 @@
 from functools import reduce
-
 from typing import Union, List, Tuple
 from collections import OrderedDict
 import sys
 from types import SimpleNamespace
+
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
+
 from mltools.numerical import (
     Format,
     NumericalCastMixin,

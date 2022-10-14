@@ -148,7 +148,7 @@ class QuantTracer(fx.Tracer):
         return node
 
 
-class HFQuantTracer(fx_hf.Tracer):
+class HFQuantTracer(fx_hf.HFTracer):
     """
     Customed tracer with scope manager for HuggingFace
     """

@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+
 from mltools.numerical import CastTo
 from mltools.sparse import Sparsify, Sparseness
 from mltools.approximate import Approximator
