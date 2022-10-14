@@ -1,5 +1,5 @@
 from functools import reduce
-from turtle import forward
+
 from typing import Union, List, Tuple
 from collections import OrderedDict
 import sys
