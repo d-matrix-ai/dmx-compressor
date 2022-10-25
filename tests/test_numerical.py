@@ -67,7 +67,7 @@ def test_conversion(from_format, to_format, register):
         ("BFP12_128", "BFP12_128"),
     ),
 )
-def test_conversion(input_a_format, input_b_format):
+def test_matmul(input_a_format, input_b_format):
     """
     Matmul between two tensors of custom format
     the test assures torch.matmul() is epsilon-accurate
