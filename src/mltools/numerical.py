@@ -7,6 +7,10 @@ import torch.nn.functional as F
 from torch.autograd import Function
 from .quant import fixed_point_quantize, block_quantize, float_quantize
 
+import numpy as np
+from numerics.unary_functions import convert_FP32_to_FPsmall
+from numerics import Data
+
 
 __ALL__ = [
     "Format",
@@ -15,6 +19,7 @@ __ALL__ = [
     "FixedPoint",
     "FloatingPoint",
     "BlockFloatingPoint",
+    "ScaledBlockFloatingPoint",
     "CastTo",
 ]
 
@@ -54,6 +59,8 @@ class Format:
             return FloatingPoint.from_shorthand(sh)
         elif sh.startswith("BFP"):
             return BlockFloatingPoint.from_shorthand(sh)
+        elif sh.startswith("SBFP"):
+            return ScaledBlockFloatingPoint.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized format shorthand: {sh}")
 
@@ -249,6 +256,82 @@ class BlockFloatingPoint(Format):
         return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({ROUNDING_MODE.inverse[self.rounding]})"
 
 
+class ScaledBlockFloatingPoint(Format):
+    r"""
+    This is a scaled block floating point tensor format.
+    """
+
+    def __init__(
+        self,
+        block_format: FixedPoint,
+        scaler_format: FloatingPoint,
+        block_size=64,
+        block_dim=-1,
+    ):
+        super().__init__()
+        # check validity of format configuration
+        assert isinstance(
+            block_format, FixedPoint
+        ), "block format needs to be fixed point"
+        assert isinstance(
+            scaler_format, FloatingPoint
+        ), "scaler format needs to be floating point"
+        assert block_format.fraction == 0, "block format needs to have zero fraction"
+        assert block_format.symmetric, "block format needs to have symmetric range"
+        assert block_size > 0, f"block size has to be positive, got {block_size}"
+
+        self.block_format = block_format
+        self.scaler_format = scaler_format
+        self.block_size = block_size
+        self.block_dim = block_dim
+
+        self.man_scaling = (
+            2 ** (self.block_format.precision - 1) - 1
+        )  # largest mantissa abs
+        self.get_chunk_max = lambda chunk: torch.max(
+            torch.abs(chunk), dim=-1, keepdim=True
+        )[0]
+
+    def cast(self, x: torch.Tensor) -> torch.Tensor:
+        _x = x.transpose(self.block_dim, -1)  # dim swap
+        xshape = _x.shape  # remember shape
+        _xs = torch.split(
+            _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
+        )  # slice to chunks
+        _xms = [
+            self.get_chunk_max(chunk) / self.man_scaling for chunk in _xs
+        ]  # max of blocks in each chunk
+        _x = torch.cat(
+            [
+                self.block_format.cast(chunk / chunk_max)
+                * self.scaler_format.cast(chunk_max)
+                for chunk, chunk_max in zip(_xs, _xms)
+            ],
+            dim=self.block_dim,
+        )  # quantize
+        _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
+        return _x
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "SBFP<{block_format_sh}><{scaler_format_sh}>{{{block_size:d},{block_dim:d}}}",
+            sh,
+        )
+        return cls(
+            block_format=FixedPoint.from_shorthand(conf["block_format_sh"]),
+            scaler_format=FloatingPoint.from_shorthand(conf["scaler_format_sh"]),
+            block_size=conf["block_size"],
+            block_dim=conf["block_dim"],
+        )
+
+    def __str__(self) -> str:
+        return f"Simulated scaled block floating point format: block format = {self.block_format}, scaler format = {self.scaler_format},\n block size = {self.block_size}, block dimension = {self.block_dim}"
+
+    def __repr__(self) -> str:
+        return f"SBFP<{repr(self.block_format)}><{repr(self.scaler_format)}>{{{self.block_size},{self.block_dim}}}"
+
+
 class CastToFormat(Function):
     r"""
     A simple STE backward function for numerical cast
@@ -264,18 +347,29 @@ class CastToFormat(Function):
         return g, None
 
     @staticmethod
-    def symbolic(g: torch._C.Graph, input: torch._C.Value, fmt: torch._C.Value) -> torch._C.Value:
+    def symbolic(
+        g: torch._C.Graph, input: torch._C.Value, fmt: torch._C.Value
+    ) -> torch._C.Value:
         if isinstance(fmt, Same):
             return g.op("Identity", input)
         elif isinstance(fmt, BlockFloatingPoint):
 
             # TODO with dtype for torch > 1.11
-            return g.op("com.microsoft::DequantizeBFP", *g.op("com.microsoft::QuantizeBFP", input, \
-                bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"), outputs=3), \
-                        bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"),\
-                            dtype_i=1, outputs=1)
+            return g.op(
+                "com.microsoft::DequantizeBFP",
+                *g.op(
+                    "com.microsoft::QuantizeBFP",
+                    input,
+                    bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"),
+                    outputs=3,
+                ),
+                bfp_type_i=torch.onnx.symbolic_helper._parse_arg(fmt.bfp_id, "i"),
+                dtype_i=1,
+                outputs=1,
+            )
         else:
             return None
+
 
 class CastTo(nn.Module):
     r"""
