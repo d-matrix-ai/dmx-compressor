@@ -22,6 +22,7 @@ test:
     - source .venv/bin/activate
     - pip install .
     - pip install ipdb
+    - pip install 'git+ssh://git@git.d-matrix.ai/software/software.git#subdirectory=tools/simulators/numerics'
     - pytest -vv ./tests/*.py
 
 triger-mlreferences:
