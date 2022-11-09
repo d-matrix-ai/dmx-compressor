@@ -112,7 +112,7 @@ def block_quantize(x, wl, dim=-1, rounding="stochastic"):
     return out
 
 
-def float_quantize(x, exp, man, bias=None, rounding="stochastic"):
+def float_quantize(x, exp, man, bias=None, flush_subnormal=True, rounding="stochastic"):
     """
     Quantize a single precision Floating Point into low-precision Floating Point
 
@@ -121,6 +121,7 @@ def float_quantize(x, exp, man, bias=None, rounding="stochastic"):
         - :attr: `exp` (int) : number of bits allocated for exponent
         - :attr: `man` (int) : number of bits allocated for mantissa, not counting the virtual bit
         - :attr: `bias` (Optional[int]) : exponent bias
+        - :attr: `flush_subnormal` (bool) : whether to flush subnormals to zero
         - :attr: `rounding` (string) : rounding mode, \"stochastic\" or \"nearest\"
 
     Returns:
@@ -136,7 +137,7 @@ def float_quantize(x, exp, man, bias=None, rounding="stochastic"):
     if bias is None:
         bias = 2 ** (exp - 1) - 1
     if rounding == "nearest":
-        out = quant_module.float_quantize_nearest(x.contiguous(), man, exp, bias)
+        out = quant_module.float_quantize_nearest(x.contiguous(), man, exp, bias, flush_subnormal)
     elif rounding == "stochastic":
-        out = quant_module.float_quantize_stochastic(x.contiguous(), man, exp, bias)
+        out = quant_module.float_quantize_stochastic(x.contiguous(), man, exp, bias, flush_subnormal)
     return out
