@@ -121,7 +121,7 @@ class FixedPoint(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "XP[{precision:d},{fraction:d}]({clamp:l}{symmetric:l}{rounding:l})", sh
+            "XP[{precision:d},{fraction:d}]({clamp:w}{symmetric:w}{rounding:w})", sh
         )
         return cls(
             precision=conf["precision"],
