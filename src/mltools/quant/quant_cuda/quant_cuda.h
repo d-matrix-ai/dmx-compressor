@@ -71,7 +71,7 @@ Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl);
  * Does not handle NaN, Inf, and denormal.
  * Stochastic Rounding.
  **/
-Tensor float_quantize_stochastic_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias);
+Tensor float_quantize_stochastic_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal);
 
 /**
  * quantize a FloatTensor into a low bit-width floating point Tensor
@@ -79,4 +79,4 @@ Tensor float_quantize_stochastic_cuda(Tensor a, int man_bits, int exp_bits, int 
  * Does not handle NaN, Inf, and denormal.
  * Nearest Rounding.
  **/
-Tensor float_quantize_nearest_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias);
+Tensor float_quantize_nearest_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal);

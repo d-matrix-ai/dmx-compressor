@@ -8,7 +8,9 @@ __global__ void float_kernel_stochastic(float* __restrict__ a,
                                         float* o, int size,
                                         int man_bits,
                                         int exp_bits, 
-                                        int exp_bias) {
+                                        int exp_bias, 
+                                        bool flush_subnormal) {
+  // TODO: implement flush_subnormal logic
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int rand_prob = (unsigned int) r[index];
@@ -44,7 +46,9 @@ __global__ void float_kernel_nearest(float* __restrict__ a,
                                      float* o, int size,
                                      int man_bits,
                                      int exp_bits, 
-                                     int exp_bias) {
+                                     int exp_bias, 
+                                     bool flush_subnormal) {
+  // TODO: implement flush_subnormal logic
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int target,quantize_bits;

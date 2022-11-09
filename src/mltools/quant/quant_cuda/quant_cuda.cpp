@@ -45,10 +45,10 @@ Tensor block_quantize_sim_nearest(Tensor a, int wl)
   return block_quantize_sim_nearest_cuda(a, wl);
 }
 
-Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias)
+Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
 {
   CHECK_INPUT(a);
-  return float_quantize_nearest_cuda(a, man_bits, exp_bits, exp_bias);
+  return float_quantize_nearest_cuda(a, man_bits, exp_bits, exp_bias, flush_subnormal);
 }
 
 Tensor fixed_point_quantize_stochastic(Tensor a, int wl, int fl, bool use_clamp, bool symmetric)
@@ -76,10 +76,10 @@ Tensor block_quantize_sim_stochastic(Tensor a, int wl)
   return block_quantize_sim_stochastic_cuda(a, wl);
 }
 
-Tensor float_quantize_stochastic(Tensor a, int man_bits, int exp_bits, int exp_bias)
+Tensor float_quantize_stochastic(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
 {
   CHECK_INPUT(a);
-  return float_quantize_stochastic_cuda(a, man_bits, exp_bits, exp_bias);
+  return float_quantize_stochastic_cuda(a, man_bits, exp_bits, exp_bias, flush_subnormal);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
