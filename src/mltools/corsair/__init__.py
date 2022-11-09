@@ -8,11 +8,11 @@ from . import nn
 
 # Numerical format aliases
 format = SimpleNamespace(
-    FLOAT32=Format.from_shorthand("FP[1|8|23]{127}(N)"),
-    FLOAT16=Format.from_shorthand("FP[1|5|10]{15}(N)"),
-    BFLOAT16=Format.from_shorthand("FP[1|8|7]{127}(N)"),
-    AFLOAT8=Format.from_shorthand("FP[1|4|3]{7}(N)"),
-    BFLOAT8=Format.from_shorthand("FP[1|5|2]{15}(N)"),
+    FLOAT32=Format.from_shorthand("FP[1|8|23]{127}(FN)"),
+    FLOAT16=Format.from_shorthand("FP[1|5|10]{15}(FN)"),
+    BFLOAT16=Format.from_shorthand("FP[1|8|7]{127}(FN)"),
+    AFLOAT8=Format.from_shorthand("FP[1|4|3]{7}(_N)"),
+    BFLOAT8=Format.from_shorthand("FP[1|5|2]{15}(_N)"),
     INT8=Format.from_shorthand("XP[8,0](CSN)"),
     INT4=Format.from_shorthand("XP[4,0](CSN)"),
     BFP16_64_LD=Format.from_shorthand("BFP[8|8]{64,-1}(N)"),
