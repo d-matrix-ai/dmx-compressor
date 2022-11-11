@@ -1,18 +1,18 @@
 model:
   input_format: BFP[8|8]{64,-1}(N)
-  output_format: FP[1|5|10]{15}(_N)
+  output_format: FP[1|5|10]{15}(FN)
 act_func:
   approximation_function: NONE
   input_format: SAME
   instance: ReLU
-  output_format: FP[1|5|10]{15}(_N)
+  output_format: FP[1|5|10]{15}(FN)
 input_layer:
   accum_format: SAME
   approximation_function: NONE
   bias_format: SAME
   input_format: BFP[8|8]{64,-1}(N)
   instance: Linear
-  output_format: FP[1|5|10]{15}(_N)
+  output_format: FP[1|5|10]{15}(FN)
   weight_format: BFP[8|8]{64,-1}(N)
   weight_sparseness: DENSE
 intermediate_layers.0:
@@ -21,7 +21,7 @@ intermediate_layers.0:
   bias_format: SAME
   input_format: BFP[8|8]{64,-1}(N)
   instance: Linear
-  output_format: FP[1|5|10]{15}(_N)
+  output_format: FP[1|5|10]{15}(FN)
   weight_format: BFP[8|8]{64,-1}(N)
   weight_sparseness: DENSE
 output_layer:
@@ -30,6 +30,6 @@ output_layer:
   bias_format: SAME
   input_format: BFP[8|8]{64,-1}(N)
   instance: Linear
-  output_format: FP[1|5|10]{15}(_N)
+  output_format: FP[1|5|10]{15}(FN)
   weight_format: BFP[8|8]{64,-1}(N)
   weight_sparseness: DENSE

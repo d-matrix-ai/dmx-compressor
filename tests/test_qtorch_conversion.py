@@ -69,10 +69,10 @@ try:
         x, y = torch.Tensor(x).to(DEVICE), torch.Tensor(y).to(DEVICE)
 
         if to_format == "FP16":
-            shorthand = "FP[1|5|10]{15}(_N)"
+            shorthand = "FP[1|5|10]{15}(FN)"
 
         elif to_format == "FP32":
-            shorthand = "FP[1|8|23]{127}(_N)"
+            shorthand = "FP[1|8|23]{127}(FN)"
 
         elif to_format.startswith("BFP"):
             nbits = int(to_format.split("_")[0][3:])  # number of bits
@@ -193,10 +193,10 @@ try:
         x, y = torch.Tensor(x).to(DEVICE), torch.Tensor(y).to(DEVICE)
 
         if to_format == "FP16":
-            shorthand = "FP[1|5|10]{15}(_" + ("U" if rnd == "u" else "D") + ")"
+            shorthand = "FP[1|5|10]{15}(F" + ("U" if rnd == "u" else "D") + ")"
 
         elif to_format == "FP32":
-            shorthand = "FP[1|8|23]{127}(_" + ("U" if rnd == "u" else "D") + ")"
+            shorthand = "FP[1|8|23]{127}(F" + ("U" if rnd == "u" else "D") + ")"
 
         elif to_format.startswith("BFP"):
             nbits = int(to_format.split("_")[0][3:])  # number of bits
