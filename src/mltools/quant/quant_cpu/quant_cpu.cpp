@@ -44,21 +44,23 @@ T clamp_helper(T a, T min, T max)
     return a;
 }
 
-void printBits(size_t const size, void const * const ptr)
+void printBits(size_t const size, void const *const ptr)
 {
-    unsigned char *b = (unsigned char*) ptr;
-    unsigned char byte;
-    int i, j;
-    
-    for (i = size-1; i >= 0; i--) {
-        for (j = 7; j >= 0; j--) {
+  unsigned char *b = (unsigned char *)ptr;
+  unsigned char byte;
+  int i, j;
 
-            byte = (b[i] >> j) & 1;
-            printf("%u", byte);
-            if ((i==size-1 && j==7) || (i==size-2 && j==7))
-              printf(" ");
-        }
+  for (i = size - 1; i >= 0; i--)
+  {
+    for (j = 7; j >= 0; j--)
+    {
+
+      byte = (b[i] >> j) & 1;
+      printf("%u", byte);
+      if ((i == size - 1 && j == 7) || (i == size - 2 && j == 7))
+        printf(" ");
     }
+  }
 }
 
 template <typename T>
@@ -179,10 +181,12 @@ unsigned int round_bitwise(unsigned int target, int man_bits, Mode rounding)
       if (target << (8 + man_bits) >> 31 == (unsigned int)0)
         rand_prob = (unsigned int)0;
   }
-  else if (rounding == rDown){
+  else if (rounding == rDown)
+  {
     rand_prob = 0;
   }
-  else{ // rounding == rUp
+  else
+  { // rounding == rUp
     rand_prob = 1 << (23 - man_bits);
   }
   unsigned int add_r = target + rand_prob;
@@ -286,8 +290,6 @@ Tensor block_quantize_up(Tensor a, int wl, int dim)
   return o;
 }
 
-
-
 Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
 {
   CHECK_INPUT(a);
@@ -304,7 +306,9 @@ Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
   return o;
 }
 
-Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, Mode rounding){
+Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal, Mode rounding)
+{
+  // TODO: implement flush_subnormal logic below
   auto a_array = a.data_ptr<float>();
   auto o = zeros_like(a);
   auto o_array = o.data_ptr<float>();
@@ -312,24 +316,26 @@ Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, Mode r
 
   for (int64_t i = 0; i < size; i++)
   {
-    unsigned int target,quantize_bits;
+    unsigned int target, quantize_bits;
     FLOAT_TO_BITS(a_array[i], target);
     float quantized;
 
-    int target_exp = (target << 1 >> 1 >> 23) - 127; 
-    int min_exp = -(exp_bias - 1);  
+    int target_exp = (target << 1 >> 1 >> 23) - 127;
+    int min_exp = -(exp_bias - 1);
     bool subnormal = (target_exp < min_exp);
-    if (subnormal){
-      float shift_float,val;
-      int shift_bits = ((127 + min_exp) <<23) | (target >> 31 <<31);
+    if (subnormal)
+    {
+      float shift_float, val;
+      int shift_bits = ((127 + min_exp) << 23) | (target >> 31 << 31);
       BITS_TO_FLOAT(shift_bits, shift_float);
-      val=a_array[i]+shift_float;
+      val = a_array[i] + shift_float;
       FLOAT_TO_BITS(val, target);
       quantize_bits = round_bitwise(target, man_bits, rounding);
       BITS_TO_FLOAT(quantize_bits, quantized);
-      quantized=quantized-shift_float;
+      quantized = quantized - shift_float;
     }
-    else{
+    else
+    {
       quantize_bits = round_bitwise(target, man_bits, rounding);
       quantize_bits = clip_exponent(exp_bits, man_bits, target, quantize_bits);
       BITS_TO_FLOAT(quantize_bits, quantized);
@@ -339,14 +345,14 @@ Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, Mode r
   return o;
 }
 
-Tensor float_quantize_stochastic(Tensor a, int man_bits, int exp_bits, int exp_bias)
+Tensor float_quantize_stochastic(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
 {
-  return float_quantize(a,man_bits, exp_bits, exp_bias, rStochastic);
+  return float_quantize(a, man_bits, exp_bits, exp_bias, flush_subnormal, rStochastic);
 }
 
-Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias)
+Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
 {
-  return float_quantize(a,man_bits, exp_bits, exp_bias, rNearest);
+  return float_quantize(a, man_bits, exp_bits, exp_bias, flush_subnormal, rNearest);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
