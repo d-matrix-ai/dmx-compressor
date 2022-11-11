@@ -191,7 +191,7 @@ class FloatingPoint(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "FP[1|{exponent:d}|{mantissa:d}]{{{bias:d}}}({flush_subnormal:w}{rounding:l})",
+            "FP[1|{exponent:d}|{mantissa:d},{bias:d}]({flush_subnormal:w}{rounding:l})",
             sh,
         )
         return cls(
@@ -206,7 +206,7 @@ class FloatingPoint(Format):
         return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, \ncasting behavior: flush subnormal = {self.flush_subnormal}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"FP[1|{self.exponent}|{self.mantissa}]{{{self.bias}}}({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
+        return f"FP[1|{self.exponent}|{self.mantissa},{self.bias}]({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class BlockFloatingPoint(Format):
