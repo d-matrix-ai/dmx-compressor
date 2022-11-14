@@ -20,35 +20,27 @@ try:
             ("CFP[1|5|2]{20}(N)", "FP32", None),
             ("CFP[1|4|3]{7}(N)", "FP32", None),
             ("CFP[1|4|3]{10}(N)", "FP32", None),
+            ("BFP32_1", "FP16", None),
+            ("FP16", "BFP16_64", "row"),
             pytest.param(
                 "FP16",
                 "BFP24_64",
-                None,
-                marks=pytest.mark.xfail(reason="qtorch bug, issue 171"),
-            ),
-            pytest.param(
-                "BFP32_1",
-                "FP16",
-                None,
-                marks=pytest.mark.xfail(reason="qtorch bug, issue 171"),
-            ),
-            pytest.param(
-                "FP16",
-                "BFP16_64",
                 "row",
-                marks=pytest.mark.xfail(reason="qtorch bug, issue 171"),
+                marks=pytest.mark.xfail(reason="qtorch bug, issue 75"),
             ),
             pytest.param(
                 "FP16",
                 "BFP16_64",
                 "col",
-                marks=pytest.mark.xfail(reason="qtorch bug, issue 171"),
+                marks=pytest.mark.xfail(reason="The numerics simulator implements \
+                    asymmetric rounding for BFP, issue 74"),
             ),
             pytest.param(
                 "FP16",
                 "BFP12_128",
                 "col",
-                marks=pytest.mark.xfail(reason="qtorch bug, issue 171"),
+                marks=pytest.mark.xfail(reason="The numerics simulator implements \
+                    asymmetric rounding for BFP, issue 74"),
             ),
         ),
     )
@@ -77,7 +69,7 @@ try:
         elif to_format.startswith("BFP"):
             nbits = int(to_format.split("_")[0][3:])  # number of bits
             block_size, mantissa = int(to_format.split("_")[1]), nbits - 8
-            dim_arg = 1 if dimension == "row" else "0"
+            dim_arg = 0 if dimension == "col" else "1"
             shorthand = (
                 f"BFP[{mantissa}|8]" + "{" + f"{block_size},{dim_arg}" + "}" + "(N)"
             )

@@ -308,7 +308,6 @@ Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
 
 Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal, Mode rounding)
 {
-  // TODO: implement flush_subnormal logic below
   auto a_array = a.data_ptr<float>();
   auto o = zeros_like(a);
   auto o_array = o.data_ptr<float>();
@@ -325,14 +324,21 @@ Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, bool f
     bool subnormal = (target_exp < min_exp);
     if (subnormal)
     {
-      float shift_float, val;
-      int shift_bits = ((127 + min_exp) << 23) | (target >> 31 << 31);
-      BITS_TO_FLOAT(shift_bits, shift_float);
-      val = a_array[i] + shift_float;
-      FLOAT_TO_BITS(val, target);
-      quantize_bits = round_bitwise(target, man_bits, rounding);
-      BITS_TO_FLOAT(quantize_bits, quantized);
-      quantized = quantized - shift_float;
+      if (flush_subnormal == false)
+      {
+        float shift_float, val;
+        int shift_bits = ((127 + min_exp) << 23) | (target >> 31 << 31);
+        BITS_TO_FLOAT(shift_bits, shift_float);
+        val = a_array[i] + shift_float;
+        FLOAT_TO_BITS(val, target);
+        quantize_bits = round_bitwise(target, man_bits, rounding);
+        BITS_TO_FLOAT(quantize_bits, quantized);
+        quantized = quantized - shift_float;
+      }
+      else //flush subnormal numbers to zero
+      {
+        quantized = 0;
+      }
     }
     else
     {
