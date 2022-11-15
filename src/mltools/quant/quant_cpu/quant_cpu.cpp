@@ -324,7 +324,7 @@ Tensor float_quantize(Tensor a, int man_bits, int exp_bits, int exp_bias, bool f
     bool subnormal = (target_exp < min_exp);
     if (subnormal)
     {
-      if (flush_subnormal == false)
+      if (!flush_subnormal)
       {
         float shift_float, val;
         int shift_bits = ((127 + min_exp) << 23) | (target >> 31 << 31);

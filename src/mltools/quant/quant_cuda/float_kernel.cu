@@ -22,7 +22,7 @@ __global__ void float_kernel_stochastic(float* __restrict__ a,
     int min_exp = -(exp_bias - 1);
     bool subnormal = (target_exp < min_exp);
     if (subnormal) {
-      if (flush_subnormal == false) {
+      if (!flush_subnormal) {
         float shift_float,val;
         int shift_bits = ((127 + min_exp)<<23) | (target >> 31 <<31);
         shift_float = BITS_TO_FLOAT(&shift_bits);
@@ -63,7 +63,7 @@ __global__ void float_kernel_nearest(float* __restrict__ a,
     int min_exp = -(exp_bias - 1);
     bool subnormal = (target_exp < min_exp);
     if (subnormal) {
-      if (flush_subnormal == false) {
+      if (!flush_subnormal) {
         float shift_float,val;
         int shift_bits = ((127 + min_exp)<<23) | (target >> 31 <<31);
         shift_float = BITS_TO_FLOAT(&shift_bits);
