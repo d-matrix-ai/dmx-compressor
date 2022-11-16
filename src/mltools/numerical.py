@@ -149,6 +149,7 @@ class FloatingPoint(Format):
         exponent=8,
         bias=None,
         flush_subnormal=True,
+        unsigned=False,
         rounding="nearest",
     ):
         super().__init__()
@@ -168,10 +169,11 @@ class FloatingPoint(Format):
         self.exponent = exponent
         self.bias = bias if bias is not None else 2 ** (exponent - 1) - 1
         self.flush_subnormal = flush_subnormal
+        self.unsigned = unsigned
         self.rounding = rounding
 
     def cast(self, x):
-        return (
+        x = (
             x
             if self.mantissa == 23
             and self.exponent == 8
@@ -187,11 +189,12 @@ class FloatingPoint(Format):
                 rounding=self.rounding,
             )
         )
+        return x.abs() if self.unsigned else x
 
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "FP[1|{exponent:d}|{mantissa:d},{bias:d}]({flush_subnormal:w}{rounding:l})",
+            "FP[{sign:d}|{exponent:d}|{mantissa:d},{bias:d}]({flush_subnormal:w}{rounding:l})",
             sh,
         )
         return cls(
@@ -199,14 +202,15 @@ class FloatingPoint(Format):
             exponent=conf["exponent"],
             bias=conf["bias"],
             flush_subnormal=conf["flush_subnormal"] == "F",
+            unsigned=conf["sign"]==0,
             rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
-        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, \ncasting behavior: flush subnormal = {self.flush_subnormal}, rounding = {self.rounding}"
+        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, unsigned = {self.unsigned}, \ncasting behavior: flush subnormal = {self.flush_subnormal}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"FP[1|{self.exponent}|{self.mantissa},{self.bias}]({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
+        return f"FP[{'0' if self.unsigned else '1'}|{self.exponent}|{self.mantissa},{self.bias}]({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class BlockFloatingPoint(Format):
