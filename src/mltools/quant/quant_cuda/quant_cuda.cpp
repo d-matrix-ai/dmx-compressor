@@ -23,26 +23,26 @@ std::tuple<Tensor, Tensor> fixed_point_quantize_nearest_mask(Tensor a, int wl, i
   return fixed_point_quantize_nearest_mask_cuda(a, wl, fl, symmetric);
 }
 
-Tensor block_quantize_down(Tensor a, int wl, int dim)
+Tensor block_quantize_down(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_down_cuda(a, wl, dim);
+  return block_quantize_down_cuda(a, wl, dim, symmetric);
 }
-Tensor block_quantize_up(Tensor a, int wl, int dim)
+Tensor block_quantize_up(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_up_cuda(a, wl, dim);
+  return block_quantize_up_cuda(a, wl, dim, symmetric);
 }
-Tensor block_quantize_nearest(Tensor a, int wl, int dim)
+Tensor block_quantize_nearest(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_nearest_cuda(a, wl, dim);
+  return block_quantize_nearest_cuda(a, wl, dim, symmetric);
 }
 
-Tensor block_quantize_sim_nearest(Tensor a, int wl)
+Tensor block_quantize_sim_nearest(Tensor a, int wl, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_sim_nearest_cuda(a, wl);
+  return block_quantize_sim_nearest_cuda(a, wl, symmetric);
 }
 
 Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
@@ -64,16 +64,16 @@ std::tuple<Tensor, Tensor> fixed_point_quantize_stochastic_mask(Tensor a, int wl
   return fixed_point_quantize_stochastic_mask_cuda(a, wl, fl, symmetric);
 }
 
-Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
+Tensor block_quantize_stochastic(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_stochastic_cuda(a, wl, dim);
+  return block_quantize_stochastic_cuda(a, wl, dim, symmetric);
 }
 
-Tensor block_quantize_sim_stochastic(Tensor a, int wl)
+Tensor block_quantize_sim_stochastic(Tensor a, int wl, bool symmetric)
 {
   CHECK_INPUT(a);
-  return block_quantize_sim_stochastic_cuda(a, wl);
+  return block_quantize_sim_stochastic_cuda(a, wl, symmetric);
 }
 
 Tensor float_quantize_stochastic(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)

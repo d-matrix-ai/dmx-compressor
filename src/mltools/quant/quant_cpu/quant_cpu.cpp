@@ -195,8 +195,9 @@ unsigned int round_bitwise(unsigned int target, int man_bits, Mode rounding)
 }
 
 void block_quantize_helper(float *input, float *output, float *max_elem,
-                           int wl, int size, Mode rounding)
+                           int wl, int size, Mode rounding, bool symmetric)
 {
+  // TODO: implement symmetric/asymmetric logic below
   for (int64_t i = 0; i < size; i++)
   {
 
@@ -246,7 +247,7 @@ Tensor get_max_entry(Tensor a, int dim)
   return max_entry;
 }
 
-Tensor block_quantize_nearest(Tensor a, int wl, int dim)
+Tensor block_quantize_nearest(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
   auto a_array = a.data_ptr<float>();
@@ -257,10 +258,10 @@ Tensor block_quantize_nearest(Tensor a, int wl, int dim)
   // get maximum number and base
   Tensor max_entry = get_max_entry(a, dim);
   auto max_elem = max_entry.data_ptr<float>();
-  block_quantize_helper(a_array, o_array, max_elem, wl, size, rNearest);
+  block_quantize_helper(a_array, o_array, max_elem, wl, size, rNearest, symmetric);
   return o;
 }
-Tensor block_quantize_down(Tensor a, int wl, int dim)
+Tensor block_quantize_down(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
   auto a_array = a.data_ptr<float>();
@@ -271,11 +272,11 @@ Tensor block_quantize_down(Tensor a, int wl, int dim)
   // get maximum number and base
   Tensor max_entry = get_max_entry(a, dim);
   auto max_elem = max_entry.data_ptr<float>();
-  block_quantize_helper(a_array, o_array, max_elem, wl, size, rDown);
+  block_quantize_helper(a_array, o_array, max_elem, wl, size, rDown, symmetric);
   return o;
 }
 
-Tensor block_quantize_up(Tensor a, int wl, int dim)
+Tensor block_quantize_up(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
   auto a_array = a.data_ptr<float>();
@@ -286,11 +287,11 @@ Tensor block_quantize_up(Tensor a, int wl, int dim)
   // get maximum number and base
   Tensor max_entry = get_max_entry(a, dim);
   auto max_elem = max_entry.data_ptr<float>();
-  block_quantize_helper(a_array, o_array, max_elem, wl, size, rUp);
+  block_quantize_helper(a_array, o_array, max_elem, wl, size, rUp, symmetric);
   return o;
 }
 
-Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
+Tensor block_quantize_stochastic(Tensor a, int wl, int dim, bool symmetric)
 {
   CHECK_INPUT(a);
   auto a_array = a.data_ptr<float>();
@@ -302,7 +303,7 @@ Tensor block_quantize_stochastic(Tensor a, int wl, int dim)
   Tensor max_entry = get_max_entry(a, dim);
   auto max_elem = max_entry.data_ptr<float>();
   // std::srand(time(0));
-  block_quantize_helper(a_array, o_array, max_elem, wl, size, rStochastic);
+  block_quantize_helper(a_array, o_array, max_elem, wl, size, rStochastic, symmetric);
   return o;
 }
 

@@ -8,7 +8,9 @@ __global__ void block_kernel_stochastic(float* __restrict__ a,
                                         int* __restrict__ r,
                                         float* o, int size,
                                         float* __restrict__ max_entry,
-                                        int man_bits) {
+                                        int man_bits,
+                                        bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int max_entry_bits = FLOAT_TO_BITS(&max_entry[index]);
@@ -33,7 +35,9 @@ __global__ void block_kernel_stochastic(float* __restrict__ a,
 __global__ void block_kernel_nearest(float* __restrict__ a,
                                      float* o, int size,
                                      float* __restrict__ max_entry,
-                                     int man_bits) {
+                                     int man_bits,
+                                     bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int max_entry_bits = FLOAT_TO_BITS(&max_entry[index]);
@@ -55,7 +59,9 @@ __global__ void block_kernel_nearest(float* __restrict__ a,
 __global__ void block_kernel_down(float* __restrict__ a,
                                      float* o, int size,
                                      float* __restrict__ max_entry,
-                                     int man_bits) {
+                                     int man_bits,
+                                     bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int max_entry_bits = FLOAT_TO_BITS(&max_entry[index]);
@@ -78,7 +84,9 @@ __global__ void block_kernel_down(float* __restrict__ a,
 __global__ void block_kernel_up(float* __restrict__ a,
                                      float* o, int size,
                                      float* __restrict__ max_entry,
-                                     int man_bits) {
+                                     int man_bits,
+                                     bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     unsigned int max_entry_bits = FLOAT_TO_BITS(&max_entry[index]);
@@ -103,7 +111,9 @@ __global__ void block_kernel_sim_stochastic(float* __restrict__ a,
                                             float* __restrict__ r,
                                             float* o, int size,
                                             float* max_entry,
-                                            int wl) {
+                                            int wl,
+                                            bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     int exponent = ((int) extract_exponent(max_entry));
@@ -117,7 +127,9 @@ __global__ void block_kernel_sim_stochastic(float* __restrict__ a,
 __global__ void block_kernel_sim_nearest(float* __restrict__ a,
                                          float* o, int size,
                                          float* max_entry,
-                                         int wl) {
+                                         int wl,
+                                         bool symmetric) {
+  // TODO: implement symmetric/asymmetric encoding below
   int index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index < size) {
     int exponent = ((int) extract_exponent(max_entry));

@@ -251,7 +251,13 @@ class BlockFloatingPoint(Format):
         )  # slice to blocks
         _x = torch.cat(
             [
-                block_quantize(block, wl=self.precision, dim=0, rounding=self.rounding)
+                block_quantize(
+                    block,
+                    wl=self.precision,
+                    dim=0,
+                    symmetric=self.symmetric,
+                    rounding=self.rounding,
+                )
                 for block in _xs
             ],
             dim=self.block_dim,
@@ -262,7 +268,8 @@ class BlockFloatingPoint(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({symmetric:w}{rounding:l})", sh
+            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({symmetric:w}{rounding:l})",
+            sh,
         )
         return cls(
             precision=conf["precision"],

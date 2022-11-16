@@ -27,7 +27,7 @@ Tensor get_max_entry(Tensor a, int dim) {
   return max_entry;
 }
 
-Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim) {
+Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim, bool symmetric) {
   auto o = at::zeros_like(a);
   auto rand_ints = randint_like(a, INT_MAX, device(kCUDA).dtype(kInt));
   int64_t size = a.numel();
@@ -41,11 +41,12 @@ Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim) {
                                                     o.data_ptr<float>(),
                                                     size,
                                                     max_entry.data_ptr<float>(),
-                                                    wl);
+                                                    wl,
+                                                    symmetric);
   return o;
 }
 
-Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim) {
+Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim, bool symmetric) {
   auto o = at::zeros_like(a);
   int64_t size = a.numel();
 
@@ -57,11 +58,12 @@ Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim) {
                                                  o.data_ptr<float>(),
                                                  size,
                                                  max_entry.data_ptr<float>(),
-                                                 wl);
+                                                 wl,
+                                                 symmetric);
   return o;
 }
 
-Tensor block_quantize_down_cuda(Tensor a, int wl, int dim) {
+Tensor block_quantize_down_cuda(Tensor a, int wl, int dim, bool symmetric) {
   auto o = at::zeros_like(a);
   int64_t size = a.numel();
 
@@ -73,11 +75,12 @@ Tensor block_quantize_down_cuda(Tensor a, int wl, int dim) {
                                                  o.data_ptr<float>(),
                                                  size,
                                                  max_entry.data_ptr<float>(),
-                                                 wl);
+                                                 wl,
+                                                 symmetric);
   return o;
 }
 
-Tensor block_quantize_up_cuda(Tensor a, int wl, int dim) {
+Tensor block_quantize_up_cuda(Tensor a, int wl, int dim, bool symmetric) {
   auto o = at::zeros_like(a);
   int64_t size = a.numel();
 
@@ -89,13 +92,14 @@ Tensor block_quantize_up_cuda(Tensor a, int wl, int dim) {
                                                  o.data_ptr<float>(),
                                                  size,
                                                  max_entry.data_ptr<float>(),
-                                                 wl);
+                                                 wl,
+                                                 symmetric);
   return o;
 }
 
 
 
-Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl) {
+Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl, bool symmetric) {
   auto o = at::zeros_like(a);
   auto rand_probs = rand_like(a);
   int64_t size = a.numel();
@@ -109,11 +113,12 @@ Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl) {
                                                         o.data_ptr<float>(),
                                                         size,
                                                         max_entry.data_ptr<float>(),
-                                                        wl);
+                                                        wl,
+                                                        symmetric);
   return o;
 }
 
-Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl) {
+Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl, bool symmetric) {
   auto o = at::zeros_like(a);
   auto rand_ints = randint_like(a, INT_MAX, device(kCUDA).dtype(kInt));
   int64_t size = a.numel();
@@ -126,7 +131,8 @@ Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl) {
                                                  o.data_ptr<float>(),
                                                  size,
                                                  max_entry.data_ptr<float>(),
-                                                 wl);
+                                                 wl,
+                                                 symmetric);
   return o;
 }
 
