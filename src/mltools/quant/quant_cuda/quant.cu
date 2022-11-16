@@ -149,8 +149,39 @@ Tensor float_quantize_stochastic_cuda(Tensor a, int man_bits, int exp_bits, int 
   return o;
 }
 
+Tensor float_quantize_down_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal) {
+  auto o = zeros_like(a);
+  int size = a.numel();
+  int blockSize = 1024;
+  int blockNums = (size + blockSize - 1) / blockSize;
+
+  float_kernel_down<<<blockNums, blockSize>>>(a.data_ptr<float>(),
+                                              o.data_ptr<float>(),
+                                              size,
+                                              man_bits,
+                                              exp_bits, 
+                                              exp_bias, 
+                                              flush_subnormal);
+  return o;
+}
+
+Tensor float_quantize_up_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal) {
+  auto o = zeros_like(a);
+  int size = a.numel();
+  int blockSize = 1024;
+  int blockNums = (size + blockSize - 1) / blockSize;
+
+  float_kernel_up<<<blockNums, blockSize>>>(a.data_ptr<float>(),
+                                            o.data_ptr<float>(),
+                                            size,
+                                            man_bits,
+                                            exp_bits, 
+                                            exp_bias, 
+                                            flush_subnormal);
+  return o;
+}
+
 Tensor float_quantize_nearest_cuda(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal) {
-  // use external random number right now
   auto o = zeros_like(a);
   int size = a.numel();
   int blockSize = 1024;
