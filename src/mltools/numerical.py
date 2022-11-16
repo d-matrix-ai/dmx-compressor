@@ -202,7 +202,7 @@ class FloatingPoint(Format):
             exponent=conf["exponent"],
             bias=conf["bias"],
             flush_subnormal=conf["flush_subnormal"] == "F",
-            unsigned=conf["sign"]==0,
+            unsigned=conf["sign"] == 0,
             rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
@@ -296,6 +296,7 @@ class ScaledBlockFloatingPoint(Format):
         ), "scaler format needs to be floating point"
         assert block_format.fraction == 0, "block format needs to have zero fraction"
         assert block_format.symmetric, "block format needs to have symmetric range"
+        assert scaler_format.unsigned, "scaler format needs to be unsigned"
         assert block_size > 0, f"block size has to be positive, got {block_size}"
 
         self.block_format = block_format
