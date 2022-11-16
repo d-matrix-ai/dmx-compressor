@@ -71,7 +71,7 @@ try:
             block_size, mantissa = int(to_format.split("_")[1]), nbits - 8
             dim_arg = 0 if dimension == "col" else "1"
             shorthand = (
-                f"BFP[{mantissa}|8]" + "{" + f"{block_size},{dim_arg}" + "}" + "(N)"
+                f"BFP[{mantissa}|8]" + "{" + f"{block_size},{dim_arg}" + "}" + "(SN)"
             )
         qtorch_y = corsair.CastTo(shorthand)(x)
         mismatch = (
@@ -199,7 +199,7 @@ try:
                 + "{"
                 + f"{block_size},{dim_arg}"
                 + "}"
-                + "("
+                + "(S"
                 + ("U" if rnd == "u" else "D")
                 + ")"
             )
