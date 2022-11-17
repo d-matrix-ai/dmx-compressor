@@ -135,7 +135,7 @@ class FixedPoint(Format):
         return f"Simulated fixed point format: precision bits = {self.precision}, fraction bits = {self.fraction}, \ncasting behavior: symmetric = {self.symmetric}, clamp = {self.clamp}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"XP[{self.precision},{'0' if self.fraction==0 else f'{self.fraction:+d}'}]({'C' if self.clamp else 'U'}{'S' if self.symmetric else 'A'}{ROUNDING_MODE.inverse[self.rounding]})"
+        return f"XP[{self.precision},{'0' if self.fraction==0 else f'{self.fraction:+d}'}]({'C' if self.clamp else '_'}{'S' if self.symmetric else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class FloatingPoint(Format):
@@ -149,6 +149,7 @@ class FloatingPoint(Format):
         exponent=8,
         bias=None,
         flush_subnormal=True,
+        unsigned=False,
         rounding="nearest",
     ):
         super().__init__()
@@ -168,10 +169,11 @@ class FloatingPoint(Format):
         self.exponent = exponent
         self.bias = bias if bias is not None else 2 ** (exponent - 1) - 1
         self.flush_subnormal = flush_subnormal
+        self.unsigned = unsigned
         self.rounding = rounding
 
     def cast(self, x):
-        return (
+        x = (
             x
             if self.mantissa == 23
             and self.exponent == 8
@@ -187,11 +189,12 @@ class FloatingPoint(Format):
                 rounding=self.rounding,
             )
         )
+        return x.abs() if self.unsigned else x
 
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "FP[1|{exponent:d}|{mantissa:d},{bias:d}]({flush_subnormal:w}{rounding:l})",
+            "FP[{sign:d}|{exponent:d}|{mantissa:d},{bias:d}]({flush_subnormal:w}{rounding:l})",
             sh,
         )
         return cls(
@@ -199,14 +202,15 @@ class FloatingPoint(Format):
             exponent=conf["exponent"],
             bias=conf["bias"],
             flush_subnormal=conf["flush_subnormal"] == "F",
+            unsigned=conf["sign"] == 0,
             rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
-        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, \ncasting behavior: flush subnormal = {self.flush_subnormal}, rounding = {self.rounding}"
+        return f"Simulated floating point format: mantissa bits = {self.mantissa}, exponent bits = {self.exponent}, exponent bias = {self.bias}, unsigned = {self.unsigned}, \ncasting behavior: flush subnormal = {self.flush_subnormal}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"FP[1|{self.exponent}|{self.mantissa},{self.bias}]({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
+        return f"FP[{'0' if self.unsigned else '1'}|{self.exponent}|{self.mantissa},{self.bias}]({'F' if self.flush_subnormal else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class BlockFloatingPoint(Format):
@@ -214,7 +218,14 @@ class BlockFloatingPoint(Format):
     This is a block floating point format simulated in FP32, using QPyTorch.
     """
 
-    def __init__(self, precision=8, block_size=64, block_dim=-1, rounding="nearest"):
+    def __init__(
+        self,
+        precision=8,
+        block_size=64,
+        block_dim=-1,
+        symmetric=True,
+        rounding="nearest",
+    ):
         super().__init__()
         # check validity of format configuration
         assert (
@@ -225,6 +236,7 @@ class BlockFloatingPoint(Format):
         self.precision = precision
         self.block_size = block_size
         self.block_dim = block_dim
+        self.symmetric = symmetric
         self.rounding = rounding
         self.bfp_id = -1
 
@@ -243,7 +255,13 @@ class BlockFloatingPoint(Format):
         )  # slice to blocks
         _x = torch.cat(
             [
-                block_quantize(block, wl=self.precision, dim=0, rounding=self.rounding)
+                block_quantize(
+                    block,
+                    wl=self.precision,
+                    dim=0,
+                    symmetric=self.symmetric,
+                    rounding=self.rounding,
+                )
                 for block in _xs
             ],
             dim=self.block_dim,
@@ -254,20 +272,22 @@ class BlockFloatingPoint(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({rounding:l})", sh
+            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({symmetric:w}{rounding:l})",
+            sh,
         )
         return cls(
             precision=conf["precision"],
             block_size=conf["block_size"],
             block_dim=conf["block_dim"],
+            symmetric=conf["symmetric"] == "S",
             rounding=ROUNDING_MODE[conf["rounding"]],
         )
 
     def __str__(self) -> str:
-        return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: rounding = {self.rounding}"
+        return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: symmetric = {self.symmetric}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({ROUNDING_MODE.inverse[self.rounding]})"
+        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({'S' if self.symmetric else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class ScaledBlockFloatingPoint(Format):
@@ -292,6 +312,7 @@ class ScaledBlockFloatingPoint(Format):
         ), "scaler format needs to be floating point"
         assert block_format.fraction == 0, "block format needs to have zero fraction"
         assert block_format.symmetric, "block format needs to have symmetric range"
+        assert scaler_format.unsigned, "scaler format needs to be unsigned"
         assert block_size > 0, f"block size has to be positive, got {block_size}"
 
         self.block_format = block_format

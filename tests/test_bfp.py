@@ -16,12 +16,12 @@ def test_castto_bfp16_1():
     x *= 0.5 / x.abs().max()
     x += 1.0
 
-    _x = numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(x)
+    _x = numerical.CastTo(format="BFP[8|8]{1,-1}(SN)")(x)
     assert torch.allclose(_x, x, rtol=0.0, atol=2 ** -7)
 
     x = -x
 
-    _x = numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(x)
+    _x = numerical.CastTo(format="BFP[8|8]{1,-1}(SN)")(x)
     assert torch.allclose(_x, x, rtol=0.0, atol=2 ** -7)
 
 
@@ -42,8 +42,8 @@ def test_bfp16_1_rounding():
             1.03125,
         ]
     ).to(device)
-    assert torch.all(numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(x) == y)
-    assert torch.all(numerical.CastTo(format="BFP[8|8]{1,-1}(N)")(-x) == -y)
+    assert torch.all(numerical.CastTo(format="BFP[8|8]{1,-1}(SN)")(x) == y)
+    assert torch.all(numerical.CastTo(format="BFP[8|8]{1,-1}(SN)")(-x) == -y)
 
 
 def test_bfp12_1_rounding():
@@ -63,5 +63,5 @@ def test_bfp12_1_rounding():
             1.5,
         ]
     ).to(device)
-    assert torch.all(numerical.CastTo(format="BFP[4|8]{1,-1}(N)")(x) == y)
-    assert torch.all(numerical.CastTo(format="BFP[4|8]{1,-1}(N)")(-x) == -y)
+    assert torch.all(numerical.CastTo(format="BFP[4|8]{1,-1}(SN)")(x) == y)
+    assert torch.all(numerical.CastTo(format="BFP[4|8]{1,-1}(SN)")(-x) == -y)
