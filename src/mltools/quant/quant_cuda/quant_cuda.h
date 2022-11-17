@@ -41,40 +41,40 @@ std::tuple<Tensor, Tensor> fixed_point_quantize_nearest_mask_cuda(Tensor a, int 
  * and block floating point exponent dimension [dim]
  * Stochastic Rounding.
  **/
-Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 /**
  * quantize a FloatTensor into block floating point with word length [wl]
  * Stochastic Rounding.
  **/
-Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl);
+Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl, bool symmetric);
 
 /**
  * quantize a FloatTensor into block floating point number with word length [wl]
  * and block floating point exponent dimension [dim]
  * Nearest Rounding.
  **/
-Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 /**
  * quantize a FloatTensor into block floating point with word length [wl]
  * Nearest Rounding.
  **/
-Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl);
+Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl, bool symmetric);
 
 /**
  * quantize a FloatTensor into block floating point number with word length [wl]
  * and block floating point exponent dimension [dim]
  * Down Rounding.
  **/
-Tensor block_quantize_down_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_down_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 /**
  * quantize a FloatTensor into block floating point number with word length [wl]
  * and block floating point exponent dimension [dim]
  * Up Rounding.
  **/
-Tensor block_quantize_up_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_up_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 
 /**
