@@ -1,5 +1,5 @@
 model:
-  input_format: BFP[8|8]{64,-1}(N)
+  input_format: BFP[8|8]{64,-1}(SN)
   output_format: FP[1|5|10,15](FN)
 act_func:
   approximation_function: NONE
@@ -10,26 +10,26 @@ input_layer:
   accum_format: SAME
   approximation_function: NONE
   bias_format: SAME
-  input_format: BFP[8|8]{64,-1}(N)
+  input_format: BFP[8|8]{64,-1}(SN)
   instance: Linear
   output_format: FP[1|5|10,15](FN)
-  weight_format: BFP[8|8]{64,-1}(N)
+  weight_format: BFP[8|8]{64,-1}(SN)
   weight_sparseness: DENSE
 intermediate_layers.0:
   accum_format: SAME
   approximation_function: NONE
   bias_format: SAME
-  input_format: BFP[8|8]{64,-1}(N)
+  input_format: BFP[8|8]{64,-1}(SN)
   instance: Linear
   output_format: FP[1|5|10,15](FN)
-  weight_format: BFP[8|8]{64,-1}(N)
+  weight_format: BFP[8|8]{64,-1}(SN)
   weight_sparseness: DENSE
 output_layer:
   accum_format: SAME
   approximation_function: NONE
   bias_format: SAME
-  input_format: BFP[8|8]{64,-1}(N)
+  input_format: BFP[8|8]{64,-1}(SN)
   instance: Linear
   output_format: FP[1|5|10,15](FN)
-  weight_format: BFP[8|8]{64,-1}(N)
+  weight_format: BFP[8|8]{64,-1}(SN)
   weight_sparseness: DENSE

@@ -40,30 +40,30 @@ std::tuple<Tensor, Tensor> fixed_point_quantize_nearest_mask_cuda(Tensor a, int 
  * and fractional bits [fl]
  * Stochastic Rounding.
  **/
-Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_stochastic_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 /**
  * quantize a FloatTensor into fixed point number with word length [wl]
  * and fractional bits [fl]
  * Nearest Rounding.
  **/
-Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim);
-Tensor block_quantize_down_cuda(Tensor a, int wl, int dim);
-Tensor block_quantize_up_cuda(Tensor a, int wl, int dim);
+Tensor block_quantize_nearest_cuda(Tensor a, int wl, int dim, bool symmetric);
+Tensor block_quantize_down_cuda(Tensor a, int wl, int dim, bool symmetric);
+Tensor block_quantize_up_cuda(Tensor a, int wl, int dim, bool symmetric);
 
 /**
  * quantize a FloatTensor into fixed point number with word length [wl]
  * and fractional bits [fl]
  * Stochastic Rounding.
  **/
-Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl);
+Tensor block_quantize_sim_stochastic_cuda(Tensor a, int wl, bool symmetric);
 
 /**
  * quantize a FloatTensor into fixed point number with word length [wl]
  * and fractional bits [fl]
  * Nearest Rounding.
  **/
-Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl);
+Tensor block_quantize_sim_nearest_cuda(Tensor a, int wl, bool symmetric);
 
 /**
  * quantize a FloatTensor into a low bit-width floating point Tensor
