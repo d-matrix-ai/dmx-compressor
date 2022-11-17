@@ -334,7 +334,8 @@ class ScaledBlockFloatingPoint(Format):
             _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
         )  # slice to chunks
         _xms = [
-            self.get_chunk_max(chunk) / self.man_scaling for chunk in _xs
+            self.get_chunk_max(chunk) / self.man_scaling + torch.finfo(x.dtype).eps
+            for chunk in _xs
         ]  # max of blocks in each chunk
         _x = torch.cat(
             [
