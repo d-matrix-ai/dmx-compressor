@@ -342,7 +342,7 @@ class ScaledBlockFloatingPoint(Format):
                     chunk_max > 0.0,
                     self.block_format.cast(chunk / chunk_max)
                     * self.scaler_format.cast(chunk_max),
-                    torch.zeros_like(chunk),
+                    chunk,
                 )
                 for chunk, chunk_max in zip(_xs, _xms)
             ],
