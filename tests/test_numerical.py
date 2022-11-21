@@ -11,11 +11,11 @@ format_dict = {
     "BFP32_1": corsair.format.FLOAT32,
     "BFP16_64": corsair.format.BFP16_64_LD,
     "BFP12_128": corsair.format.BFP12_128_LD,
-    "BFP24_64": numerical.Format.from_shorthand("BFP[16|8]{64,-1}(N)"),
-    "CFP[1|5|2]{15}(N)": numerical.Format.from_shorthand("FP[1|5|2,15](N)"),
-    "CFP[1|5|2]{20}(N)": numerical.Format.from_shorthand("FP[1|5|2,20](N)"),
-    "CFP[1|4|3]{7}(N)": numerical.Format.from_shorthand("FP[1|4|3,7](N)"),
-    "CFP[1|4|3]{10}(N)": numerical.Format.from_shorthand("FP[1|4|3,10](N)"),
+    "BFP24_64": numerical.Format.from_shorthand("BFP[16|8]{64,-1}(_N)"),
+    "CFP[1|5|2]{15}(N)": numerical.Format.from_shorthand("FP[1|5|2,15](FN)"),
+    "CFP[1|5|2]{20}(N)": numerical.Format.from_shorthand("FP[1|5|2,20](FN)"),
+    "CFP[1|4|3]{7}(N)": numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
+    "CFP[1|4|3]{10}(N)": numerical.Format.from_shorthand("FP[1|4|3,10](FN)"),
     # "SBFP12": ,
 }
 
