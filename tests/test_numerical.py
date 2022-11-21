@@ -52,8 +52,8 @@ def test_conversion(from_format, to_format, register):
     """
 
     test_data = TestData(from_format, to_format, register)
-    input_fp32 = test_data.input.to_fp32()
-    output_fp32 = test_data.output.to_fp32()
+    input_fp32 = torch.from_numpy(test_data.input.to_fp32())
+    output_fp32 = torch.from_numpy(test_data.output.to_fp32())
 
     output = corsair.CastTo(format=format_dict[to_format])(input_fp32)
     assert torch.allclose(output, output_fp32, atol=0)
@@ -74,9 +74,9 @@ def test_matmul(input_a_format, input_b_format):
     """
 
     test_data = TestOpData(input_a_format, input_b_format)
-    input_a_fp32 = test_data.input_a.to_fp32()
-    input_b_fp32 = test_data.input_b.to_fp32()
-    output_fp32 = test_data.output.to_fp32()
+    input_a_fp32 = torch.from_numpy(test_data.input_a.to_fp32())
+    input_b_fp32 = torch.from_numpy(test_data.input_b.to_fp32())
+    output_fp32 = torch.from_numpy(test_data.output.to_fp32())
 
     output = torch.matmul(input_a_fp32, input_b_fp32)
     assert torch.allclose(output, output_fp32)
