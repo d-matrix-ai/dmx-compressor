@@ -21,7 +21,7 @@ format_dict = {
 
 
 @pytest.mark.parametrize(
-    "from_format,to_format,register",
+    "from_format,to_format,register,rounding",
     (
         ("BFP32_1", "FP16", None, None),
         ("FP16", "BFP16_64", "row", None),
@@ -45,13 +45,13 @@ format_dict = {
         ("SBFP12", "BFP16_64", None, None),
     ),
 )
-def test_conversion(from_format, to_format, register):
+def test_conversion(from_format, to_format, register, rounding):
     """
     Conversion of one tensor format to another
     the test assures mltools conversion is accurate
     """
 
-    test_data = TestData(from_format, to_format, register)
+    test_data = TestData(from_format, to_format, register, rounding)
     input_fp32 = torch.from_numpy(test_data.input.to_fp32())
     output_fp32 = torch.from_numpy(test_data.output.to_fp32())
 
