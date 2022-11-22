@@ -338,8 +338,12 @@ class ScaledBlockFloatingPoint(Format):
         ]  # max of blocks in each chunk
         _x = torch.cat(
             [
-                self.block_format.cast(chunk / chunk_max)
-                * self.scaler_format.cast(chunk_max)
+                torch.where(
+                    chunk_max > 0.0,
+                    self.block_format.cast(chunk / chunk_max)
+                    * self.scaler_format.cast(chunk_max),
+                    chunk,
+                )
                 for chunk, chunk_max in zip(_xs, _xms)
             ],
             dim=self.block_dim,
