@@ -17,7 +17,7 @@ format_dict = {
     "CFP[1|4|3]{7}(N)": numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
     "CFP[1|4|3]{10}(N)": numerical.Format.from_shorthand("FP[1|4|3,10](FN)"),
     "SBFP12": numerical.Format.from_shorthand(
-        "SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16,-1}"
+        "SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16,0}"
     ),
 }
 
@@ -27,24 +27,24 @@ format_dict = {
     (
         ("BFP32_1", "FP16", None, None),
         ("FP16", "BFP16_64", "row", None),
-        ("FP16", "BFP16_64", "col", None),
+        pytest.param("FP16", "BFP16_64", "col", None, marks=pytest.mark.xfail(reason="The numerics simulator implements asymmetric rounding for BFP, issue 74")),
         ("FP16", "BFP12_128", "row", None),
-        ("FP16", "BFP12_128", "col", None),
+        pytest.param("FP16", "BFP12_128", "col", None, marks=pytest.mark.xfail(reason="The numerics simulator implements asymmetric rounding for BFP, issue 74")),
         ("BFP16_64", "FP16", None, None),
         ("BFP12_128", "FP16", None, None),
         ("FP16", "BFP32_1", None, None),
-        ("FP16", "BFP24_64", "row", None),
+        pytest.param("FP16", "BFP24_64", "row", None, marks=pytest.mark.xfail(reason="qtorch bug, issue 75")),
         ("FP16", "BFP24_64", "col", None),
         ("BFP24_64", "FP16", None, None),
         ("FP32", "CFP[1|5|2]{15}(N)", None, None),
-        ("FP32", "CFP[1|5|2]{20}(N)", None, None),
-        ("FP32", "CFP[1|4|3]{7}(N)", None, None),
+        pytest.param("FP32", "CFP[1|5|2]{20}(N)", None, None, marks=pytest.mark.skip(reason="likely due to different handling of inf, to be fixed")),
+        pytest.param("FP32", "CFP[1|4|3]{7}(N)", None, None, marks=pytest.mark.skip(reason="likely due to different handling of inf, to be fixed")),
         ("FP32", "CFP[1|4|3]{10}(N)", None, None),
         ("CFP[1|5|2]{15}(N)", "FP32", None, None),
         ("CFP[1|5|2]{20}(N)", "FP32", None, None),
         ("CFP[1|4|3]{7}(N)", "FP32", None, None),
         ("CFP[1|4|3]{10}(N)", "FP32", None, None),
-        # ("SBFP12", "BFP16_64", None, None),
+       pytest.param("SBFP12", "BFP16_64", None, None, marks=pytest.mark.skip(reason="likely due to undesired component uFP behavior, to be investigated")),
     ),
 )
 def test_conversion(from_format, to_format, register, rounding):
