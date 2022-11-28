@@ -362,6 +362,16 @@ Tensor float_quantize_nearest(Tensor a, int man_bits, int exp_bits, int exp_bias
   return float_quantize(a, man_bits, exp_bits, exp_bias, flush_subnormal, rNearest);
 }
 
+Tensor float_quantize_down(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
+{
+  return float_quantize(a, man_bits, exp_bits, exp_bias, flush_subnormal, rDown);
+}
+
+Tensor float_quantize_up(Tensor a, int man_bits, int exp_bits, int exp_bias, bool flush_subnormal)
+{
+  return float_quantize(a, man_bits, exp_bits, exp_bias, flush_subnormal, rUp);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
   m.def("fixed_point_quantize_stochastic_mask", &fixed_point_quantize_stochastic_mask, "Fixed Point Number Stochastic Quantization with Mask (CPU)");
@@ -371,7 +381,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
   m.def("fixed_point_quantize_nearest_mask", &fixed_point_quantize_nearest_mask, "Fixed Point Number Nearest Quantization with Mask (CPU)");
   m.def("fixed_point_quantize_nearest", &fixed_point_quantize_nearest, "Fixed Point Number Nearest Neighbor Quantization (CPU)");
   m.def("block_quantize_nearest", &block_quantize_nearest, "Block Floating Point Number Nearest Neighbor Quantization (CPU)");
-  m.def("block_quantize_down", &block_quantize_down, "Block Floating Point Number Rounding Down Quantization (CPU)");
-  m.def("block_quantize_up", &block_quantize_up, "Block Floating Point Number Rounding Up Quantization (CPU)");
   m.def("float_quantize_nearest", &float_quantize_nearest, "Low-Bitwidth Floating Point Number Nearest Neighbor Quantization (CPU)");
+  m.def("block_quantize_down", &block_quantize_down, "Block Floating Point Number Rounding Down Quantization (CPU)");
+  m.def("float_quantize_down", &float_quantize_down, "Low-Bitwidth Floating Point Number Rounding Down Quantization (CPU)");
+  m.def("block_quantize_up", &block_quantize_up, "Block Floating Point Number Rounding Up Quantization (CPU)");
+  m.def("float_quantize_up", &float_quantize_up, "Low-Bitwidth Floating Point Number Rounding Up Quantization (CPU)");
 }
