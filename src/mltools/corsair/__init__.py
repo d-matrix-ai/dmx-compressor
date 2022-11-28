@@ -32,33 +32,21 @@ sparseness = SimpleNamespace(
 # Default approximation function aliases
 default_approx = SimpleNamespace(
     SOFTMAX=ApproximationFunction.from_shorthand("SOFTMAX(base2,float16)"),
-    GELU="GELU(poly2,float16)",
-    LAYERNORM="LAYERNORM(quake3,float16)",
+    GELU=ApproximationFunction.from_shorthand("GELU(poly2,float16)"),
+    LAYERNORM=ApproximationFunction.from_shorthand("LAYERNORM(quake3,float16)"),
 )
 
 
-counterpart = {
-    torch.nn.Linear: nn.Linear,
-    torch.nn.Conv2d: nn.Conv2d,
-    torch.nn.AdaptiveAvgPool2d: nn.AdaptiveAvgPool2d,
-    torch.nn.MaxPool2d: nn.MaxPool2d,
-    torch.nn.BatchNorm2d: nn.BatchNorm2d,
-    torch.nn.LayerNorm: nn.LayerNorm,
-    torch.nn.Dropout: nn.Dropout,
-    torch.nn.Softmax: nn.Softmax,
-    torch.nn.ReLU: nn.ReLU,
-    torch.nn.ReLU6: nn.ReLU6,
-    torch.nn.Tanh: nn.Tanh,
-}
-
-class Chiplet():
+class Chiplet:
     def __init__(self):
         pass
 
-class Quad():
+
+class Quad:
     def __init__(self):
         pass
 
-class Slice():
+
+class Slice:
     def __init__(self):
         pass

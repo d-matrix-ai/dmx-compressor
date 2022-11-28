@@ -1,5 +1,3 @@
-from ast import Str
-from logging import PlaceHolder
 from modulefinder import Module
 import sys
 import re
@@ -9,7 +7,6 @@ from .nn import *
 from mltools import corsair, numerical
 from mltools.utils import (
     load_config_file,
-    graph_utils,
     save_config_file,
     print_model_tree,
 )
@@ -55,12 +52,12 @@ class Model(torch.nn.Module):
         self.head = head
         self.tail = tail
 
-    def forward(self, input, dmir_executor=None):
+    def forward(self, input):
         # NOTE: only a single input is allowed
         output = self.head(input)
         if isinstance(output, torch.Tensor):
             output = (output,)
-        output = self.body(*output) if dmir_executor is None else dmir_executor(*output)
+        output = self.body(*output)
         output = self.tail(output)
         return output
 
@@ -100,14 +97,6 @@ class Model(torch.nn.Module):
     def print_model_tree(self, include_type=False):
         print_model_tree(self, include_type)
 
-    def fx_graph(self, sample_input, **kwargs):
-        return dmir.parse_fx(
-            self.body,
-            self.head(sample_input),
-            graph_dict=dict(),
-            **kwargs,
-        )
-
 
 class CorsairConfig(dict):
     r"""
@@ -142,7 +131,7 @@ class CorsairTransformation(SimpleNamespace):
     def __init__(
         self,
         module_types=(),
-        name_re: Str = "",
+        name_re: str = "",
         module_config: CorsairModuleConfig = CorsairModuleConfig(),
     ) -> None:
         assert all([issubclass(mt, CorsairModule) for mt in module_types])

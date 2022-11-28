@@ -12,7 +12,7 @@ __ALL__ = [
     "GELUApproximation",
     "LayerNormApproximation",
     "Approximate",
-    "Approximator"
+    "Approximator",
 ]
 
 
@@ -41,8 +41,6 @@ class ApproximationFunction:
             return GELUApproximation.from_shorthand(sh)
         elif sh.startswith("LAYERNORM"):
             return LayerNormApproximation.from_shorthand(sh)
-        elif sh.startswith("LOWRANK_WEIGHT"):
-            return LowRankWeight.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized approximation function shorthand: {sh}")
 
@@ -68,6 +66,7 @@ class NoApproximation(ApproximationFunction):
     def __repr__(self) -> str:
         return f"NONE"
 
+
 class Identity(ApproximationFunction):
     r"""
     This is a identity function that does no approximation and just returns the original value
@@ -92,7 +91,6 @@ class Identity(ApproximationFunction):
 
     def __repr__(self) -> str:
         return f"Identity"
-
 
 
 class SoftmaxApproximation(ApproximationFunction):
@@ -136,33 +134,6 @@ class SoftmaxApproximation(ApproximationFunction):
 
     def __repr__(self) -> str:
         return f"SOFTMAX({self.algorithm},{self.nform})"
-
-
-class LowRankWeight(ApproximationFunction):
-    def __init__(self, algorithm="svd", rank=6):
-        super().__init__()
-        assert algorithm in ("svd",), f"unsupported low_rank algorithm {algorithm}"
-        self.algorithm = algorithm
-        self.rank = rank
-
-    def execute(self, *args, **kwargs):
-        return eval(f"functions.{self.algorithm}_lowrank_approximate_tensor")(
-            *args, **dict(kwargs, rank=self.rank)
-        )
-
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        conf = parse("LOWRANK_WEIGHT({algorithm:w},{rank:d})", sh)
-        return cls(
-            algorithm=conf["algorithm"],
-            rank=conf["rank"],
-        )
-
-    def __str__(self) -> str:
-        return f"Low-rank weight approximation: algorithm = {self.algorithm}, rank = {self.rank}"
-
-    def __repr__(self) -> str:
-        return f"LOWRANK_WEIGHT({self.algorithm},{self.rank})"
 
 
 class LayerNormApproximation(ApproximationFunction):
@@ -254,10 +225,12 @@ class Approximate(nn.Module):
     def extra_repr(self):
         return f"function = {self.function.__repr__()}"
 
+
 class Approximator(nn.Module):
     r"""
     A nn.Module subclass that mimics the behavior of ApproximationMixin
     """
+
     def __init__(self, function=Identity()):
         super().__init__()
         if not isinstance(function, ApproximationFunction):
@@ -268,22 +241,17 @@ class Approximator(nn.Module):
         _output = self.function.execute(input)[0]
         if not isinstance(
             self.function,
-            (
-                NoApproximation,
-                LowRankWeight,
-            ),
+            (NoApproximation,),
         ):
             with torch.no_grad():
-                self.approximation_error = _output-input
+                self.approximation_error = _output - input
         return _output
 
     def extra_repr(self):
         return f"function = {self.function.__repr__()}"
-    
+
     def approximation_function(self):
         return repr(self.function)
-
-
 
 
 class ApproximationMixin:
@@ -302,10 +270,7 @@ class ApproximationMixin:
         _output = super().forward(input)
         if not isinstance(
             self.approximator.function,
-            (
-                NoApproximation,
-                LowRankWeight,
-            ),
+            (NoApproximation,),
         ):
             with torch.no_grad():
                 _approx = self.approximator(input, *args, **kwargs)
