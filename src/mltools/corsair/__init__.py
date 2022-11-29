@@ -17,6 +17,8 @@ format = SimpleNamespace(
     INT4=Format.from_shorthand("XP[4,0](CSN)"),
     BFP16_64_LD=Format.from_shorthand("BFP[8|8]{64,-1}(SN)"),
     BFP16_64_FD=Format.from_shorthand("BFP[8|8]{64,1}(SN)"),
+    BFP16_128_LD=Format.from_shorthand("BFP[8|8]{128,-1}(SN)"),
+    BFP16_128_FD=Format.from_shorthand("BFP[8|8]{128,1}(SN)"),
     BFP12_128_LD=Format.from_shorthand("BFP[4|8]{128,-1}(SN)"),
     BFP12_128_FD=Format.from_shorthand("BFP[4|8]{128,1}(SN)"),
 )
