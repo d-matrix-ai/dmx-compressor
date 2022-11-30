@@ -177,7 +177,9 @@ class Linear(CorsairModule, torch.nn.Linear):
         super().__init__(in_features, out_features, bias=bias, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _product = self.accum_cast(torch.matmul(_input, self._weight.t()))
+        _product = self.accum_cast(
+            torch.matmul(_input.to(self._weight.dtype), self._weight.t())
+        )
         if self.bias is not None:
             _output = torch.add(_product, self._bias)
         else:
@@ -213,7 +215,9 @@ class Conv2d(CorsairModule, torch.nn.Conv2d):
         )
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _convolution = self.accum_cast(self._conv_forward(_input, self._weight, None))
+        _convolution = self.accum_cast(
+            self._conv_forward(_input.to(self._weight.dtype), self._weight, None)
+        )
         if self.bias is not None:
             _output = torch.add(_convolution, self._bias.unsqueeze(-1).unsqueeze(-1))
         else:

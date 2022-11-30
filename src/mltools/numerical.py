@@ -175,13 +175,10 @@ class FloatingPoint(Format):
     def cast(self, x):
         x = (
             x
-            if self.mantissa == 23
-            and self.exponent == 8
-            and self.bias == 127
-            and not self.flush_subnormal
-            and self.rounding == "nearest"
+            if (x.dtype == torch.float32 and repr(self).startswith("FP[1|8|23,127]"))
+            or (x.dtype == torch.float16 and repr(self).startswith("FP[1|5|10,15]"))
             else float_quantize(
-                x,
+                x.float(),
                 man=self.mantissa,
                 exp=self.exponent,
                 bias=self.bias,
@@ -248,7 +245,7 @@ class BlockFloatingPoint(Format):
         # input of Conv2D: [B, Cin, H, W], dim=1
         # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
         # TODO: modify qtorch kernels do the following at C++ level
-        _x = x.transpose(self.block_dim, -1)  # dim swap
+        _x = x.float().transpose(self.block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
         _xs = torch.split(
             _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
@@ -328,7 +325,7 @@ class ScaledBlockFloatingPoint(Format):
         )[0]
 
     def cast(self, x: torch.Tensor) -> torch.Tensor:
-        _x = x.transpose(self.block_dim, -1)  # dim swap
+        _x = x.float().transpose(self.block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
         _xs = torch.split(
             _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
