@@ -105,7 +105,8 @@ def test_conversion(from_format, to_format, register, rounding):
     input_fp32 = torch.from_numpy(test_data.input.to_fp32())
     output_fp32 = torch.from_numpy(test_data.output.to_fp32())
 
-    output = corsair.CastTo(format=format_dict[to_format])(input_fp32)
+    output_format = format_dict[(to_format, register)]
+    output = corsair.CastTo(format=output_format)(input_fp32)
     assert torch.allclose(output, output_fp32, atol=0)
 
 
