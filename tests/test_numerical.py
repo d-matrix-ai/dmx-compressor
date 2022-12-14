@@ -6,17 +6,19 @@ from numerics import TestData, TestOpData, convert_matmul_results
 
 # helper dictionary that maps a numerics format string to a numerical.Format object
 format_dict = {
-    "FP16": corsair.format.FLOAT16,
-    "FP32": corsair.format.FLOAT32,
-    "BFP32_1": corsair.format.FLOAT32,
-    "BFP16_64": corsair.format.BFP16_64_LD,
-    "BFP12_128": corsair.format.BFP12_128_LD,
-    "BFP24_64": numerical.Format.from_shorthand("BFP[16|8]{64,-1}(_N)"),
-    "CFP[1|5|2]{15}(N)": numerical.Format.from_shorthand("FP[1|5|2,15](FN)"),
-    "CFP[1|5|2]{20}(N)": numerical.Format.from_shorthand("FP[1|5|2,20](FN)"),
-    "CFP[1|4|3]{7}(N)": numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
-    "CFP[1|4|3]{10}(N)": numerical.Format.from_shorthand("FP[1|4|3,10](FN)"),
-    "SBFP12": numerical.Format.from_shorthand(
+    ("FP16", None): corsair.format.FLOAT16,
+    ("FP32", None): corsair.format.FLOAT32,
+    ("BFP32_1", None): corsair.format.FLOAT32,
+    ("BFP16_64", "row"): numerical.Format.from_shorthand("BFP[8|8]{64,-2}(_N)"),
+    ("BFP16_64", "col"): numerical.Format.from_shorthand("BFP[8|8]{64,-1}(_N)"),
+    ("BFP12_128", "row"): numerical.Format.from_shorthand("BFP[4|8]{128,-2}(_N)"),
+    ("BFP12_128", "col"): numerical.Format.from_shorthand("BFP[4|8]{128,-1}(_N)"),
+    ("BFP24_64", None): numerical.Format.from_shorthand("BFP[16|8]{64,-1}(_N)"),
+    ("CFP[1|5|2]{15}(N)", None): numerical.Format.from_shorthand("FP[1|5|2,15](FN)"),
+    ("CFP[1|5|2]{20}(N)", None): numerical.Format.from_shorthand("FP[1|5|2,20](FN)"),
+    ("CFP[1|4|3]{7}(N)" , None): numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
+    ("CFP[1|4|3]{10}(N)", None): numerical.Format.from_shorthand("FP[1|4|3,10](FN)"),
+    ("SBFP12", None): numerical.Format.from_shorthand(
         "SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16,0}"
     ),
 }
