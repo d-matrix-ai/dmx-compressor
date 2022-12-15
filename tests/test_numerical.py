@@ -22,6 +22,7 @@ format_dict = {
     ("SBFP12", None): numerical.Format.from_shorthand(
         "SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16,0}"
     ),
+    ("UFP[0|4|4]{9}(N)", None): numerical.Format.from_shorthand("FP[0|4|4,9](FN)"),
 }
 
 
