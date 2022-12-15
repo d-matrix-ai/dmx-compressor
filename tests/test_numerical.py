@@ -17,7 +17,7 @@ format_dict = {
     ("BFP24_64", "col"): numerical.Format.from_shorthand("BFP[16|8]{64,-1}(_N)"),
     ("CFP[1|5|2]{15}(N)", None): numerical.Format.from_shorthand("FP[1|5|2,15](FN)"),
     ("CFP[1|5|2]{20}(N)", None): numerical.Format.from_shorthand("FP[1|5|2,20](FN)"),
-    ("CFP[1|4|3]{7}(N)" , None): numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
+    ("CFP[1|4|3]{7}(N)", None): numerical.Format.from_shorthand("FP[1|4|3,7](FN)"),
     ("CFP[1|4|3]{10}(N)", None): numerical.Format.from_shorthand("FP[1|4|3,10](FN)"),
     ("SBFP12", None): numerical.Format.from_shorthand(
         "SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16,0}"
@@ -94,6 +94,15 @@ format_dict = {
                 reason="likely due to undesired component uFP behavior, to be investigated"
             ),
         ),
+        ("FP32", "UFP8", None, None),
+        ("FP16", "BFP16_64", "row", "u"),
+        ("FP16", "BFP16_64", "col", "u"),
+        ("FP16", "BFP12_128", "row", "u"),
+        ("FP16", "BFP12_128", "col", "u"),
+        ("FP16", "BFP16_64", "row", "d"),
+        ("FP16", "BFP16_64", "col", "d"),
+        ("FP16", "BFP12_128", "row", "d"),
+        ("FP16", "BFP12_128", "col", "d"),
     ),
 )
 def test_conversion(from_format, to_format, register, rounding):
