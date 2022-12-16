@@ -361,22 +361,22 @@ def fallbacklayer_norm(
     input, normalized_shape, weight=None, bias=None, eps=2.0**-126, nform="float16"
 ):
     r"""
-    This function computes layer norm in float16 but with only 1/sqrt computed in FP32.
+    This function computes layer norm in nform but with only 1/sqrt computed in FP32.
     Args: xin is a vector, each element in nform
     Returns: xout is a vector of normalized values in nform
     TODO: supoprt affine weight  
     """
     assert eps == 2.0**-126, f"eps has to be 2.**-126"
-    assert nform == "float16", f"nform has to be 'float16'"
+    nform = eval(f"torch.{nform}")
 
-    beta = torch.zeros(1, dtype=torch.float16)  # beta parameter for normalized mean
-    gamma = torch.ones(1, dtype=torch.float16)  # gamma parameter for normalized sigma
+    beta = torch.zeros(1, dtype=nform)  # beta parameter for normalized mean
+    gamma = torch.ones(1, dtype=nform)  # gamma parameter for normalized sigma
     eps = torch.Tensor(
         [eps], dtype=torch.float32
     )  # default 2.**-126 is the smallest normal FP32 number
 
     # compute mean and variance
-    _x = input.half()
+    _x = input.to(nform)
     _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
     _xvar = torch.var(
         _x,
@@ -389,10 +389,10 @@ def fallbacklayer_norm(
     _xvar_FP32 = (
         _xvar.to(torch.float32) + eps
     )  # cast FP32; + eps to avoid dividing by zero
-    _xvar_sqrt_recip_FP32 = torch.ones(1, dtype=torch.float16) / torch.sqrt(
+    _xvar_sqrt_recip_FP32 = torch.ones(1, dtype=nform) / torch.sqrt(
         _xvar_FP32
     )  # compute sqrt reciprocal in FP32
-    _xvar_sqrt_recip = _xvar_sqrt_recip_FP32.to(torch.float16)  # convert back to FP16
+    _xvar_sqrt_recip = _xvar_sqrt_recip_FP32.to(nform)  # convert back to nform
 
     # compute normalized output
     _xout = _x - _xmean
