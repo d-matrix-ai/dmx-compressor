@@ -148,3 +148,5 @@ For more detailed information, go over the following documents on specific topic
 - Multi-layer perceptron on MNIST
 - Transformer language models on GLUE and SQuAD
 - Convolutional nets on CIFAR10/100 and Imagenet
+
+Very important changes
