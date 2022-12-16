@@ -63,15 +63,7 @@ format_dict = {
         ("FP16", "BFP24_64", "col", None),
         ("BFP24_64", "FP16", None, None),
         ("FP32", "CFP[1|5|2]{15}(N)", None, None),
-        pytest.param(
-            "FP32",
-            "CFP[1|5|2]{20}(N)",
-            None,
-            None,
-            marks=pytest.mark.skip(
-                reason="likely due to different handling of inf, to be fixed"
-            ),
-        ),
+        ("FP32", "CFP[1|5|2]{20}(N)", None, None),
         pytest.param(
             "FP32",
             "CFP[1|4|3]{7}(N)",
