@@ -35,7 +35,7 @@ sparseness = SimpleNamespace(
 default_approx = SimpleNamespace(
     SOFTMAX=ApproximationFunction.from_shorthand("SOFTMAX(base2,float16)"),
     GELU=ApproximationFunction.from_shorthand("GELU(poly2,float16)"),
-    LAYERNORM=ApproximationFunction.from_shorthand("LAYERNORM(quake3,float16)"),
+    LAYERNORM=ApproximationFunction.from_shorthand("LAYERNORM(fallback,float16)"),
 )
 
 
