@@ -44,6 +44,7 @@ def aware(patch_hf_transformers: bool = False):
         transformers.activations.QuickGELUActivation = GELU
         transformers.activations.ClippedGELUActivation = GELU
 
+        transformers.pytorch_utils.Conv1D = HFTransformersConv1D
 
 class Model(torch.nn.Module):
     r"""
