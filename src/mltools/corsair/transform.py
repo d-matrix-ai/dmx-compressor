@@ -2,6 +2,7 @@ from modulefinder import Module
 import sys
 import re
 import torch
+import transformers
 from types import SimpleNamespace
 from .nn import *
 from mltools import corsair, numerical
@@ -16,7 +17,7 @@ import torch.nn as nn
 from ..numerical import CastTo
 
 
-def aware():
+def aware(patch_hf_transformers: bool = False):
     # add new torch.nn modules for corsair
     torch.nn.CastTo = CastTo
     torch.nn.Sparsify = Sparsify
@@ -34,6 +35,14 @@ def aware():
     torch.nn.ReLU6 = ReLU6
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
+    # overload huggingface transformers modules
+    if patch_hf_transformers:
+        # TODO: implement different versions of the HF GELU approximations
+        transformers.activations.NewGELUActivation = GELU
+        transformers.activations.GELUActivation = GELU
+        transformers.activations.FastGELUActivation = GELU
+        transformers.activations.QuickGELUActivation = GELU
+        transformers.activations.ClippedGELUActivation = GELU
 
 
 class Model(torch.nn.Module):

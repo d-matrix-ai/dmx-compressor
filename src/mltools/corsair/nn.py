@@ -380,8 +380,8 @@ class Tanh(CorsairModule, torch.nn.Tanh):
 
 
 class GELU(CorsairModule, torch.nn.GELU):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
