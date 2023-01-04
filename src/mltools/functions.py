@@ -28,7 +28,7 @@ def poly2softmax(x, dim=-1, nform="float16", **kwargs):
         sum_ey = torch.sum(ey, dim=dim, keepdim=True)
 
         # compute softmax
-        eps = torch.tensor(2 ** -24, dtype=torch.float16)
+        eps = torch.tensor(2**-24, dtype=torch.float16)
         y = ey / (sum_ey + eps)
         y = y.float()
 
@@ -68,8 +68,8 @@ def poly2exp(x, nform, dim=-1):
 
     if nform == "int":
         scale = 14  # emulate integer arithmetic with 14 bit fractional part
-        c0int = 2 ** scale  # poly coefficient c0 = 1
-        c1int = round(1.0151 * 2 ** scale)  # poly coefficient c1
+        c0int = 2**scale  # poly coefficient c0 = 1
+        c1int = round(1.0151 * 2**scale)  # poly coefficient c1
         # note poly coefficient c2 is 0.5
 
         # range reduction to range -log(2)/2 < r < log(2)/2
@@ -77,7 +77,7 @@ def poly2exp(x, nform, dim=-1):
         r = x - k * ln2
 
         # compute exp(r) emulating fixed point arithmetic
-        rint = torch.round(r * 2 ** scale)
+        rint = torch.round(r * 2**scale)
 
         mult_add1 = torch.round(c1int + 0.5 * rint)
         mult_add2 = torch.round(c0int + torch.round(mult_add1 * rint * 2 ** (-scale)))
@@ -171,7 +171,7 @@ def base2softmax(x, dim=-1, nform="float16", quake3=False, **kwargs):
         sum_ey = torch.sum(ey, dim=dim, keepdim=True)
 
         # compute softmax
-        eps = torch.tensor(2 ** -24, dtype=torch.float16)
+        eps = torch.tensor(2**-24, dtype=torch.float16)
         y = ey * recip_float16_quake3(sum_ey + eps) if quake3 else ey / (sum_ey + eps)
         y = y.float()
 
@@ -212,14 +212,14 @@ def base2exp(x, nform, dim=-1):
 
     if nform == "int":
         scale = 14  # assuming 14 bits after binary fixed point
-        log2e = round(log2e_fp * 2 ** scale) / 2 ** scale  # log2(e)
-        d = round(d * 2 ** scale) / 2 ** scale
+        log2e = round(log2e_fp * 2**scale) / 2**scale  # log2(e)
+        d = round(d * 2**scale) / 2**scale
 
         # range reduction to k and v
         z = x * log2e
         k = torch.floor(z)
         v = z - k
-        v = torch.round(v * 2 ** scale) / 2 ** scale
+        v = torch.round(v * 2**scale) / 2**scale
     elif nform == "float32":
         log2e = torch.tensor(log2e_fp, dtype=torch.float32)
         d = torch.tensor(d, dtype=torch.float32)
@@ -357,6 +357,47 @@ def quake3layer_norm(
     return _x.float()
 
 
+def fallbacklayer_norm(
+    input, normalized_shape, weight=None, bias=None, eps=2.0**-126, nform="float16"
+):
+    r"""
+    This function computes layer norm in nform but with only 1/sqrt computed in FP32, a custom implementation of torch.nn.functional.layer_norm().
+    """
+    nform = eval(f"torch.{nform}")
+
+    eps = torch.Tensor([eps]).to(torch.float32)
+    # default eps==2.**-126 is the smallest normal FP32 number
+
+    # compute mean and variance
+    _x = input.to(nform)
+    _xmean = torch.mean(_x, dim=tuple(range(-len(normalized_shape), 0)), keepdim=True)
+    _xvar = torch.var(
+        _x,
+        dim=tuple(range(-len(normalized_shape), 0)),
+        unbiased=False,
+        keepdim=True,
+    )
+
+    # compute reciprocal sqrt of var in FP32
+    _xvar_FP32 = (
+        _xvar.to(torch.float32) + eps
+    )  # cast FP32; + eps to avoid dividing by zero
+    _xvar_sqrt_recip_FP32 = torch.ones(1, dtype=nform) / torch.sqrt(
+        _xvar_FP32
+    )  # compute sqrt reciprocal in FP32
+    _xvar_sqrt_recip = _xvar_sqrt_recip_FP32.to(nform)  # convert back to nform
+
+    # compute normalized output
+    _x = _x - _xmean
+    if weight is not None:
+        _x = _x * weight.to(nform)
+    _x = _x * _xvar_sqrt_recip
+    if bias is not None:
+        _x += bias.to(nform)
+
+    return _x
+
+
 def poly2gelu(xin, nform="float16"):
     r"""
     This function computes a 2nd-order polynomial approximaiton to gelu()
@@ -385,7 +426,7 @@ def svd_lowrank_approximate_tensor(x, rank=6):
 
     _x = x.reshape(-1, m, n)
     for i in range(len(_x)):
-        u, s, vh = torch.linalg.svd(_x[i],full_matrices=False)
+        u, s, vh = torch.linalg.svd(_x[i], full_matrices=False)
         s[rank:] = 0.0
         _x[i] = u @ torch.diag(s) @ vh
     return x

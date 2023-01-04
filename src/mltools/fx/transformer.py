@@ -149,12 +149,12 @@ class InputOutputTransformer(fx.Transformer):
                 new_args += (arg,)
         call_fnc_node.args = new_args
         call_fnc_node.kwargs = new_kwargs
-        approx_name = call_fnc_node.name + "_approx"
-        self.module.add_submodule(approx_name, Approximator())
-        call_fnc_node_approx = self.new_graph.create_node(
-            "call_module", approx_name, args=(call_fnc_node,)
-        )
-        result_node = call_fnc_node_approx
+        # approx_name = call_fnc_node.name + "_approx"
+        # self.module.add_submodule(approx_name, Approximator())
+        # call_fnc_node_approx = self.new_graph.create_node(
+        #     "call_module", approx_name, args=(call_fnc_node,)
+        # )
+        result_node = call_fnc_node
         layer = self.scopeDict[call_fnc_node.name][0]
         if self.config:
             cast_name = call_fnc_node.name + "_cast"
@@ -168,7 +168,7 @@ class InputOutputTransformer(fx.Transformer):
                 cast_format = self.config[layer_key]["output_format"]
                 self.module.add_submodule(cast_name, CastTo(format=cast_format))
                 result_node = self.new_graph.create_node(
-                    "call_module", cast_name, args=(call_fnc_node_approx,)
+                    "call_module", cast_name, args=(result_node,)
                 )
         return Proxy(result_node, self.tracer)
 

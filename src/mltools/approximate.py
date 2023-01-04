@@ -141,10 +141,10 @@ class LayerNormApproximation(ApproximationFunction):
     This class specifies an approximation function for layer normalization.
     """
 
-    def __init__(self, algorithm="quake3", nform="float16"):
+    def __init__(self, algorithm="fallback", nform="float16"):
         super().__init__()
         # check validity of configuration
-        assert algorithm in ("quake3",), f"unsupported layer_norm algorithm {algorithm}"
+        assert algorithm in ("quake3", "fallback"), f"unsupported layer_norm algorithm {algorithm}"
         assert nform in (
             "float16",
             "float32",
