@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from parse import parse
 from torch.autograd import Function
+import transformers
 from mltools.utils.visualization import mask2braille
 
 __ALL__ = [
@@ -312,6 +313,7 @@ class WeightSparseMixin:
                 nn.Embedding,
                 nn.EmbeddingBag,
                 nn.modules.conv._ConvNd,
+                transformers.pytorch_utils.Conv1D,
             ),
         ):
             self.weight_sparsifier = Sparsify(self.weight.shape)

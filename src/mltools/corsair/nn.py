@@ -8,6 +8,8 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 
+import transformers
+
 from mltools.numerical import (
     Format,
     NumericalCastMixin,
@@ -184,6 +186,17 @@ class Linear(CorsairModule, torch.nn.Linear):
             _output = torch.add(_product, self._bias)
         else:
             _output = _product
+        return _output
+
+
+class HFTransformersConv1D(CorsairModule, transformers.pytorch_utils.Conv1D):
+    def __init__(self, nf: int, nx: int) -> None:
+        super().__init__(nf, nx)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        size_out = _input.size()[:-1] + (self.nf,)
+        _output = torch.addmm(self.bias, _input.view(-1, _input.size(-1)), self.weight)
+        _output = _output.view(size_out)
         return _output
 
 
@@ -380,8 +393,8 @@ class Tanh(CorsairModule, torch.nn.Tanh):
 
 
 class GELU(CorsairModule, torch.nn.GELU):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(_input)
