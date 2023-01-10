@@ -6,36 +6,17 @@ from torch import fx
 from .. import numerical
 from .. import sparse
 
-from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
-from torch.fx.proxy import Proxy
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
-from torch.fx._compatibility import compatibility
-from torch._C import ScriptObject
-from types import CodeType, FunctionType, ModuleType
+from torch.fx.node import Argument, Node, Target
+from typing import Any, Callable, Dict, Optional, Tuple
 from typing import (
     Any,
     Dict,
-    NamedTuple,
     Optional,
-    Set,
     Tuple,
-    Type,
-    List,
     Callable,
-    Union,
-)
-import functools
-from torch.fx._symbolic_trace import (
-    _autowrap_check,
-    Graph,
-    _Patcher,
-    _patch_wrapped_functions,
 )
 
 import transformers.utils.fx as fx_hf
-
-_orig_module_call: Callable = torch.nn.Module.__call__
-_orig_module_getattr: Callable = torch.nn.Module.__getattr__
 
 # Referenced from https://pytorch.org/docs/stable/_modules/torch/ao/quantization/quantize_fx.html#convert_fx
 class Scope(object):
