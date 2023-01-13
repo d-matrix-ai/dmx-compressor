@@ -363,9 +363,10 @@ def fallbacklayer_norm(
     r"""
     This function computes layer norm in nform but with only 1/sqrt computed in FP32, a custom implementation of torch.nn.functional.layer_norm().
     """
+    device = torch.device('cuda' if input.is_cuda else 'cpu')
     nform = eval(f"torch.{nform}")
 
-    eps = torch.Tensor([eps]).to(torch.float32)
+    eps = torch.Tensor([eps]).to(torch.float32, device=device)
     # default eps==2.**-126 is the smallest normal FP32 number
 
     # compute mean and variance
@@ -382,7 +383,7 @@ def fallbacklayer_norm(
     _xvar_FP32 = (
         _xvar.to(torch.float32) + eps
     )  # cast FP32; + eps to avoid dividing by zero
-    _xvar_sqrt_recip_FP32 = torch.ones(1, dtype=nform) / torch.sqrt(
+    _xvar_sqrt_recip_FP32 = torch.ones(1, dtype=nform, device=device) / torch.sqrt(
         _xvar_FP32
     )  # compute sqrt reciprocal in FP32
     _xvar_sqrt_recip = _xvar_sqrt_recip_FP32.to(nform)  # convert back to nform
