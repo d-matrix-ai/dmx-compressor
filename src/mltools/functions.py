@@ -367,7 +367,7 @@ def fallbacklayer_norm(
     device = torch.device('cuda' if input.is_cuda else 'cpu')
     nform = eval(f"torch.{nform}")
 
-    eps = torch.Tensor([eps]).to(torch.float32, device=device)
+    eps = torch.Tensor([eps]).to(device, torch.float32)
     # default eps==2.**-126 is the smallest normal FP32 number
 
     # compute mean and variance

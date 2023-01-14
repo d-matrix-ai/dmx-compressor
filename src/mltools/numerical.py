@@ -8,8 +8,6 @@ from torch.autograd import Function
 from .quant import fixed_point_quantize, block_quantize, float_quantize
 
 import numpy as np
-from numerics.unary_functions import convert_FP32_to_FPsmall
-from numerics import Data
 
 
 __ALL__ = [
