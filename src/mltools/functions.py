@@ -11,6 +11,7 @@ def poly2softmax(x, dim=-1, nform="float16", **kwargs):
     formats can be specified using nform variable,
     including int (fixed point), float32, float16, and bfloat16
     """
+    x = torch.where(x < -16384.0, -16384.0, x)  # as stipulated by Ilya L
     eps = 1.0e-30  # small number to avoid dividing by zero
 
     # compute exp(r) and k, where exp(x)=2^k * exp(r)
@@ -149,6 +150,7 @@ def base2softmax(x, dim=-1, nform="float16", quake3=False, **kwargs):
     formats can be specified using nform variable,
     including int (fixed point), float32, float16, and bfloat16
     """
+    x = torch.where(x < -16384.0, -16384.0, x)  # as stipulated by Ilya L
     eps = 1.0e-30  # small number to avoid dividing by zero
     # compute exp(x) for input vector x
     # including integer vector k for normalization
