@@ -399,7 +399,7 @@ def fallbacklayer_norm(
     if bias is not None:
         _x += bias.to(nform)
 
-    return _x
+    return _x.float()
 
 
 def poly2gelu(xin, nform="float16"):
