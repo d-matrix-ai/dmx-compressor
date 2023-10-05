@@ -1,6 +1,7 @@
-ML Tools
-Copyright 2021-2023 d-Matrix
+The initial developer of ML Tools is d-Matrix Corporation (http://www.d-matrix.ai)
+Copyright 2021-2023 d-Matrix Corporation, All Rights Reserved.
 
-This project includes code derived from QPytorch, which have been copied and derieved
-from the git repository availible at https://github.com/Tiiiger/QPyTorch and used under
-the terms of the QPytorch software license
+The ML Tools includes code derived from QPyTorch, which has been copied and derived from the GitHub repository at https://github.com/Tiiiger/QPyTorch and used under
+the terms of the QPytorch software license.
+
+The ML Tools also includes code derived from PyTorch from Meta Platforms Inc. at PyTorch.org.  PyTorch is in the GitHub repository, see PyTorch.org., and under the Apache 2.0 License.
