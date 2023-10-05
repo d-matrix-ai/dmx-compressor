@@ -3,9 +3,5 @@ numpy
 bidict
 parse
 pptree
-pytest
-python
-tqdm
 transformers
 torch
-torchvision
