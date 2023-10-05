@@ -1,0 +1,6 @@
+ML Tools
+Copyright 2021-2023 d-Matrix
+
+This project includes code derived from QPytorch, which have been copied and derieved
+from the git repository availible at https://github.com/Tiiiger/QPyTorch and used under
+the terms of the QPytorch software license
