@@ -1,6 +1,6 @@
 # ML tools
 
-This project contains tools for deep neural net compression for Corsair deployment.
+This project contains tools for deep neural net compression for d-Matrix hardware deployment.
 
   - [Overview](#overview)
   - [Getting started](#getting-started)
@@ -11,22 +11,22 @@ This project contains tools for deep neural net compression for Corsair deployme
 
 ## Overview
 
-In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements Corsair-specific features, including 
+In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements Dmx-specific features, including 
 - ***custom low-precision integer formats and arithmetic*** (for both activations and parameters), 
 - ***fine-grain structured weight sparsity*** (for linear and convolutional weights), and 
 - ***custom integer operation logics*** (for element-wise activation functions and normalizations).
 
 It is so designed as 
-- to provide a functionally complete set of Corsair-specific features to augment native PyTorch ones in order to make them Corsair-aware, and
-- to retain all framework functionalities in order to support Corsair-aware network compression and optimization.  
+- to provide a functionally complete set of Dmx-specific features to augment native PyTorch ones in order to make them Dmx-aware, and
+- to retain all framework functionalities in order to support Dmx-aware network compression and optimization.  
 
-Workloads compressed and optimized here are ***ML references***, to be converted into DMIR for downstream SW stack or functional simulator to consume.
+Workloads compressed and optimized here are to be converted into DMIR for downstream SW stack or functional simulator to consume.
 
 ### What is this project for?
 
-- As a tool for algorithm research on Corsair-aware network compression and optimization
-- As a tool for generation of ML references of customer workloads in production
-- As an entry point for customer to optimize custom workloads for Corsair deployment
+- As a tool for algorithm research on Dmx-aware network compression and optimization
+- As a tool for generation of ML workloads in production
+- As an entry point for customer to optimize custom workloads for d-Matrix hardware deployment
 
 ### What is this project ***not*** for?
 
@@ -35,7 +35,7 @@ Workloads compressed and optimized here are ***ML references***, to be converted
 
 ## Getting started
 
-The two methods getting started with mltools and mlreferences are either
+The methods getting started with mltools are either
 installing via pip your python environment, or using git to checkout the source
 and then installing the libraries in pip's developer mode.
     
@@ -43,30 +43,30 @@ and then installing the libraries in pip's developer mode.
 
 Given a customer workload training/evaluation Python script, use the high-level API through two steps.
 
-1. Import extended PyTorch that is Corsair-aware.  This is done by adding
+1. Import extended PyTorch that is Dmx-aware.  This is done by adding
 
     ```python
-    corsair.aware()
+    dmx.aware()
     ```
 
-    to the script.  This will augment `torch.nn` with Corsair-specific features, while retaining all PyTorch functionalities, _i.e._
+    to the script.  This will augment `torch.nn` with Dmx-specific features, while retaining all PyTorch functionalities, _i.e._
 
     - all valid PyTorch model definitions remain valid and
     - all PyTorch models remain functionally equivalent, in both forward and backward passes, to those in native PyTorch.
 
-2. Wrap a DNN in a `corsair.Model` container, _e.g._
+2. Wrap a DNN in a `dmx.Model` container, _e.g._
    
     ```python
-    model = corsair.Model(Net())
+    model = dmx.Model(Net())
     ```
 
-3. Define all Corsair-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
+3. Define all Dmx-specific configurations in a `.yaml` file and transform a PyTorch `model` object by
 
     ```python
-    model.transform("corsair_config.yaml")
+    model.transform("configs/dmx_example_config_lenet5.yaml")
     ```
 
-    [This](configs/corsair_mnist_lenet.yaml) is an example Corsair configuration file.  
+    [This](configs/dmx_example_config_lenet5.yaml) is an example Dmx configuration file.  
 
 The following code blocks show a simplest example usage.  
 
@@ -81,8 +81,6 @@ The following code blocks show a simplest example usage.
 ```python
 import torch​
 ​
-
-
 data = data_loader()​
 model = some_network()​
 
@@ -95,13 +93,13 @@ results = evaluate(model, data)​
 
 ```python
 import torch​
-from mltools import corsair ​
-​corsair.aware()
+from mltools import dmx
+dmx.aware()
 
 data = data_loader()​
 model = some_network()​
-model = corsair.Model(model)
-model.transform('corsair_config.yaml') ​
+model = dmx.Model(model)
+model.transform('dmx_config.yaml') ​
 
 results = evaluate(model, data)​
 ```
@@ -114,18 +112,20 @@ results = evaluate(model, data)​
 
 For more detailed information, go over the following documents on specific topics.
 
-### Corsair-aware features
+### Dmx-aware features
 
-- Corsair execution
+- d-Matrix hardware execution
 - [Numerics](docs/numerics.rst)
 - Weight sparsity
 - Custom logic
-- Configurations for Corsair-specific transformation
+- Configurations for Dmx-specific transformation
 - List of supported modules and models
 - torch-mlir
 
 ### Examples
 
-- Multi-layer perceptron on MNIST
-- Transformer language models on GLUE and SQuAD
+- Diffusers pipelines on LAION
+- Transformer language models on SQuAD, Wikitext2, CNN_DailyMail
 - Convolutional nets on CIFAR10/100 and Imagenet
+- Multi-layer perceptron on MNIST
+

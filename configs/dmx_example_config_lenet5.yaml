@@ -1,0 +1,60 @@
+conv1:
+  accum_format: SAME
+  approximation_function: NONE
+  bias_format: SAME
+  input_format: BFP[8|8]{64,1}(SN)
+  instance: Conv2d
+  output_format: FP[1|5|10,15](FN)
+  state_dict_url: file:///tools/d-matrix/ml/checkpoints/lenet5/f1be8bf82c48ca00db28acc816f714eb.pth
+  weight_format: BFP[8|8]{64,1}(SN)
+  weight_sparseness: DENSE
+conv2:
+  accum_format: SAME
+  approximation_function: NONE
+  bias_format: SAME
+  input_format: BFP[8|8]{64,1}(SN)
+  instance: Conv2d
+  output_format: FP[1|5|10,15](FN)
+  state_dict_url: file:///tools/d-matrix/ml/checkpoints/lenet5/0a804a68cc814dea663980c21267cfff.pth
+  weight_format: BFP[8|8]{64,1}(SN)
+  weight_sparseness: DENSE
+fc1:
+  accum_format: SAME
+  approximation_function: NONE
+  bias_format: SAME
+  input_format: BFP[8|8]{64,-1}(SN)
+  instance: Linear
+  output_format: FP[1|5|10,15](FN)
+  state_dict_url: file:///tools/d-matrix/ml/checkpoints/lenet5/605f403d4b6d7bdb59c9bf0fcbc0e4b9.pth
+  weight_format: BFP[8|8]{64,-1}(SN)
+  weight_sparseness: DENSE
+fc2:
+  accum_format: SAME
+  approximation_function: NONE
+  bias_format: SAME
+  input_format: BFP[8|8]{64,-1}(SN)
+  instance: Linear
+  output_format: FP[1|5|10,15](FN)
+  state_dict_url: file:///tools/d-matrix/ml/checkpoints/lenet5/4a714b04996f838bb797f3c0d3ce1020.pth
+  weight_format: BFP[8|8]{64,-1}(SN)
+  weight_sparseness: DENSE
+fc3:
+  accum_format: SAME
+  approximation_function: NONE
+  bias_format: SAME
+  input_format: BFP[8|8]{64,-1}(SN)
+  instance: Linear
+  output_format: FP[1|5|10,15](FN)
+  state_dict_url: file:///tools/d-matrix/ml/checkpoints/lenet5/99f0891391fdd2057ed6696058b54a2b.pth
+  weight_format: BFP[8|8]{64,-1}(SN)
+  weight_sparseness: DENSE
+mp1:
+  approximation_function: NONE
+  input_format: SAME
+  instance: MaxPool2d
+  output_format: FP[1|5|10,15](FN)
+mp2:
+  approximation_function: NONE
+  input_format: SAME
+  instance: MaxPool2d
+  output_format: FP[1|5|10,15](FN)
