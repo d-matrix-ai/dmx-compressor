@@ -38,42 +38,6 @@ Workloads compressed and optimized here are ***ML references***, to be converted
 The two methods getting started with mltools and mlreferences are either
 installing via pip your python environment, or using git to checkout the source
 and then installing the libraries in pip's developer mode.
-
-### PIP Packages
-
-The easiest way to set up the d-MATRiX tool chain as a user is to install the
-packages via pip.  Currently there is a pypiserver instance accessible inside
-the d-MATRiX VPN.
-
-``` sh
-pip install mltools mlreferences transformers --index-url http://pypi.d-matrix.ai --trusted-host pypi.d-matrix.ai 
-```
-
-### Developer mode
-
-Follow these steps to set up as a d-MATRiX internal developer (not for external customers).
-This does a git checkout and installs the libraries in developer mode using pip.
-
-1. Clone the repo.
-   ```sh
-   git clone git@git.d-matrix.ai:ml-team/mltools.git
-   cd mltools
-   ```
-2. (*Recommended*) Start a new virtual environment with Python version 3.6 or higher, _e.g._
-   ```sh
-   conda create -n mltls python=3.9
-   conda activate mltls
-   ```
-3. In the virtual environment set up the package and dependencies for development.
-
-    ```sh
-    pip install -e .
-    ```
-4. (*Recommended*) In the project root directory create a `.env` file for project-specific environmental variable settings such as common data and models directories.
-    ```sh
-    echo "DATA_PATH=/tools/d-matrix/ml/data" >> .env
-    echo "MODEL_PATH=/tools/d-matrix/ml/models" >> .env
-    ```
     
 ## API in a nutshell
 
