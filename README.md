@@ -11,16 +11,14 @@ This project contains tools for deep neural net compression for d-Matrix hardwar
 
 ## Overview
 
-In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements Dmx-specific features, including 
+In essence this is an extension of the [PyTorch](https://pytorch.org/) framework that implements d-Matrix specific features, including 
 - ***custom low-precision integer formats and arithmetic*** (for both activations and parameters), 
 - ***fine-grain structured weight sparsity*** (for linear and convolutional weights), and 
 - ***custom integer operation logics*** (for element-wise activation functions and normalizations).
 
 It is so designed as 
-- to provide a functionally complete set of Dmx-specific features to augment native PyTorch ones in order to make them Dmx-aware, and
-- to retain all framework functionalities in order to support Dmx-aware network compression and optimization.  
-
-Workloads compressed and optimized here are to be converted into DMIR for downstream SW stack or functional simulator to consume.
+- to provide a functionally complete set of d-Matrix specific features to augment native PyTorch ones in order to make them "Dmx-aware"
+- to retain all framework functionalities in order to support Dmx-aware network compression and optimization.
 
 ### What is this project for?
 
