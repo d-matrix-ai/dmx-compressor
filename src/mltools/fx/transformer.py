@@ -174,10 +174,9 @@ class DMXAwareTransformer(fx.Transformer):
             and "layer" not in prev_target[: prev_target.find(".")]
         ):
             return super().call_function(target, args, kwargs)
-        if node_key == repr(eval("torch.matmul")):
-            new_name = prev_target[: prev_target.rfind(".") + 1] + "act_act_matmul"
-        elif prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
-            "bert"
+        if prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
+            "bert",
+            "vit",
         ):
             new_name = prev_target[: prev_target.rfind(".") + 1] + "intermediate_act_fn"
         elif prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (

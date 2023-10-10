@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from mltools import dmx
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Sequence
+import inspect
 
 from .nn import *
 from ..numerical import CastTo, Quantize, DeQuantize
@@ -111,6 +112,7 @@ class Model(torch.nn.Module):
         )
         self.head = head
         self.tail = tail
+        self.monkey_patched = monkey_patched
 
     def forward(self, input):
         r"""Runs a forward pass of the model on input and returns the output
@@ -125,6 +127,9 @@ class Model(torch.nn.Module):
         output = self.head(input)
         if isinstance(output, torch.Tensor):
             output = (output,)
+        if not self.monkey_patched:
+            sig = inspect.signature(self.body.forward)
+            output = output[: len(sig.parameters.keys())]
         output = self.body(*output)
         output = self.tail(output)
         return output
