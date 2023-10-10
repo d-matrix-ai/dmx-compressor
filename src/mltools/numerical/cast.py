@@ -282,6 +282,7 @@ class NumericalCastMixin:
         )
         self.bias_cast = CastTo() if "bias" in pnames else None
         self.residual_cast = None
+        self.multiplier_cast = None
 
     def init_smoothquant(
         self,
@@ -368,6 +369,12 @@ class NumericalCastMixin:
     @property
     def residual_format(self):
         return (self.residual_cast.format) if self.residual_cast is not None else None
+
+    @property
+    def multiplier_format(self):
+        return (
+            (self.multiplier_cast.format) if self.multiplier_cast is not None else None
+        )
 
     @property
     def bias_format(self):

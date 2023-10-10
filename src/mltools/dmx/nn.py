@@ -86,6 +86,8 @@ class DmxModule(
             self.output_cast.set_format(format=config["output_format"])
         if self.residual_cast is not None and "residual_format" in config:
             self.residual_cast.set_format(format=config["residual_format"])
+        if self.multiplier_cast is not None and "multiplier_format" in config:
+            self.multiplier_cast.set_format(format=config["multiplier_format"])
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_cast is not None and "weight_format" in config:
@@ -260,6 +262,10 @@ class DmxModuleConfig(dict):
                 freeze or module.residual_format != "SAME"
             ):
                 cc.residual_format = module.residual_format
+            if module.multiplier_format is not None and (
+                freeze or module.multiplier_format != "SAME"
+            ):
+                cc.multiplier_format = module.multiplier_format
             if module.output_format is not None and (
                 freeze or module.output_format != "SAME"
             ):
@@ -315,6 +321,17 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         _residual = self.residual_cast(residual)
         _output = _input + _residual
+        return _output
+
+
+class ActActMatMul(DmxModule, torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.multiplier_cast = CastTo()
+
+    def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
+        _multiplier = self.multiplier_cast(multiplier)
+        _output = torch.matmul(_input, _multiplier)
         return _output
 
 
