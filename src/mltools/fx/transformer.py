@@ -45,6 +45,7 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.silu": dmx.nn.SiLU,
     "torch.nn.functional.tanh": dmx.nn.Tanh,
     "torch.nn.functional.gelu": dmx.nn.GELU,
+    "torch.matmul": dmx.nn.ActActMatMul,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
@@ -173,7 +174,9 @@ class DMXAwareTransformer(fx.Transformer):
             and "layer" not in prev_target[: prev_target.find(".")]
         ):
             return super().call_function(target, args, kwargs)
-        if prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
+        if node_key == repr(eval("torch.matmul")):
+            new_name = prev_target[: prev_target.rfind(".") + 1] + "act_act_matmul"
+        elif prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
             "bert"
         ):
             new_name = prev_target[: prev_target.rfind(".") + 1] + "intermediate_act_fn"
