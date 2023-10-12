@@ -217,6 +217,8 @@ class DMXAwareTransformer(fx.Transformer):
                 new_name = curr_target + ".resadd"
             else:
                 return super().call_function(target, args, kwargs)
+        elif node_key == repr(eval("torch.matmul")):
+            new_name = curr_target + ".matmul"
         else:
             new_name = curr_target if curr_target != "" else candidate
 
