@@ -1,15 +1,12 @@
 import torch
 import torch.nn as nn
 
-from mltools.fx.tracer import HFQuantTracer
-from ..numerical import CastTo
+from mltools.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
 from ..fx import QuantTracer, InputOutputTransformer
 from mltools.fx.transformer import ConfigurationTransformer, DMXAwareTransformer
 from torch.fx import GraphModule
 from torch import fx
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-from types import SimpleNamespace
-import transformers.utils.fx as hf_fx
 
 
 def substitute_transform(
@@ -30,10 +27,10 @@ def substitute_transform(
         transformed model
     """
     if hf:
-        gm = hf_fx.symbolic_trace(root, input_names)
+        gm, tracer = hf_symbolic_trace(root, input_names)
     else:
-        gm = fx.symbolic_trace(root, concrete_args)
-    transformer = DMXAwareTransformer(gm)
+        gm, tracer = symbolic_trace(root, concrete_args)
+    transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     for key, val in root.__dict__.items():
         if key not in transformed.__dict__:
