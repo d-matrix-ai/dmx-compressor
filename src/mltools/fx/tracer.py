@@ -7,16 +7,130 @@ from .. import numerical
 from .. import sparse
 
 from torch.fx.node import Argument, Node, Target
-from typing import Any, Callable, Dict, Optional, Tuple
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Tuple,
-    Callable,
-)
-
+from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
 import transformers.utils.fx as fx_hf
+
+from transformers.utils.fx import (
+    HFTracer,
+    get_concrete_args,
+    check_if_model_is_supported,
+)
+from torch.fx.graph_module import GraphModule
+from transformers.modeling_utils import PreTrainedModel
+
+
+def hf_symbolic_trace(
+    model: PreTrainedModel,
+    input_names: Optional[List[str]] = None,
+    disable_check: bool = False,
+    tracer_cls: Type[HFTracer] = HFTracer,
+) -> GraphModule:
+    """
+    Performs symbolic tracing on a huggingface model.
+
+    Args:
+        model ([`PretrainedModel`]):
+            The model to trace.
+        input_names (`List[str]`, *optional*):
+            The names of the inputs of the traced model. If unset, model.dummy_inputs.keys() are used instead.
+        disable_check (`bool`, *optional*, defaults to `False`):
+            If `True`, no check is done before trying to trace the model, this is mostly usesul for debugging purposes.
+        tracer_cls (`Type[HFTracer]`, *optional*, defaults to `HFTracer`):
+            The tracer class to use for instantiating the tracer. If unset, `HFTracer` is used instead.
+
+    Returns:
+        `torch.fx.GraphModule`: A GraphModule constructed by recording operations seen while tracing the model.
+        `torch.fx.Tracer`: The tracer used for tracing the model.
+
+    Example:
+
+        ```python
+        from mltools.fx.tracer import hf_symbolic_trace
+
+        traced_model,tracer = hf_symbolic_trace(model, input_names=["input_ids", "attention_mask", "token_type_ids"])
+        ```
+    """
+    if input_names is None:
+        input_names = model.dummy_inputs.keys()
+
+    input_names = list(input_names)
+    concrete_args = get_concrete_args(model, input_names)
+
+    if not disable_check:
+        check_if_model_is_supported(model)
+
+    # Tracing.
+    tracer = tracer_cls()
+    traced_graph = tracer.trace(model, concrete_args=concrete_args)
+    traced = GraphModule(model, traced_graph)
+
+    traced.config = model.config
+    # The model class must be stored as an attribute to allow model deserialization, which uses trace, and thus
+    # _generate_dummy_input, where the model class is needed.
+    traced.class_for_deserialization = model.__class__
+    traced.device = model.device
+
+    return (traced, tracer)
+
+
+def symbolic_trace(
+    root: Union[torch.nn.Module, Callable[..., Any]],
+    concrete_args: Optional[Dict[str, Any]] = None,
+) -> GraphModule:
+    """
+    Symbolic tracing API
+
+    Given an ``nn.Module`` or function instance ``root``, this function will return a ``GraphModule``
+    constructed by recording operations seen while tracing through ``root`` and the tracer used to trace the model.
+
+    ``concrete_args`` allows you to partially specialize your function, whether it's to remove control flow or data structures.
+
+    For example::
+
+        def f(a, b):
+            if b == True:
+                return a
+            else:
+                return a*2
+
+    FX can typically not trace through this due to the presence of control
+    flow. However, we can use `concrete_args` to specialize on the value of
+    `b` to trace through this::
+
+        f = fx.symbolic_trace(f, concrete_args={'b': False})
+        assert f(3, False)  == 6
+
+    Note that although you can still pass in different values of `b`, they will be ignored.
+
+    We can also use `concrete_args` to eliminate data-structure handling from
+    our function. This will use pytrees to flatten your input. To avoid
+    overspecializing, pass in `fx.PH` for values that shouldn't be
+    specialized. For example::
+
+        def f(x):
+            out = 0
+            for v in x.values():
+                out += v
+            return out
+        f = fx.symbolic_trace(f, concrete_args={'x': {'a': fx.PH, 'b': fx.PH, 'c': fx.PH}})
+        assert f({'a': 1, 'b': 2, 'c': 4}) == 7
+
+
+    Args:
+        root (Union[torch.nn.Module, Callable]): Module or function to be traced and converted
+            into a Graph representation.
+        concrete_args (Optional[Dict[str, any]]): Inputs to be partially specialized
+
+    Returns:
+        GraphModule: a Module created from the recorded operations from ``root``.
+        Tracer: the tracer used for tracing the model
+    """
+    tracer = fx.Tracer()
+    graph = tracer.trace(root, concrete_args)
+    name = (
+        root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    )
+    return (GraphModule(tracer.root, graph, name), tracer)
 
 
 # Referenced from https://pytorch.org/docs/stable/_modules/torch/ao/quantization/quantize_fx.html#convert_fx

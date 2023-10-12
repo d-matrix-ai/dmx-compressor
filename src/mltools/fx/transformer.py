@@ -1,9 +1,10 @@
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union, Set
 
 import torch
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx.proxy import Proxy
+import re
 
 from mltools.numerical import CastTo
 from mltools.sparse import Sparsify, Sparseness
@@ -93,6 +94,46 @@ def process_kwargs(kwargs):
     return new_kwargs
 
 
+def get_name_for_func_nodes(
+    candidate: str, used_names: Set[str], base_count: Dict[str, int]
+):
+    """Get the unique name for functional nodes
+
+    Arguments:
+        candidate (str): used as the basis for the unique name, relevant to the user.
+        used_names (Set[str]): A Set of names already used for nodes
+        base_count (Dict[str, int]): A dict counting number of names sharing the same candidate base
+    """
+    illegal_char_regex = re.compile("[^0-9a-zA-Z_]+")
+    name_suffix_regex = re.compile(r"(.*)_(\d+)$")
+
+    candidate = illegal_char_regex.sub("_", candidate)
+    if not candidate:
+        candidate = "_unnamed"
+
+    if candidate[0].isdigit():
+        candidate = f"_{candidate}"
+
+    match = name_suffix_regex.match(candidate)
+    if match is None:
+        base = candidate
+        num = None
+    else:
+        base, num_str = match.group(1, 2)
+        num = int(num_str)
+
+    candidate = base if num is None else f"{base}_{num}"
+    if not num:
+        num = base_count[base]
+
+    while candidate in used_names or fx.graph._Namespace()._is_illegal_name(
+        candidate, None
+    ):
+        num += 1
+        candidate = f"{base}_{num}"
+    return candidate
+
+
 class DMXAwareTransformer(fx.Transformer):
     """
     Substitute as in dmx.model.aware(), replace torch.nn.modules and
@@ -100,14 +141,17 @@ class DMXAwareTransformer(fx.Transformer):
 
     Args:
         module (fx.GraphModule): the module to transform
+        node_name_to_scope (dict): A dictionary storing the mapping between node names and scopes
 
     Attributes:
         module (fx.GraphModule): the module to transform
+        node_name_to_scope (dict): A dictionary storing the mapping between node names and scopes
     """
 
-    def __init__(self, module: fx.GraphModule):
+    def __init__(self, module: fx.GraphModule, node_name_to_scope: dict):
         super().__init__(module)
         self.module = module
+        self.node_name_to_scope = node_name_to_scope
 
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
@@ -131,14 +175,11 @@ class DMXAwareTransformer(fx.Transformer):
         node_key = type(curr_mod).__module__ + "." + type(curr_mod).__name__
         if node_key not in dmx_aware_mapping:
             return super().call_module(target, args, kwargs)
-        curr_node = self.new_graph.call_module(target)
-        new_name = curr_node.target
-        self.new_graph.erase_node(curr_node)
         self.module.add_submodule(
-            new_name, dmx_aware_mapping[node_key].from_raw(curr_mod)
+            target, dmx_aware_mapping[node_key].from_raw(curr_mod)
         )
         new_node = self.new_graph.create_node(
-            "call_module", new_name, args=(args[0].node,)
+            "call_module", target, args=(args[0].node,)
         )
         return Proxy(new_node, self.tracer)
 
@@ -163,37 +204,31 @@ class DMXAwareTransformer(fx.Transformer):
         if node_key not in dmx_aware_functional_mappings:
             return super().call_function(target, args, kwargs)
         # Skip tranformation for add that is not in a resnet
+        candidate = self.new_graph._target_to_str(target)
+        curr_name = get_name_for_func_nodes(
+            candidate,
+            self.new_graph._graph_namespace._used_names,
+            self.new_graph._graph_namespace._base_count,
+        )
 
-        curr_node = self.new_graph.call_function(target)
-        self.new_graph.erase_node(curr_node)
-        prev_target = curr_node.prev.target
-        if node_key == "<built-in function add>" and not isinstance(prev_target, str):
-            return super().call_function(target, args, kwargs)
-        if (
-            node_key == "<built-in function add>"
-            and "layer" not in prev_target[: prev_target.find(".")]
-        ):
-            return super().call_function(target, args, kwargs)
-        if prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
-            "bert",
-            "vit",
-        ):
-            new_name = prev_target[: prev_target.rfind(".") + 1] + "intermediate_act_fn"
-        elif prev_target.find(".") != -1 and prev_target[: prev_target.find(".")] in (
-            "encoder",
-            "decoder",
-        ):
-            new_name = prev_target[: prev_target.rfind(".") + 1] + "act"
-        elif (
-            prev_target.find(".") != -1
-            and "layer" in prev_target[: prev_target.find(".")]
-        ):
-            new_name = prev_target[: prev_target.rfind(".") + 1] + "resadd"
+        curr_target, curr_type = self.node_name_to_scope[curr_name]
+        if node_key == "<built-in function add>":
+            if "resnet" in str(curr_type):
+                new_name = curr_target + ".resadd"
+            else:
+                return super().call_function(target, args, kwargs)
         else:
-            new_name = "act_func"
+            new_name = curr_target if curr_target != "" else candidate
+
+        # If new name is not candidate, need to add candidate to used names,
+        # otherwise next call_function will use the same candidate. (create_name is also called in create_node)
+        if new_name != candidate:
+            self.new_graph._graph_namespace.create_name(candidate, None)
+
         self.module.add_submodule(new_name, dmx_aware_functional_mappings[node_key]())
         new_node = self.new_graph.create_node(
-            "call_module", new_name, args=(curr_node.prev,)
+            "call_module",
+            new_name,
         )
         new_node.args = process_args(args)
         new_node.kwargs = process_kwargs(kwargs)
