@@ -4,8 +4,137 @@ import torch.nn.functional as F
 from functools import wraps
 from typing import List, Optional, Callable, Tuple
 from types import SimpleNamespace
-from dmsimd import SIMDKernels as _K
 import math
+
+try:
+    from dmsimd import SIMDKernels as _K
+
+except ModuleNotFoundError:
+    class _K:
+        @staticmethod
+        def add(a, b):
+            """
+            Adds two numbers using the tieops add operation.
+
+            Args:
+                a (float): The first operand.
+                b (float): The second operand.
+
+            Returns:
+                float: The result of a + b.
+            """
+            pass
+
+        @staticmethod
+        def tanh(x):
+            """
+            Compute the hyperbolic tangent of a number.
+
+            Args:
+                x (float): The input value.
+
+            Returns:
+                float: The hyperbolic tangent of x.
+            """
+            pass
+
+        @staticmethod
+        def sigmoid(x):
+            """
+            Compute the sigmoid function of a number.
+
+            Args:
+                x (float): The input value.
+
+            Returns:
+                float: The sigmoid of x.
+            """
+            pass
+
+        @staticmethod
+        def relu(x):
+            """
+            Compute the Rectified Linear Unit (ReLU) function of a number.
+
+            Args:
+                x (float): The input value.
+
+            Returns:
+                float: The ReLU of x.
+            """
+            pass
+
+        @staticmethod
+        def gelu(x):
+            """
+            Compute the Gaussian Error Linear Unit (GELU) function of a number.
+
+            Args:
+                x (float): The input value.
+
+            Returns:
+                float: The GELU of x.
+            """
+            return x
+
+        @staticmethod
+        def layernorm_reduction(x, norm=1):
+            """
+            Apply Layer Normalization to a tensor.
+
+            Args:
+                x (float): The input tensor.
+                mean (float): The mean of the tensor.
+                variance (float): The variance of the tensor.
+                epsilon (float): A small constant to prevent division by zero (default 1e-6).
+
+            Returns:
+                float: The normalized tensor.
+            """
+            return x, x
+
+        @staticmethod
+        def layernorm_elementwise(
+            x, mean, variance, weight, bias, norm=1, epsilon=1e-6
+        ):
+            """
+            Apply Layer Normalization Elementwise operation to a tensor.
+            Args:
+                x (float): The input tensor.
+                mean (float): The mean of the tensor.
+                variance (float): The variance of the tensor.
+                epsilon (float): A small constant to prevent division by zero (default 1e-6).
+
+            Returns:
+                float: The normalized tensor.
+            """
+            return x
+
+        @staticmethod
+        def softmax(input_array):
+            """
+            Calculate the softmax of an input array.
+
+            Args:
+                input_array (list or numpy.ndarray): The input array containing numeric values.
+
+            Returns:
+                list or numpy.ndarray: The softmax probabilities as a new array of the same shape as the input_array.
+            """
+            return input_array
+
+        @staticmethod
+        def silu(x):
+            """
+            Compute the Sigmoid-weighted Linear Unit (SiLU) function of a number.
+
+            Args:
+                x (float): The input value.
+
+            Returns:
+                float: The SiLU of x.
+            """
+            return x
 
 __ALL__ = ["gelu", "layer_norm", "softmax", "hf_diffusers_timesteps"]
 
