@@ -103,13 +103,19 @@ class Model(torch.nn.Module):
         monkey_patched: bool = True,
         hf: bool = False,
         input_names: Optional[List[str]] = None,
+        concrete_args: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__()
         self.body = (
             body
             if monkey_patched
-            else substitute_transform(body, hf=hf, input_names=input_names)
+            else substitute_transform(
+                body, hf=hf, input_names=input_names, concrete_args=concrete_args
+            )
         )
+        # self.gm = substitute_transform(
+        #     body, hf=hf, input_names=input_names, concrete_args=concrete_args
+        # )[1]
         self.head = head
         self.tail = tail
         self.monkey_patched = monkey_patched
@@ -128,8 +134,8 @@ class Model(torch.nn.Module):
         if isinstance(output, torch.Tensor):
             output = (output,)
         if not self.monkey_patched:
-            sig = inspect.signature(self.body.forward)
-            output = output[: len(sig.parameters.keys())]
+            # sig = inspect.signature(self.body.forward)
+            output = [out for out in output if out is not None]
         output = self.body(*output)
         output = self.tail(output)
         return output

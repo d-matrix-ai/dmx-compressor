@@ -22,6 +22,7 @@ from transformers.modeling_utils import PreTrainedModel
 def hf_symbolic_trace(
     model: PreTrainedModel,
     input_names: Optional[List[str]] = None,
+    concrete_args: Optional[Dict[str, Any]] = None,
     disable_check: bool = False,
     tracer_cls: Type[HFTracer] = HFTracer,
 ) -> GraphModule:
@@ -54,11 +55,16 @@ def hf_symbolic_trace(
         input_names = model.dummy_inputs.keys()
 
     input_names = list(input_names)
-    concrete_args = get_concrete_args(model, input_names)
-
+    if concrete_args:
+        new_args = get_concrete_args(model, input_names)
+        for key, value in new_args.items():
+            if key not in concrete_args:
+                concrete_args[key] = value
+        concrete_args.update()
+    else:
+        concrete_args = get_concrete_args(model, input_names)
     if not disable_check:
         check_if_model_is_supported(model)
-
     # Tracing.
     tracer = tracer_cls()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
