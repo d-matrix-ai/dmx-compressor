@@ -1,4 +1,35 @@
-# ML tools
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/cf45cefd-f2d1-44ef-ae14-13fa98b9f52e">
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/7e745aae-44e2-427a-9a6d-bd7eea1cde1f">
+    <img alt="dmatrix-logo" src="https://github.com/d-matrix-ai/mltools/assets/139168891/6dd0dad4-5308-4280-a935-34987ee60188" width="600" height="200" style="max-width: 100%;"> 
+  </picture>
+</p>
+
+<p align="center">
+    <a href="https://github.com/d-matrix-ai/dmx-mltools/actions/workflows/python-app.yml">
+        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-mltools/python-app.yml">
+    </a>
+    <a href="https://github.com/d-matrix-ai/dmx-mltools/blob/main/LICENSE">
+        <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-mltools">
+    </a>
+    <a href="PLACEHOLDER">
+        <img alt="Documentation" src="https://img.shields.io/website/http/PLACEHOLDER?down_color=red&down_message=offline&up_message=online&label=docs">
+    </a>
+    <a href="https://github.com/d-matrix-ai/dmx-mltools/releases">
+        <img alt="GitHub release" src="https://img.shields.io/github/downloads/d-matrix-ai/dmx-mltools/total?label=release">
+    </a>
+    <a href="https://github.com/d-matrix-ai/dmx-mltools/commits/main">
+        <img alt="Commits" src="https://img.shields.io/github/last-commit/d-matrix-ai/dmx-mltools/main">
+    </a>
+    <a href="https://github.com/d-matrix-ai/dmx-mltools/graphs/contributors">
+        <img alt="Contributors" src="https://img.shields.io/github/contributors-anon/d-matrix-ai/dmx-mltools">
+    </a>
+    <a href="https://github.com/d-matrix-ai/dmx-mltools">
+        <img alt="Stars" src="https://img.shields.io/github/stars/d-matrix-ai/dmx-mltools">
+    </a>
+</p>
+<br/>
 
 This project contains tools for deep neural net compression for d-Matrix hardware deployment.
 
