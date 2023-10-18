@@ -273,35 +273,25 @@ class BlockFloatingPoint(Format):
         # input of Conv2D: [B, Cin, H, W], dim=1
         # weight of Conv2D: [Cout, Cin//G, K, K], dim=1
         # TODO: modify qtorch kernels do the following at C++ level
-        if self.block_size == 1:  # borrowing float_quantize for block_size==1
-            _x = float_quantize(
-                x.float(),
-                man=self.precision-2,  # 1 for sign and 1 for implicit bit
-                exp=8,
-                bias=127,
-                flush_subnormal=False,
-                rounding=self.rounding,
-            )
-        else:
-            _x = x.float().transpose(self.block_dim, -1)  # dim swap
-            xshape = _x.shape  # remember shape
-            _xs = torch.split(
-                _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
-            )  # slice to blocks
-            _x = torch.cat(
-                [
-                    block_quantize(
-                        block,
-                        wl=self.precision,
-                        dim=0,
-                        symmetric=self.symmetric,
-                        rounding=self.rounding,
-                    )
-                    for block in _xs
-                ],
-                dim=-1,
-            )  # quantize
-            _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
+        _x = x.float().transpose(self.block_dim, -1)  # dim swap
+        xshape = _x.shape  # remember shape
+        _xs = torch.split(
+            _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
+        )  # slice to blocks
+        _x = torch.cat(
+            [
+                block_quantize(
+                    block,
+                    wl=self.precision,
+                    dim=0,
+                    symmetric=self.symmetric,
+                    rounding=self.rounding,
+                )
+                for block in _xs
+            ],
+            dim=-1,
+        )  # quantize
+        _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
         return _x
 
     @property
