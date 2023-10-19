@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/cf45cefd-f2d1-44ef-ae14-13fa98b9f52e">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/7e745aae-44e2-427a-9a6d-bd7eea1cde1f">
-    <img alt="dmatrix-logo" src="https://github.com/d-matrix-ai/mltools/assets/139168891/6dd0dad4-5308-4280-a935-34987ee60188" width="600" height="200" style="max-width: 100%;"> 
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/f1466cf9-a2b6-4f17-8690-cc165462bae7">
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/e494e084-52c3-4404-8402-8f64f826d344">
+    <img alt="dmatrix-logo" src="https://github.com/d-matrix-ai/mltools/assets/139168891/f1466cf9-a2b6-4f17-8690-cc165462bae7" width="900" height="180" style="max-width: 100%;"> 
   </picture>
 </p>
 
