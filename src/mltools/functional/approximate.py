@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from . import functions, vsimd
 
+
 __ALL__ = [
     "ApproximationFunction",
     "ApproximationMixin",
@@ -12,6 +13,7 @@ __ALL__ = [
     "SoftmaxApproximation",
     "GELUApproximation",
     "LayerNormApproximation",
+    "HFDiffusersTimestepsApproximation",
     "Approximate",
     "Approximator",
 ]
@@ -42,6 +44,8 @@ class ApproximationFunction:
             return GELUApproximation.from_shorthand(sh)
         elif sh.startswith("LAYERNORM"):
             return LayerNormApproximation.from_shorthand(sh)
+        elif sh.startswith("HFDIFFUSERSTIMESTEPS"):
+            return HFDiffusersTimestepsApproximation.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized approximation function shorthand: {sh}")
 
@@ -255,6 +259,52 @@ class GELUApproximation(ApproximationFunction):
             "GELU(vsimd)"
             if self.algorithm == "vsimd"
             else f"GELU({self.algorithm},{self.nform})"
+        )
+
+
+class HFDiffusersTimestepsApproximation(ApproximationFunction):
+    r"""
+    This class specifies an approximation function for HFDiffusersTimesteps.
+    """
+
+    def __init__(self, algorithm: str = "vsimd", nform: Optional[str] = None):
+        super().__init__()
+        assert algorithm in (
+            "vsimd",
+        ), f"unsupported HF_DIFFUSERS_TIMESTEPS algorithm {algorithm}"
+        assert nform in (
+            "float16",
+            None,
+        ), f"unsupported HF_DIFFUSERS_TIMESTEPS numerical format {nform}"
+
+        self.algorithm = algorithm
+        self.nform = nform
+
+    def execute(self, *args, **kwargs):
+        if self.algorithm == "vsimd":
+            return vsimd.hf_diffusers_timesteps(*args, **kwargs)
+        else:
+            raise ValueError("unrecognized the algorithm")
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        if sh == "HFDIFFUSERSTIMESTEPS(vsimd)":
+            return cls(algorithm="vsimd", nform=None)
+        else:
+            conf = parse("HFDIFFUSERSTIMESTEPS({algorithm:w},{nform:w})", sh)
+            return cls(
+                algorithm=conf["algorithm"],
+                nform=conf["nform"],
+            )
+
+    def __str__(self) -> str:
+        return f"HFDIFFUSERSTIMESTEPS approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
+
+    def __repr__(self) -> str:
+        return (
+            "HFDIFFUSERSTIMESTEPS(vsimd)"
+            if self.algorithm == "vsimd"
+            else f"HFDIFFUSERSTIMESTEPS({self.algorithm},{self.nform})"
         )
 
 

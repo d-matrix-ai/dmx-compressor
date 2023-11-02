@@ -126,5 +126,6 @@ default_approx = SimpleNamespace(
     LAYERNORM=ApproximationFunction.from_shorthand("LAYERNORM(vsimd)"),
     T5LAYERNORM=ApproximationFunction.from_shorthand("NONE"),
     LLAMALAYERNORM=ApproximationFunction.from_shorthand("NONE"),
-    LlamaRotaryEmbeddingRefactored=ApproximationFunction.from_shorthand("NONE"),
+    LLAMAROTARYEMBEDDINGREFACTORED=ApproximationFunction.from_shorthand("NONE"),
+    HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("HFDIFFUSERSTIMESTEPS(vsimd)"),
 )

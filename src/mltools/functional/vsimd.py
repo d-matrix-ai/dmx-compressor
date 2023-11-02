@@ -5,8 +5,9 @@ from functools import wraps
 from typing import List, Optional, Callable, Tuple
 from types import SimpleNamespace
 from dmsimd import SIMDKernels as _K
+import math
 
-__ALL__ = ["gelu", "layer_norm", "softmax"]
+__ALL__ = ["gelu", "layer_norm", "softmax", "hf_diffusers_timesteps"]
 
 
 class K(SimpleNamespace):
@@ -20,6 +21,16 @@ class K(SimpleNamespace):
     def gelu(x: torch.Tensor) -> torch.Tensor:
         device, dtype = x.device, x.dtype
         x = _K.gelu(x.cpu().numpy())
+        return torch.Tensor(x).to(dtype).to(device)
+
+    def sin(x: torch.Tensor) -> torch.Tensor:
+        device, dtype = x.device, x.dtype
+        x = _K.sin(x.cpu().numpy())
+        return torch.Tensor(x).to(dtype).to(device)
+
+    def cos(x: torch.Tensor) -> torch.Tensor:
+        device, dtype = x.device, x.dtype
+        x = _K.cos(x.cpu().numpy())
         return torch.Tensor(x).to(dtype).to(device)
 
     def layernorm_reduction(
@@ -168,3 +179,26 @@ def layer_norm(
         output.append(torch.cat(output_tiles, dim=1))
     output = torch.cat(output, dim=0)
     return output.view_as(input)
+
+
+def hf_diffusers_timesteps(
+    timesteps: torch.Tensor,
+    num_channels: int,
+    half_dim: int,
+    exponent: float,
+    flip_sin_to_cos: bool = False,
+    downscale_freq_shift: float = 1,
+    scale: float = 1,
+    max_period: int = 10000,
+):
+    emb = timesteps[:, None].half() * exponent.half()[None, :]  # this is not allowed
+    emb *= scale  # need kernels, annotate shape and dtype
+    emb = torch.cat([K.sin(emb), K.cos(emb)], dim=-1)
+
+    if flip_sin_to_cos:
+        emb = torch.cat([emb[:, half_dim:], emb[:, :half_dim]], dim=-1)
+
+    if embedding_dim % 2 == 1:
+        emb = torch.nn.functional.pad(emb, (0, 1, 0, 0))
+
+    return emb
