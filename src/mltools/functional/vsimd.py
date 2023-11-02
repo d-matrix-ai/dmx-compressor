@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from dmsimd import SIMDKernels as _K
 import math
 
-__all__ = ["gelu", "layer_norm", "softmax", "hf_diffusers_timesteps"]
+__ALL__ = ["gelu", "layer_norm", "softmax", "hf_diffusers_timesteps"]
 
 
 class K(SimpleNamespace):
