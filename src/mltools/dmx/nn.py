@@ -7,6 +7,9 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 import transformers
+import diffusers
+import math
+from dmsimd import SIMDKernels as _K
 
 from mltools.numerical import (
     Format,
@@ -86,8 +89,6 @@ class DmxModule(
             self.output_cast.set_format(format=config["output_format"])
         if self.residual_cast is not None and "residual_format" in config:
             self.residual_cast.set_format(format=config["residual_format"])
-        if self.multiplier_cast is not None and "multiplier_format" in config:
-            self.multiplier_cast.set_format(format=config["multiplier_format"])
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_cast is not None and "weight_format" in config:
@@ -262,10 +263,6 @@ class DmxModuleConfig(dict):
                 freeze or module.residual_format != "SAME"
             ):
                 cc.residual_format = module.residual_format
-            if module.multiplier_format is not None and (
-                freeze or module.multiplier_format != "SAME"
-            ):
-                cc.multiplier_format = module.multiplier_format
             if module.output_format is not None and (
                 freeze or module.output_format != "SAME"
             ):
@@ -321,17 +318,6 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         _residual = self.residual_cast(residual)
         _output = _input + _residual
-        return _output
-
-
-class ActActMatMul(DmxModule, torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.multiplier_cast = CastTo()
-
-    def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        _multiplier = self.multiplier_cast(multiplier)
-        _output = torch.matmul(_input, _multiplier)
         return _output
 
 
@@ -955,6 +941,43 @@ class HFTransformersLlamaRMSNorm(
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
+        return _output
+
+
+class HFDiffusersTimesteps(DmxModule, diffusers.models.embeddings.Timesteps):
+    def __init__(
+        self,
+        num_channels: int,
+        flip_sin_to_cos: bool,
+        downscale_freq_shift: float,
+        max_period: int = 10000,
+        scale: float = 1,
+    ) -> None:
+        super().__init__(num_channels, flip_sin_to_cos, downscale_freq_shift)
+
+        self.max_period = max_period
+        self.scale = scale
+
+        self.half_dim = num_channels // 2
+
+        exponent = -math.log(max_period) * torch.arange(
+            start=0, end=self.half_dim, dtype=torch.float32
+        )
+        exponent = exponent / (self.half_dim - downscale_freq_shift)
+
+        self.exponent = torch.exp(exponent)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(
+            (_input,),
+            num_channels=self.num_channels,
+            half_dim=self.half_dim,
+            exponent=self.exponent,
+            flip_sin_to_cos=self.flip_sin_to_cos,
+            downscale_freq_shift=self.downscale_freq_shift,
+            scale=self.scale,
+            max_period=self.max_period,
+        )
         return _output
 
 

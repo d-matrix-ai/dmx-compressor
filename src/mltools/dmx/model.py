@@ -69,6 +69,7 @@ def aware(patch_hf_transformers: bool = True):
         transformers.models.llama.modeling_llama.LlamaRotaryEmbeddingRefactored = (
             HFTransformersLlamaRotaryEmbeddingRefactored
         )
+        diffusers.models.embeddings.Timesteps = HFDiffusersTimesteps
 
 
 class Model(torch.nn.Module):
