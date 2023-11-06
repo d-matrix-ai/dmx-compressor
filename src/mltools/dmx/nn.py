@@ -7,7 +7,6 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 import math
-from dmsimd import SIMDKernels as _K
 
 from mltools.numerical import (
     Format,
