@@ -198,7 +198,7 @@ def hf_diffusers_timesteps(
     if flip_sin_to_cos:
         emb = torch.cat([emb[:, half_dim:], emb[:, :half_dim]], dim=-1)
 
-    if embedding_dim % 2 == 1:
+    if num_channels % 2 == 1:
         emb = torch.nn.functional.pad(emb, (0, 1, 0, 0))
 
     return emb
