@@ -341,7 +341,7 @@ class SmoothQuant(nn.Module):
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
         """
-        Overrides torch.nn._load_from_state_dict() to avoid tensor shape mismatch
+        Overrides torch.nn.Module._load_from_state_dict() to avoid tensor shape mismatch
         """
         self.scale = state_dict[prefix + "scale"]  # asign scale manually
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
