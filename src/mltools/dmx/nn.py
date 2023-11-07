@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
+import transformers
+import diffusers
 import math
 
 from mltools.numerical import (
@@ -385,6 +387,19 @@ class Linear(DmxModule, torch.nn.Linear):
         initial_dmx = Linear(raw.in_features, raw.out_features, bias=raw.bias != None)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+
+class HFTransformersConv1D(DmxModule, transformers.pytorch_utils.Conv1D):
+    def __init__(self, nf: int, nx: int) -> None:
+        super().__init__(nf, nx)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        size_out = _input.size()[:-1] + (self.nf,)
+        _output = torch.addmm(
+            self._bias, _input.view(-1, _input.size(-1)), self._weight
+        )
+        _output = _output.view(size_out)
+        return _output
 
 
 class Conv1d(DmxModule, torch.nn.Conv1d):
@@ -887,6 +902,132 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         )
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+
+class HFTransformersT5LayerNorm(
+    DmxModule, transformers.models.t5.modeling_t5.T5LayerNorm
+):
+    r"""
+    An extension of the Hugging Face Transformers T5 LayerNorm layer to support DmxModule configurations.
+    This module applies RMS-based layer normalization over the input tensor.
+    The layer normalization is parameterized by the `hidden_size` and optional `eps` value for numerical stability.
+
+    Args:
+        hidden_size (int): The size of the hidden layer (number of hidden units).
+        eps (float, optional): A small constant added to the denominator for numerical stability. Defaults to 1e-6.
+
+    Methods:
+        _forward (_input: Tensor) -> Tensor: Computes the forward pass of the layer normalization.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        eps: float = 1e-6,
+    ) -> None:
+        super().__init__(hidden_size, eps=eps)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward((_input,))
+        return _output
+
+
+class HFTransformersLlamaRMSNorm(
+    DmxModule, transformers.models.llama.modeling_llama.LlamaRMSNorm
+):
+    r"""
+    An extension of the Hugging Face Transformers Llama RMSNorm layer to support DmxModule configurations.
+    This module performs RMS-based layer normalization on the input tensor.
+    The layer normalization is characterized by the `hidden_size` and an optional `eps` value for numerical stability.
+
+    Args:
+        hidden_size (int): The size of the hidden layer (number of hidden units).
+        eps (float, optional): A small constant added to the denominator for numerical stability. Defaults to 1e-6.
+
+    Methods:
+        _forward (_input: Tensor) -> Tensor: Computes the forward pass of the RMS layer normalization.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        eps: float = 1e-6,
+    ) -> None:
+        super().__init__(hidden_size, eps=eps)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward((_input,))
+        return _output
+
+
+class HFDiffusersTimesteps(DmxModule, diffusers.models.embeddings.Timesteps):
+    def __init__(
+        self,
+        num_channels: int,
+        flip_sin_to_cos: bool,
+        downscale_freq_shift: float,
+        max_period: int = 10000,
+        scale: float = 1,
+    ) -> None:
+        super().__init__(num_channels, flip_sin_to_cos, downscale_freq_shift)
+
+        self.max_period = max_period
+        self.scale = scale
+
+        self.half_dim = num_channels // 2
+
+        exponent = -math.log(max_period) * torch.arange(
+            start=0, end=self.half_dim, dtype=torch.float32
+        )
+        exponent = exponent / (self.half_dim - downscale_freq_shift)
+
+        self.exponent = torch.exp(exponent)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(
+            (_input,),
+            num_channels=self.num_channels,
+            half_dim=self.half_dim,
+            exponent=self.exponent,
+            flip_sin_to_cos=self.flip_sin_to_cos,
+            downscale_freq_shift=self.downscale_freq_shift,
+            scale=self.scale,
+            max_period=self.max_period,
+        )
+        return _output
+
+
+class HFTransformersLlamaRotaryEmbeddingRefactored(
+    DmxModule, transformers.models.llama.modeling_llama.LlamaRotaryEmbeddingRefactored
+):
+    r"""
+    An extension of the Hugging Face Transformers Llama RotaryEmbeddingRefactored layer to support DmxModule configurations.
+    This module applies rotary embeddings to the input tensor. It is parameterized by the `dim`, the `max_position_embeddings`, and an optional base value for the rotary embeddings.
+
+    Args:
+        dim (int): Dimensionality of the embeddings.
+        max_position_embeddings (int, optional): Maximum number of position embeddings. Defaults to 2048.
+        base (int, optional): The base value used for generating position embeddings. Defaults to 10000.
+        device (optional): The device on which to run the module. If None, uses the device of the input.
+
+    Methods:
+        _forward (_input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None) -> Tensor: Computes the forward pass of the rotary embeddings.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        max_position_embeddings: int = 2048,
+        base: int = 10000,
+        device=None,
+    ) -> None:
+        super().__init__(dim, max_position_embeddings, base, device)
+
+    def _forward(
+        self, _input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None
+    ) -> Tensor:
+        _output = self.approx_forward((_input, position_ids, seq_len))
+        return _output
 
 
 class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
