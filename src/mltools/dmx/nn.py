@@ -7,7 +7,6 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 import transformers
-import diffusers
 import math
 
 from mltools.numerical import (
@@ -957,43 +956,6 @@ class HFTransformersLlamaRMSNorm(
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
-        return _output
-
-
-class HFDiffusersTimesteps(DmxModule, diffusers.models.embeddings.Timesteps):
-    def __init__(
-        self,
-        num_channels: int,
-        flip_sin_to_cos: bool,
-        downscale_freq_shift: float,
-        max_period: int = 10000,
-        scale: float = 1,
-    ) -> None:
-        super().__init__(num_channels, flip_sin_to_cos, downscale_freq_shift)
-
-        self.max_period = max_period
-        self.scale = scale
-
-        self.half_dim = num_channels // 2
-
-        exponent = -math.log(max_period) * torch.arange(
-            start=0, end=self.half_dim, dtype=torch.float32
-        )
-        exponent = exponent / (self.half_dim - downscale_freq_shift)
-
-        self.exponent = torch.exp(exponent)
-
-    def _forward(self, _input: Tensor) -> Tensor:
-        _output = self.approx_forward(
-            (_input,),
-            num_channels=self.num_channels,
-            half_dim=self.half_dim,
-            exponent=self.exponent,
-            flip_sin_to_cos=self.flip_sin_to_cos,
-            downscale_freq_shift=self.downscale_freq_shift,
-            scale=self.scale,
-            max_period=self.max_period,
-        )
         return _output
 
 
