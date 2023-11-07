@@ -959,39 +959,6 @@ class HFTransformersLlamaRMSNorm(
         return _output
 
 
-class HFTransformersLlamaRotaryEmbeddingRefactored(
-    DmxModule, transformers.models.llama.modeling_llama.LlamaRotaryEmbeddingRefactored
-):
-    r"""
-    An extension of the Hugging Face Transformers Llama RotaryEmbeddingRefactored layer to support DmxModule configurations.
-    This module applies rotary embeddings to the input tensor. It is parameterized by the `dim`, the `max_position_embeddings`, and an optional base value for the rotary embeddings.
-
-    Args:
-        dim (int): Dimensionality of the embeddings.
-        max_position_embeddings (int, optional): Maximum number of position embeddings. Defaults to 2048.
-        base (int, optional): The base value used for generating position embeddings. Defaults to 10000.
-        device (optional): The device on which to run the module. If None, uses the device of the input.
-
-    Methods:
-        _forward (_input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None) -> Tensor: Computes the forward pass of the rotary embeddings.
-    """
-
-    def __init__(
-        self,
-        dim: int,
-        max_position_embeddings: int = 2048,
-        base: int = 10000,
-        device=None,
-    ) -> None:
-        super().__init__(dim, max_position_embeddings, base, device)
-
-    def _forward(
-        self, _input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None
-    ) -> Tensor:
-        _output = self.approx_forward((_input, position_ids, seq_len))
-        return _output
-
-
 class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
     r"""
     An extension of PyTorch's BatchNorm2d layer to support DmxModule configurations.

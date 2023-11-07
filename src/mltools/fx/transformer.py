@@ -37,7 +37,6 @@ dmx_aware_mapping = {
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.HFTransformersLlamaRMSNorm,
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,
-    "transformers.models.llama.modeling_llama.LlamaRotaryEmbeddingRefactored": dmx.nn.HFTransformersLlamaRotaryEmbeddingRefactored,
 }
 
 dmx_aware_functional_mappings = {
