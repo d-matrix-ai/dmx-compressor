@@ -400,6 +400,12 @@ class HFTransformersConv1D(DmxModule, transformers.pytorch_utils.Conv1D):
         _output = _output.view(size_out)
         return _output
 
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = HFTransformersConv1D(raw.weight.shape[1], raw.weight.shape[0])
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
 
 class Conv1d(DmxModule, torch.nn.Conv1d):
     r"""

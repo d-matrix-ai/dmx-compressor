@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #
 import logging
+import math
 import torch
 from torch import fx
 from .. import numerical
@@ -9,6 +10,7 @@ from .. import sparse
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
 import transformers.utils.fx as fx_hf
+import transformers
 
 from transformers.utils.fx import (
     HFTracer,
@@ -19,12 +21,61 @@ from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
 
 
+class DmxHFTracer(HFTracer):
+    """
+    Custom HFTracer where definition of leaf nodes
+    """
+
+    def __init__(self, autowrap_modules=(math,), autowrap_functions=()):
+        super().__init__(
+            autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions
+        )
+
+    def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
+        """
+        A method to specify whether a given ``nn.Module`` is a "leaf" module.
+
+        Leaf modules are the atomic units that appear in
+        the IR, referenced by ``call_module`` calls. By default,
+        Modules in the PyTorch standard library namespace (torch.nn)
+        are leaf modules. All other modules are traced through and
+        their constituent ops are recorded, unless specified otherwise
+        via this parameter.
+
+        Args:
+            m (Module): The module being queried about
+            module_qualified_name (str): The path to root of this module. For example,
+                if you have a module hierarchy where submodule ``foo`` contains
+                submodule ``bar``, which contains submodule ``baz``, that module will
+                appear with the qualified name ``foo.bar.baz`` here.
+        Returns:
+            True if m is a leaf module
+        """
+        is_leaf = isinstance(
+            m,
+            (
+                numerical.CastTo,
+                sparse.Sparsify,
+                transformers.pytorch_utils.Conv1D,
+            ),
+        )
+        is_leaf = is_leaf or (
+            (
+                m.__module__.startswith("torch.nn")
+                or m.__module__.startswith("torch.ao.nn")
+                or m.__module__.startswith("transformers.activations")
+            )
+            and not isinstance(m, torch.nn.Sequential)
+        )
+        return is_leaf
+
+
 def hf_symbolic_trace(
     model: PreTrainedModel,
     input_names: Optional[List[str]] = None,
     concrete_args: Optional[Dict[str, Any]] = None,
     disable_check: bool = False,
-    tracer_cls: Type[HFTracer] = HFTracer,
+    tracer_cls: Type[DmxHFTracer] = DmxHFTracer,
 ) -> GraphModule:
     """
     Performs symbolic tracing on a huggingface model.
