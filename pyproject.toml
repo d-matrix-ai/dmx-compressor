@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mltools"
-version = "0.1.1"
+version = "0.1.2"
 description = "d-MATRiX ML tools"
 authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>","Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>", "Zifei Xu <xuzifei@d-matrix.ai>"]
 include = [{ path = "tests", format = "sdist" }]
@@ -13,15 +13,10 @@ pptree = "^3.1"
 pytest = "^7.1.1"
 python = ">=3.8,<3.11"
 tqdm = "^4.64.0"
-transformers = "^4.19"
+transformers = "^4.30"
 torch = ">=1.12.0, < 2.1"
 torchvision = ">=0.13.0, < 0.16.0"
-
-[[tool.poetry.source]]
-name = "dmatrix"
-url = "http://pypi.d-matrix.ai"
-default = true
-secondary = false
+diffusers = "^0.20"
 
 [tool.poetry-dynamic-versioning]
 vcs = "git"
