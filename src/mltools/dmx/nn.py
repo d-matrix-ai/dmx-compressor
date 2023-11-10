@@ -239,6 +239,10 @@ class DmxModule(
         for key, val in raw.state_dict().items():
             state_dic[key] = val
         self.load_state_dict(state_dic)
+        # inherit some module attributes from raw module
+        self.training = raw.training
+        if hasattr(raw, "dtype"):
+            self.dtype = raw.dtype
 
 
 class DmxModuleConfig(dict):
@@ -907,6 +911,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
             raw.normalized_shape, eps=raw.eps, elementwise_affine=raw.elementwise_affine
         )
         initial_dmx.update_params_with_raw(raw)
+        initial_dmx.type(raw.weight.dtype)
         return initial_dmx
 
 
