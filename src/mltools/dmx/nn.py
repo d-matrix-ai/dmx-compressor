@@ -678,6 +678,22 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             _output = _convolution
         return _output
 
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = ConvTranspose2d(
+            raw.in_channels,
+            raw.out_channels,
+            raw.kernel_size,
+            stride=raw.stride,
+            padding=raw.padding,
+            dilation=raw.dilation,
+            groups=raw.groups,
+            bias=raw.bias != None,
+            padding_mode=raw.padding_mode,
+        )
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
 
 class AdaptiveAvgPool2d(DmxModule, torch.nn.AdaptiveAvgPool2d):
     r"""
@@ -939,6 +955,23 @@ class HFTransformersT5LayerNorm(
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
         return _output
+
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        """
+        Creates a new LayerNorm object (DmxModule) from a given PyTorch LayerNorm layer.
+
+        Args:
+            raw (torch.nn.Module): A PyTorch LayerNorm layer to be converted.
+
+        Returns:
+            DmxModule: A LayerNorm object that has the same configuration as the input PyTorch LayerNorm layer.
+        """
+        initial_dmx = HFTransformersT5LayerNorm(
+            raw.weight.shape, eps=raw.variance_epsilon
+        )
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
 
 
 class HFTransformersLlamaRMSNorm(
