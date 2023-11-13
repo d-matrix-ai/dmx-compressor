@@ -146,10 +146,11 @@ class K(SimpleNamespace):
 
     TILE_SIZE = 64
     NORM = 1
-
+        
     def gelu(x: torch.Tensor) -> torch.Tensor:
         device, dtype = x.device, x.dtype
-        x = _K.gelu(x.cpu().numpy())
+        x= x.cpu().numpy()
+        x = np.array([_K.gelu(_x) for _x in x])
         return torch.Tensor(x).to(dtype).to(device)
 
     def sin(x: torch.Tensor) -> torch.Tensor:
