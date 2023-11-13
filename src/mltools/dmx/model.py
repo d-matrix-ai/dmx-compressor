@@ -48,6 +48,24 @@ def aware(patch_hf_transformers: bool = True):
     torch.nn.Tanh = Tanh
     torch.nn.GELU = GELU
     # overload huggingface transformers modules
+    if patch_hf_transformers:
+        transformers.activations.NewGELUActivation = GELU
+        transformers.activations.GELUActivation = GELU
+        transformers.activations.FastGELUActivation = GELU
+        transformers.activations.QuickGELUActivation = GELU
+        transformers.activations.ClippedGELUActivation = GELU
+        # modeling_gpt2
+        transformers.pytorch_utils.Conv1D = HFTransformersConv1D
+        # modeling_bloom
+        transformers.models.bloom.modeling_bloom.BloomGelu = GELU
+        # modeling_t5
+        transformers.models.t5.modeling_t5.T5LayerNorm = HFTransformersT5LayerNorm
+        # modelling_llama
+        transformers.activations.SiLUActivation = SiLU
+        transformers.models.llama.modeling_llama.LlamaRMSNorm = (
+            HFTransformersLlamaRMSNorm
+        )
+        transformers.activations.SiLUActivation = SiLU
 
 
 class Model(torch.nn.Module):
