@@ -108,9 +108,6 @@ class Model(torch.nn.Module):
                 body, hf=hf, input_names=input_names, concrete_args=concrete_args
             )
         )
-        # self.gm = substitute_transform(
-        #     body, hf=hf, input_names=input_names, concrete_args=concrete_args
-        # )[1]
         self.head = head
         self.tail = tail
         self.monkey_patched = monkey_patched

@@ -26,6 +26,7 @@ def substitute_transform(
     Returns:
         transformed model
     """
+    # breakpoint()
     if hf:
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
@@ -33,8 +34,9 @@ def substitute_transform(
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     for key, val in root.__dict__.items():
-        if key not in transformed.__dict__:
+        if key not in transformed.__dict__ and key != "forward":
             transformed.__dict__[key] = val
+    breakpoint()
     return transformed
 
 

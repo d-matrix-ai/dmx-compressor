@@ -213,6 +213,9 @@ class DmxModule(
             **kwargs (Optional[Dict]): variable length of kwargs
         """
         _dtype, _device = input.dtype, input.device
+        if hasattr(self, "weight"):
+            weight_device = self.weight.device
+            input = input.to(weight_device)
         if self.smoothquant is not None:
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
@@ -235,12 +238,18 @@ class DmxModule(
         """
         state_dic = self.state_dict()
         for key, val in raw.state_dict().items():
-            state_dic[key] = val
+            state_dic[key] = val.to(val.device)
         self.load_state_dict(state_dic)
+        # Inherit device from raw module
+        for n, m in raw.named_parameters():
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = m.device if m.device != "cpu" else device
+            setattr(self, n, torch.nn.Parameter(getattr(self, n).to(device)))
+            print(n, device)
         # inherit some module attributes from raw module
         self.training = raw.training
         if hasattr(raw, "dtype"):
-            self.dtype = raw.dtype
+            self.dtype = raw.dtyp
 
 
 class DmxModuleConfig(dict):
