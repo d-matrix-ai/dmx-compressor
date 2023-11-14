@@ -7,6 +7,7 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 import transformers
+import diffusers
 import math
 
 from mltools.numerical import (
@@ -962,6 +963,76 @@ class HFTransformersLlamaRMSNorm(
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
+        return _output
+
+
+class HFDiffusersTimesteps(DmxModule, diffusers.models.embeddings.Timesteps):
+    def __init__(
+        self,
+        num_channels: int,
+        flip_sin_to_cos: bool,
+        downscale_freq_shift: float,
+        max_period: int = 10000,
+        scale: float = 1,
+    ) -> None:
+        super().__init__(num_channels, flip_sin_to_cos, downscale_freq_shift)
+
+        self.max_period = max_period
+        self.scale = scale
+
+        self.half_dim = num_channels // 2
+
+        exponent = -math.log(max_period) * torch.arange(
+            start=0, end=self.half_dim, dtype=torch.float32
+        )
+        exponent = exponent / (self.half_dim - downscale_freq_shift)
+
+        self.exponent = torch.exp(exponent)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward(
+            (_input,),
+            num_channels=self.num_channels,
+            half_dim=self.half_dim,
+            exponent=self.exponent,
+            flip_sin_to_cos=self.flip_sin_to_cos,
+            downscale_freq_shift=self.downscale_freq_shift,
+            scale=self.scale,
+            max_period=self.max_period,
+        )
+        return _output
+
+
+class HFTransformersLlamaRotaryEmbeddingRefactored(
+    DmxModule, transformers.models.llama.modeling_llama.LlamaRotaryEmbeddingRefactored
+):
+    r"""
+    An extension of the Hugging Face Transformers Llama RotaryEmbeddingRefactored layer to support DmxModule configurations.
+    This module applies rotary embeddings to the input tensor. It is parameterized by the `dim`, the `max_position_embeddings`, and an optional base value for the rotary embeddings.
+
+    Args:
+        dim (int): Dimensionality of the embeddings.
+        max_position_embeddings (int, optional): Maximum number of position embeddings. Defaults to 2048.
+        base (int, optional): The base value used for generating position embeddings. Defaults to 10000.
+        device (optional): The device on which to run the module. If None, uses the device of the input.
+
+    Methods:
+        _forward (_input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None) -> Tensor: Computes the forward pass of the rotary embeddings.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        max_position_embeddings: int = 2048,
+        base: int = 10000,
+        device=None,
+    ) -> None:
+        super().__init__(dim, max_position_embeddings, base, device)
+
+    def _forward(
+        self, _input: Tensor, position_ids: Tensor, seq_len: Optional[int] = None
+    ) -> Tensor:
+        _output = self.approx_forward((_input, position_ids, seq_len))
         return _output
 
 
