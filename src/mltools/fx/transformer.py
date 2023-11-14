@@ -220,7 +220,22 @@ class DMXAwareTransformer(fx.Transformer):
             else:
                 return super().call_function(target, args, kwargs)
         elif node_key == repr(eval("torch.matmul")):
-            new_name = curr_target + ".matmul"
+            cand_name = curr_target + ".matmul"
+            curr_name = get_name_for_func_nodes(
+                cand_name,
+                self.new_graph._graph_namespace._used_names,
+                self.new_graph._graph_namespace._base_count,
+            )
+            # replace "_" with "." exit for last "_" if new_name ends with digit
+            new_name = curr_name.replace("_", ".")
+            new_name = (
+                new_name[: new_name.rfind(".")]
+                + "_"
+                + new_name[new_name.rfind(".") + 1 :]
+                if new_name[-1].isdigit()
+                else new_name
+            )
+
         else:
             new_name = curr_target + "." + candidate if curr_target != "" else candidate
 
