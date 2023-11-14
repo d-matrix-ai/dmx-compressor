@@ -7,7 +7,6 @@ import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 import transformers
-import math
 
 from mltools.numerical import (
     Format,
