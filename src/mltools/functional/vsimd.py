@@ -10,6 +10,7 @@ try:
     from dmsimd import SIMDKernels as _K
 
 except ModuleNotFoundError:
+
     class _K:
         @staticmethod
         def add(a, b):
@@ -136,6 +137,7 @@ except ModuleNotFoundError:
             """
             return x
 
+
 __ALL__ = ["gelu", "layer_norm", "softmax", "hf_diffusers_timesteps"]
 
 
@@ -147,20 +149,19 @@ class K(SimpleNamespace):
     TILE_SIZE = 64
     NORM = 1
 
-    def gelu(x: torch.Tensor) -> torch.Tensor:
-        device, dtype = x.device, x.dtype
-        x = _K.gelu(x.cpu().numpy())
-        return torch.Tensor(x).to(dtype).to(device)
+    def elemwise_kernel(func):
+        @wraps(func)
+        def wrapper(x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+            device, dtype, shape = x.device, x.dtype, x.shape
+            x = x.cpu().numpy()
+            x = np.array([func(_x) for _x in x])
+            return torch.Tensor(x).to(dtype).to(device).view(shape)
 
-    def sin(x: torch.Tensor) -> torch.Tensor:
-        device, dtype = x.device, x.dtype
-        x = _K.sin(x.cpu().numpy())
-        return torch.Tensor(x).to(dtype).to(device)
+        return wrapper
 
-    def cos(x: torch.Tensor) -> torch.Tensor:
-        device, dtype = x.device, x.dtype
-        x = _K.cos(x.cpu().numpy())
-        return torch.Tensor(x).to(dtype).to(device)
+    gelu = elemwise_kernel(_K.gelu)
+    # sin = elemwise_kernel(_K.sin)
+    # cos = elemwise_kernel(_K.cos)
 
     def layernorm_reduction(
         x: torch.Tensor, norm: int = NORM
