@@ -9,6 +9,7 @@ import re
 from mltools.numerical import CastTo
 from mltools.sparse import Sparsify, Sparseness
 from mltools import dmx
+import inspect
 
 
 dmx_aware_mapping = {
@@ -45,6 +46,8 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.silu": dmx.nn.SiLU,
     "torch.nn.functional.tanh": dmx.nn.Tanh,
     "torch.nn.functional.gelu": dmx.nn.GELU,
+    "torch.nn.functional.softmax": dmx.nn.Softmax,
+    "torch.nn.functional.dropout": dmx.nn.Dropout,
     "torch.matmul": dmx.nn.ActActMatMul,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
@@ -219,20 +222,28 @@ class DMXAwareTransformer(fx.Transformer):
         elif node_key == repr(eval("torch.matmul")):
             new_name = curr_target + ".matmul"
         else:
-            new_name = curr_target if curr_target != "" else candidate
+            new_name = curr_target + "." + candidate if curr_target != "" else candidate
 
         # If new name is not candidate, need to add candidate to used names,
         # otherwise next call_function will use the same candidate. (create_name is also called in create_node)
         if new_name != candidate:
             self.new_graph._graph_namespace.create_name(candidate, None)
-
-        self.module.add_submodule(new_name, dmx_aware_functional_mappings[node_key]())
+        # find out what kwargs to pass in to new module
+        empty_mod = dmx_aware_functional_mappings[node_key]()
+        accepted_kwarg_keys = inspect.signature(empty_mod.__init__).parameters.keys()
+        newkwargs = {}
+        for key, value in kwargs.items():
+            if key in accepted_kwarg_keys:
+                newkwargs[key] = value
+        self.module.add_submodule(
+            new_name, dmx_aware_functional_mappings[node_key](**newkwargs)
+        )
         new_node = self.new_graph.create_node(
             "call_module",
             new_name,
         )
         new_node.args = process_args(args)
-        new_node.kwargs = process_kwargs(kwargs)
+        # new_node.kwargs = process_kwargs(kwargs)
         return Proxy(new_node, self.tracer)
 
 
