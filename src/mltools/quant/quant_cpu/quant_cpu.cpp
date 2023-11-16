@@ -239,12 +239,19 @@ unsigned int round_bitwise(unsigned int target, int man_bits, Mode rounding)
 void block_quantize_helper(float *input, float *output, float *max_elem,
                            int wl, int size, bool symmetric, Mode rounding)
 {
-  // TODO: implement symmetric/asymmetric logic below
   for (int64_t i = 0; i < size; i++)
   {
-
     unsigned int max_num;
     FLOAT_TO_BITS(max_elem[i], max_num);
+
+    if (!symmetric)
+    {
+      if (input[i] == -max_elem[i] && (max_num >> 16 << 25) == (unsigned int)0xFE000000)
+      {
+        max_num = (max_num >> 23) + 1 << 23;
+      }
+    }
+
     unsigned int max_exp = max_num << 1 >> 24 << 23;
     float base_float;
     BITS_TO_FLOAT(max_exp, base_float);
