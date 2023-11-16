@@ -245,7 +245,6 @@ class DmxModule(
             device = "cuda" if torch.cuda.is_available() else "cpu"
             device = m.device if m.device != "cpu" else device
             setattr(self, n, torch.nn.Parameter(getattr(self, n).to(device)))
-            print(n, device)
         # inherit some module attributes from raw module
         self.training = raw.training
         if hasattr(raw, "dtype"):
