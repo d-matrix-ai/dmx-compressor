@@ -185,6 +185,21 @@ class DMXAwareTransformer(fx.Transformer):
         )
         return Proxy(new_node, self.tracer)
 
+    def create_unique_name_in_scope(self, cand_name):
+        curr_name = get_name_for_func_nodes(
+            cand_name,
+            self.new_graph._graph_namespace._used_names,
+            self.new_graph._graph_namespace._base_count,
+        )
+        # replace "_" with "." exit for last "_" if new_name ends with digit
+        new_name = curr_name.replace("_", ".")
+        new_name = (
+            new_name[: new_name.rfind(".")] + "_" + new_name[new_name.rfind(".") + 1 :]
+            if new_name[-1].isdigit()
+            else new_name
+        )
+        return new_name
+
     def call_function(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
@@ -216,26 +231,16 @@ class DMXAwareTransformer(fx.Transformer):
         curr_target, curr_type = self.node_name_to_scope[curr_name]
         if node_key == "<built-in function add>":
             if "resnet" in str(curr_type):
-                new_name = curr_target + ".resadd"
+                cand_name = curr_target + ".resadd"
+                new_name = self.create_unique_name_in_scope(cand_name)
+            elif "dropout" in str(args[0]) or "dropout" in str(args[1]):
+                cand_name = curr_target + ".resadd"
+                new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)
         elif node_key == repr(eval("torch.matmul")):
             cand_name = curr_target + ".matmul"
-            curr_name = get_name_for_func_nodes(
-                cand_name,
-                self.new_graph._graph_namespace._used_names,
-                self.new_graph._graph_namespace._base_count,
-            )
-            # replace "_" with "." exit for last "_" if new_name ends with digit
-            new_name = curr_name.replace("_", ".")
-            new_name = (
-                new_name[: new_name.rfind(".")]
-                + "_"
-                + new_name[new_name.rfind(".") + 1 :]
-                if new_name[-1].isdigit()
-                else new_name
-            )
-
+            new_name = self.create_unique_name_in_scope(cand_name)
         else:
             new_name = curr_target + "." + candidate if curr_target != "" else candidate
 
