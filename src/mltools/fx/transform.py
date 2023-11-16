@@ -40,7 +40,6 @@ def substitute_transform(
     for key, val in root.__dict__.items():
         if key not in transformed.__dict__ and key != "forward":
             transformed.__dict__[key] = val
-    breakpoint()
     return transformed
 
 
