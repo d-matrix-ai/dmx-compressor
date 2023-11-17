@@ -864,7 +864,7 @@ class Softmax(DmxModule, torch.nn.Softmax):
         super().__init__(dim=dim)
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _output = self.approx_forward((_input,), self.dim)
+        _output = self.approx_forward((_input,), dim=self.dim)
         return _output
 
     @staticmethod
