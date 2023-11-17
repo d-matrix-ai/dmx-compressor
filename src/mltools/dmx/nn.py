@@ -213,7 +213,7 @@ class DmxModule(
             **kwargs (Optional[Dict]): variable length of kwargs
         """
         _dtype, _device = input.dtype, input.device
-        if hasattr(self, "weight"):
+        if hasattr(self, "weight") and self.weight != None:
             weight_device = self.weight.device
             input = input.to(weight_device)
         if self.smoothquant is not None:
