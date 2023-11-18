@@ -248,7 +248,7 @@ class DmxModule(
         # inherit some module attributes from raw module
         self.training = raw.training
         if hasattr(raw, "dtype"):
-            self.dtype = raw.dtyp
+            self.dtype = raw.dtype
 
 
 class DmxModuleConfig(dict):
