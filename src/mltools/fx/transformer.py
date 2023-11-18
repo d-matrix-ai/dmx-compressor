@@ -263,7 +263,6 @@ class DMXAwareTransformer(fx.Transformer):
             new_name,
         )
         new_node.args = process_args(args)
-        # new_node.kwargs = process_kwargs(kwargs)
         return Proxy(new_node, self.tracer)
 
 
