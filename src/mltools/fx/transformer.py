@@ -245,7 +245,6 @@ class DMXAwareTransformer(fx.Transformer):
             new_name = self.create_unique_name_in_scope(cand_name)
         else:
             new_name = curr_target + "." + candidate if curr_target != "" else candidate
-
         # If new name is not candidate, need to add candidate to used names,
         # otherwise next call_function will use the same candidate. (create_name is also called in create_node)
         if new_name != candidate:

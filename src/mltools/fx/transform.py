@@ -38,6 +38,16 @@ def substitute_transform(
     return transformed
 
 
+def remove_new_forward(model):
+    """
+    This function removes the .forward attributes assigned to submodules of model which is added for model parallelization,
+    but it causes trouble with fx tracing.
+    """
+    for n, m in model.named_modules():
+        if "forward" in m.__dict__.keys():
+            m.__dict__.pop("forward")
+
+
 def cast_input_output_transform(
     root: torch.nn.Module,
     tracer: Union[QuantTracer, HFQuantTracer] = QuantTracer(),
