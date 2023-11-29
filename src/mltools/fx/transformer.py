@@ -230,10 +230,12 @@ class DMXAwareTransformer(fx.Transformer):
 
         curr_target, curr_type = self.node_name_to_scope[curr_name]
         if node_key == "<built-in function add>":
-            if "resnet" in str(curr_type):
-                cand_name = curr_target + ".resadd"
-                new_name = self.create_unique_name_in_scope(cand_name)
-            elif "dropout" in str(args[0]) or "dropout" in str(args[1]):
+            if (
+                isinstance(args[0], Proxy)
+                and isinstance(args[1], Proxy)
+                and args[0].node.op == "call_module"
+                and args[1].node.op == "call_module"
+            ):
                 cand_name = curr_target + ".resadd"
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
