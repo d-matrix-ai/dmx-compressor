@@ -332,6 +332,7 @@ class ResAdd(DmxModule, torch.nn.Module):
             Sum of _input tensor and quantized residual tensor.
         """
         _residual = self.residual_cast(residual)
+        _input = _input.to(_residual.device)
         _output = _input + _residual
         return _output
 

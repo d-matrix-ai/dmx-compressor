@@ -27,11 +27,6 @@ def substitute_transform(
         transformed model
     """
     if hf:
-        # # remove hooks from parallel models as it causes error when traced
-        # for key, val in root.__dict__.items():
-        #     if "hook" in key:
-        #         root.__dict__[key] = None
-        # if hasattr(root,'for')
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
         gm, tracer = symbolic_trace(root, concrete_args)
