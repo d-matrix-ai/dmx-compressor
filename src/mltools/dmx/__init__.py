@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction
-from .model import Model, aware, DmxConfig, DmxTransformation
+from .model import Model, aware, DmxConfig, DmxConfigRule
 from .nn import *
 
 # Numerical format aliases

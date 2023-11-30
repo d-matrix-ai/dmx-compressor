@@ -43,29 +43,29 @@ class Lenet5(nn.Module):
         return x
 
 
-conv_quantize_input = dmx.DmxTransformation(
+conv_quantize_input = dmx.DmxConfigRule(
     module_types=(torch.nn.Conv2d,),
     module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128_FD),
 )
-conv_quantize_weight = dmx.DmxTransformation(
+conv_quantize_weight = dmx.DmxConfigRule(
     module_types=(torch.nn.Conv2d,),
     module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128_FD),
 )
-conv_sparsify_weight = dmx.DmxTransformation(
+conv_sparsify_weight = dmx.DmxConfigRule(
     module_types=(torch.nn.Conv2d,),
     module_config=dmx.DmxModuleConfig(
         weight_sparseness=Sparseness.from_shorthand("TOPK{0.5}(U)")
     ),
 )
-fc_quantize_input = dmx.DmxTransformation(
+fc_quantize_input = dmx.DmxConfigRule(
     module_types=(torch.nn.Linear,),
     module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128_LD),
 )
-fc_quantize_weight = dmx.DmxTransformation(
+fc_quantize_weight = dmx.DmxConfigRule(
     module_types=(torch.nn.Linear,),
     module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128_LD),
 )
-fc_sparsify_weight = dmx.DmxTransformation(
+fc_sparsify_weight = dmx.DmxConfigRule(
     module_types=(torch.nn.Linear,),
     module_config=dmx.DmxModuleConfig(
         weight_sparseness=Sparseness.from_shorthand("TOPK{0.5}(U)")

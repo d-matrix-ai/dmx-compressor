@@ -1,4 +1,5 @@
 import re
+from mltools.fx.transformer import DMXAwareTransformer
 import torch
 import transformers
 from types import SimpleNamespace
@@ -132,7 +133,7 @@ class Model(torch.nn.Module):
         output = self.tail(output)
         return output
 
-    def transform(self, config="configs/dmx.yaml", *transformations):
+    def transform(self, config="configs/dmx.yaml", *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
 
@@ -140,7 +141,7 @@ class Model(torch.nn.Module):
 
         Args:
             config (Optional[str]): config file to be used for transformation. Defaults to "configs/dmx.yaml".
-            *transformations (DmxTransformation): variable length of list of transformation rules
+            *rules (List[DmxConfigRule]): variable length of list of configuration rules on top of config.
 
         Returns:
             Returns the transformed model
@@ -153,8 +154,8 @@ class Model(torch.nn.Module):
             if n in config:
                 m.transform(config[n])
 
-        for tr in transformations:
-            tr.apply_to(self)
+        for _r in rules:
+            _r.apply_to(self)
 
         return self
 
@@ -365,7 +366,7 @@ class DmxConfig(dict):
         return self.keys()
 
 
-class DmxTransformation(SimpleNamespace):
+class DmxConfigRule(SimpleNamespace):
     r"""
     This is a rule that specifies how to transform from DmxConfig to DmxConfig
     This defines the 'action' in the state space
@@ -433,3 +434,7 @@ class DmxTransformation(SimpleNamespace):
                 and getattr(dmx.nn, config[n]["instance"]) in self.module_types
             ):
                 config[n].update(self.module_config)
+
+
+# alias for backward compatibility, to be deprecated
+DmxTransformation = DmxConfigRule
