@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from . import nn
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction

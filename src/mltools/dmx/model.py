@@ -1,21 +1,17 @@
 import re
-from mltools.fx.transformer import DMXAwareTransformer
 import torch
 import transformers
 from types import SimpleNamespace
-from mltools import dmx
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Sequence
 import inspect
-
-from .nn import *
-from ..numerical import CastTo, Quantize, DeQuantize
-from ..fx.transform import substitute_transform
-
 from torch.fx import GraphModule
 from torch import fx
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-from types import SimpleNamespace
+from mltools import dmx
+from mltools.dmx.nn import *
+from mltools.numerical import CastTo, Quantize, DeQuantize
+from mltools.fx.transform import substitute_transform
+from mltools.fx.transformer import DMXAwareTransformer
 
 
 def aware(patch_hf_transformers: bool = True):
@@ -32,41 +28,43 @@ def aware(patch_hf_transformers: bool = True):
     torch.nn.quantized.Quantize = Quantize
     torch.nn.quantized.DeQuantize = DeQuantize
     # overload existing torch.nn modules for dmx
-    torch.nn.Linear = Linear
-    torch.nn.Conv1d = Conv1d
-    torch.nn.Conv2d = Conv2d
-    torch.nn.ConvTranspose2d = ConvTranspose2d
-    torch.nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
-    torch.nn.MaxPool2d = MaxPool2d
-    torch.nn.BatchNorm2d = BatchNorm2d
-    torch.nn.GroupNorm = GroupNorm
-    torch.nn.LayerNorm = LayerNorm
-    torch.nn.Dropout = Dropout
-    torch.nn.Softmax = Softmax
-    torch.nn.ReLU = ReLU
-    torch.nn.ReLU6 = ReLU6
-    torch.nn.SiLU = SiLU
-    torch.nn.Tanh = Tanh
-    torch.nn.GELU = GELU
+    torch.nn.Linear = dmx.nn.Linear
+    torch.nn.Conv1d = dmx.nn.Conv1d
+    torch.nn.Conv2d = dmx.nn.Conv2d
+    torch.nn.ConvTranspose2d = dmx.nn.ConvTranspose2d
+    torch.nn.AdaptiveAvgPool2d = dmx.nn.AdaptiveAvgPool2d
+    torch.nn.MaxPool2d = dmx.nn.MaxPool2d
+    torch.nn.BatchNorm2d = dmx.nn.BatchNorm2d
+    torch.nn.GroupNorm = dmx.nn.GroupNorm
+    torch.nn.LayerNorm = dmx.nn.LayerNorm
+    torch.nn.Dropout = dmx.nn.Dropout
+    torch.nn.Softmax = dmx.nn.Softmax
+    torch.nn.ReLU = dmx.nn.ReLU
+    torch.nn.ReLU6 = dmx.nn.ReLU6
+    torch.nn.SiLU = dmx.nn.SiLU
+    torch.nn.Tanh = dmx.nn.Tanh
+    torch.nn.GELU = dmx.nn.GELU
     # overload huggingface transformers modules
     if patch_hf_transformers:
-        transformers.activations.NewGELUActivation = GELU
-        transformers.activations.GELUActivation = GELU
-        transformers.activations.FastGELUActivation = GELU
-        transformers.activations.QuickGELUActivation = GELU
-        transformers.activations.ClippedGELUActivation = GELU
+        transformers.activations.NewGELUActivation = dmx.nn.GELU
+        transformers.activations.GELUActivation = dmx.nn.GELU
+        transformers.activations.FastGELUActivation = dmx.nn.GELU
+        transformers.activations.QuickGELUActivation = dmx.nn.GELU
+        transformers.activations.ClippedGELUActivation = dmx.nn.GELU
         # modeling_gpt2
-        transformers.pytorch_utils.Conv1D = HFTransformersConv1D
+        transformers.pytorch_utils.Conv1D = dmx.nn.HFTransformersConv1D
         # modeling_bloom
-        transformers.models.bloom.modeling_bloom.BloomGelu = GELU
+        transformers.models.bloom.modeling_bloom.BloomGelu = dmx.nn.GELU
         # modeling_t5
-        transformers.models.t5.modeling_t5.T5LayerNorm = HFTransformersT5LayerNorm
-        # modelling_llama
-        transformers.activations.SiLUActivation = SiLU
-        transformers.models.llama.modeling_llama.LlamaRMSNorm = (
-            HFTransformersLlamaRMSNorm
+        transformers.models.t5.modeling_t5.T5LayerNorm = (
+            dmx.nn.HFTransformersT5LayerNorm
         )
-        transformers.activations.SiLUActivation = SiLU
+        # modelling_llama
+        transformers.activations.SiLUActivation = dmx.nn.SiLU
+        transformers.models.llama.modeling_llama.LlamaRMSNorm = (
+            dmx.nn.HFTransformersLlamaRMSNorm
+        )
+        transformers.activations.SiLUActivation = dmx.nn.SiLU
 
 
 class Model(torch.nn.Module):

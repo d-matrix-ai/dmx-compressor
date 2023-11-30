@@ -6,10 +6,11 @@ import tempfile
 import shutil
 import yaml
 from typing import Type
-from ..dmx import nn
-from ..numerical import Format
-from ..sparse import Sparseness
-from ..functional import ApproximationFunction
+import mltools
+from mltools.dmx import nn
+from mltools.numerical import Format
+from mltools.sparse import Sparseness
+from mltools.functional import ApproximationFunction
 
 
 def compute_md5(file_name):
