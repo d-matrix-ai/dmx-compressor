@@ -36,6 +36,7 @@ class GraphvizInterpreter(fx.Interpreter):
         self.nodeDict = nodeDict
         self.functionNum = 0
         self.methodNum = 0
+        self.moduleNum = 0
         self.pygraph = Digraph(
             node_attr=node_attr,
             graph_attr=dict(layout="dot"),
@@ -123,7 +124,7 @@ class GraphvizInterpreter(fx.Interpreter):
                 # argNode is input
                 if argNode.name in self.input_names:
                     self.edges[argNode.name + target_name] = (
-                        [str(id("start")), str(id(target_name)), "input: "],
+                        [str(id("start")), str(id(target_name)), argNode.name + ": "],
                         {"fillcolor": "green", "arrowsize": "2"},
                     )
                     name = argNode.name + target_name
@@ -188,7 +189,7 @@ class GraphvizInterpreter(fx.Interpreter):
                 # argNode is input
                 if argNode.name in self.input_names:
                     self.edges[argNode.name + target_name] = (
-                        [str(id("start")), str(id(target_name)), "input: "],
+                        [str(id("start")), str(id(target_name)), argNode.name + ": "],
                         {"fillcolor": "green", "arrowsize": "2"},
                     )
                     name = argNode.name + target_name
@@ -237,23 +238,13 @@ class GraphvizInterpreter(fx.Interpreter):
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
-        # Circle with target inside (different shape for different casts)
+        # Circle with target inside
         # args are used to put text above the in edges
         # output is out edge
-        # format = ""
-        # if "cast" in target:
-        #     color = "#9BB8ED"
-        #     format = "\n\n" + repr(self.module.get_submodule(target).format)
-        # elif "spars" in target:
-        #     color = "#A39FE1"
-        #     format = "\n\n" + repr(self.module.get_submodule(target).sparseness)
-        # elif "approx" in target:
-        #     color = "#DCD0EA"
-        #     format = "\n\n" + repr(self.module.get_submodule(target).function)
-        # else:
-        #     color = "#D5D6EA"
+
         color = "#D5D6EA"
-        call_module_node = self.nodeDict[target]
+        call_module_node = self.nodeDict["module"][self.moduleNum]
+        self.moduleNum += 1
         target_name = call_module_node.name
         print_out = target_name
         if isinstance(self.module.get_submodule(target), dmx.nn.DmxModule):
@@ -285,8 +276,6 @@ class GraphvizInterpreter(fx.Interpreter):
                 print_out += "\n approximate_function: " + repr(
                     self.module.get_submodule(target).approximator.function
                 )
-        call_module_node = self.nodeDict[target]
-        target_name = call_module_node.name
         self.nodes.append(
             (
                 [(str(id(call_module_node.name))), print_out],
@@ -302,7 +291,7 @@ class GraphvizInterpreter(fx.Interpreter):
                 # argNode is input
                 if argNode.name in self.input_names:
                     self.edges[argNode.name + target_name] = (
-                        [str(id("start")), str(id(target_name)), "input: "],
+                        [str(id("start")), str(id(target_name)), argNode.name + ": "],
                         {"fillcolor": "green", "arrowsize": "2"},
                     )
                     name = argNode.name + target_name
@@ -381,7 +370,6 @@ def visualize_graph(
         graph = tracer.trace(model)
         model = fx.GraphModule(tracer.root, graph)
     nodeDict = NodeDictTransformer(model).transform()
-    breakpoint()
     gi = GraphvizInterpreter(model, nodeDict)
     if isinstance(input, tuple):
         gi.run(*input)

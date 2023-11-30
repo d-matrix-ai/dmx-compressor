@@ -530,7 +530,7 @@ class NodeDictTransformer(fx.Transformer):
 
     Attributes:
         module (fx.GraphModule): the module to create the mapping
-        nodeDict (dict): dictionary to store the mapping between target and node
+        nodeDict (dict): dictionary to store the mapping between occurance order of the node and the node
     """
 
     def __init__(self, module: fx.GraphModule):
@@ -540,6 +540,7 @@ class NodeDictTransformer(fx.Transformer):
         self.nodeDict = dict()
         self.nodeDict["function"] = list()
         self.nodeDict["method"] = list()
+        self.nodeDict["module"] = list()
 
     def placeholder(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
@@ -671,7 +672,7 @@ class NodeDictTransformer(fx.Transformer):
         call_module_node = self.new_graph.call_module(target)
         call_module_node.args = process_args(args)
         call_module_node.kwargs = process_kwargs(kwargs)
-        self.nodeDict[target] = call_module_node
+        self.nodeDict["module"].append(call_module_node)
         return Proxy(call_module_node, self.tracer)
 
     def transform(self) -> dict:
