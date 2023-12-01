@@ -237,10 +237,20 @@ class Model(torch.nn.Module):
                 for _, m in self.named_dmx_modules()
             ]
 
+    @staticmethod
+    def _save_specific_layers_state_dict_and_register_urls(
+        specific_layers: Dict[str, Sequence[DmxModule]],
+        save_checkpoint_to: Optional[str],
+    ):
+        if save_checkpoint_to is not None:
+            for _, m in specific_layers:
+                m.save_state_dict_and_register_url(parent_dir=save_checkpoint_to)
+
     @contextmanager
     def calibrating_weights(
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
+        save_checkpoint_to: Optional[str] = None,
     ) -> None:
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
@@ -248,11 +258,15 @@ class Model(torch.nn.Module):
             yield [
                 stack.enter_context(m.calibrating_weight()) for _, m in specific_layers
             ]
+        self._save_specific_layers_state_dict_and_register_urls(
+            specific_layers, save_checkpoint_to
+        )
 
     @contextmanager
     def calibrating_activations(
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
+        save_checkpoint_to: Optional[str] = None,
     ) -> None:
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
@@ -261,11 +275,15 @@ class Model(torch.nn.Module):
                 stack.enter_context(m.calibrating_activation())
                 for _, m in specific_layers
             ]
+        self._save_specific_layers_state_dict_and_register_urls(
+            specific_layers, save_checkpoint_to
+        )
 
     @contextmanager
     def calibrating_smoothquant(
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
+        save_checkpoint_to: Optional[str] = None,
     ) -> None:
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
@@ -274,11 +292,15 @@ class Model(torch.nn.Module):
                 stack.enter_context(m.calibrating_smoothquant())
                 for _, m in specific_layers
             ]
+        self._save_specific_layers_state_dict_and_register_urls(
+            specific_layers, save_checkpoint_to
+        )
 
     @contextmanager
     def optimal_brain_compressing(
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
+        save_checkpoint_to: Optional[str] = None,
         **hyperparams,
     ) -> None:
         if specific_layers is None:
@@ -288,6 +310,9 @@ class Model(torch.nn.Module):
                 stack.enter_context(m.optimal_brain_compressing(**hyperparams))
                 for _, m in specific_layers
             ]
+        self._save_specific_layers_state_dict_and_register_urls(
+            specific_layers, save_checkpoint_to
+        )
 
 
 class DmxConfig(dict):
