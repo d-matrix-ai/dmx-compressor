@@ -7,9 +7,6 @@
 </p>
 
 <p align="center">
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/actions/workflows/python-app.yml">
-        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-mltools/python-app.yml">
-    </a>
     <a href="https://github.com/d-matrix-ai/dmx-mltools/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-mltools">
     </a>
