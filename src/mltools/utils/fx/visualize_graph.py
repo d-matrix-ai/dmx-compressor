@@ -50,11 +50,11 @@ class GraphvizInterpreter(fx.Interpreter):
         # A dictionary that stores edge info attached to the node, an edge is stored under the first node it attaches to
         # Both node and edge infos are stored as a tuple of args and kwargs
         self.edges = dict()
-        self.sizeDict = dict()
         self.input_names = []
 
     def run(self, *args, initial_env: Optional[Dict[Node, Any]] = None) -> Any:
         self.sizes = dict()
+        self.dtypes = dict()
         self.env = initial_env if initial_env else {}
 
         # Positional function args are consumed left-to-right by
@@ -73,6 +73,7 @@ class GraphvizInterpreter(fx.Interpreter):
             self.env[node] = self.run_node(node)
             if isinstance(self.env[node], torch.Tensor):
                 self.sizes[node.name] = list(self.env[node].shape)
+                self.dtypes[node.name] = self.env[node].dtype
             elif isinstance(self.env[node], torch.Size):
                 self.sizes[node.name] = list(self.env[node])
             if self.garbage_collect_values:
@@ -140,6 +141,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = argNode.name
                 if argNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[argNode.name])
+                if argNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
             else:
                 nodeName = repr(argNode) + target_name
                 self.nodes.append(
@@ -166,6 +169,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = kwargNode.name
                 if kwargNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[kwargNode.name])
+                if kwargNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
         return super().call_function(target, args, kwargs)
 
     def call_method(
@@ -205,6 +210,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = argNode.name
                 if argNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[argNode.name])
+                if argNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
             # if argNode is not a fx.node but a normal parameter passed to the method
             else:
                 nodeName = repr(argNode) + target_name
@@ -232,6 +239,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = kwargNode.name
                 if kwargNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[kwargNode.name])
+                if kwargNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
 
         return super().call_method(target, args, kwargs)
 
@@ -307,6 +316,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = argNode.name
                 if argNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[argNode.name])
+                if argNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
             else:
                 nodeName = repr(argNode) + target_name
                 self.nodes.append(
@@ -333,6 +344,8 @@ class GraphvizInterpreter(fx.Interpreter):
                     name = kwargNode.name
                 if kwargNode.name in self.sizes:
                     self.edges[name][0][-1] += str(self.sizes[kwargNode.name])
+                if kwargNode.name in self.dtypes:
+                    self.edges[name][0][-1] += "\n" + str(self.dtypes[argNode.name])
         return super().call_module(target, args, kwargs)
 
     def output(
@@ -345,7 +358,12 @@ class GraphvizInterpreter(fx.Interpreter):
             self.edges[argNode.name][1]["arrowhead"] = "normal"
             self.edges[argNode.name][1]["arrowsize"] = "2"
             self.edges[argNode.name][1]["fillcolor"] = "blue"
-            self.edges[argNode.name][0][2] = "output: " + str(self.sizes[argNode.name])
+            self.edges[argNode.name][0][2] = (
+                "output: "
+                + str(self.sizes[argNode.name])
+                + "\n"
+                + str(self.dtypes[argNode.name])
+            )
         for nargs, nkwargs in self.nodes:
             self.pygraph.node(*nargs, **nkwargs)
         for eargs, ekwargs in self.edges.values():
@@ -365,6 +383,7 @@ def visualize_graph(
         net = torch.nn.Linear(64,64)
         gm = cast_input_output_transform(net)
         visualize_graph(gm,torch.rand(1,64))
+    Note: remember to install pygraphviz by sudo apt install graphviz
     """
     if not isinstance(model, fx.GraphModule):
         graph = tracer.trace(model)
