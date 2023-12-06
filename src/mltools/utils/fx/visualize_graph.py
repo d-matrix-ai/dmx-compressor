@@ -394,4 +394,9 @@ def visualize_graph(
         gi.run(*input)
     else:
         gi.run(input)
-    gi.pygraph.render(filename=file_name)
+    try:
+        gi.pygraph.render(filename=file_name)
+    except RuntimeError:
+        print(
+            "Pygraphviz not installed from root! Please install by 'sudo apt install graphviz'"
+        )
