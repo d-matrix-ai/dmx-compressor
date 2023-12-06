@@ -17,7 +17,7 @@
         <img alt="Documentation" src="https://readthedocs.org/projects/dmx-mltools/badge/?version=latest">
     </a>
     <a href="https://github.com/d-matrix-ai/dmx-mltools/releases">
-        <img alt="GitHub release" src="https://img.shields.io/github/downloads/d-matrix-ai/dmx-mltools/total?label=release">
+        <img alt="GitHub release" src="https://img.shields.io/github/v/release/d-matrix-ai/dmx-mltools">
     </a>
     <a href="https://github.com/d-matrix-ai/dmx-mltools/commits/main">
         <img alt="Commits" src="https://img.shields.io/github/last-commit/d-matrix-ai/dmx-mltools/main">
