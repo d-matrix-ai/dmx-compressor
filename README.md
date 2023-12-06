@@ -13,8 +13,8 @@
     <a href="https://github.com/d-matrix-ai/dmx-mltools/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-mltools">
     </a>
-    <a href="PLACEHOLDER">
-        <img alt="Documentation" src="https://img.shields.io/website/http/PLACEHOLDER?down_color=red&down_message=offline&up_message=online&label=docs">
+    <a href="https://dmx-mltools.readthedocs.io/en/latest/">
+        <img alt="Documentation" src="https://readthedocs.org/projects/dmx-mltools/badge/?version=latest">
     </a>
     <a href="https://github.com/d-matrix-ai/dmx-mltools/releases">
         <img alt="GitHub release" src="https://img.shields.io/github/downloads/d-matrix-ai/dmx-mltools/total?label=release">
