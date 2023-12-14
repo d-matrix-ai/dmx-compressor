@@ -11,7 +11,6 @@ from mltools.sparse import Sparsify, Sparseness
 from mltools import dmx
 import inspect
 
-
 dmx_aware_mapping = {
     "torch.nn.modules.linear.Linear": dmx.nn.Linear,
     "torch.nn.modules.conv.Conv1d": dmx.nn.Conv1d,
@@ -504,20 +503,6 @@ class InputOutputTransformer(fx.Transformer):
         # functions is not wrapped in proxies. We need to do a unwrap for proxies before passing to new node.
         call_method_node.args = process_args(args)
         call_method_node.kwargs = process_kwargs(kwargs)
-
-        # cast_name = target+"_cast"
-        # cast_format = "SAME"
-        # # Not so sure about this part as no cfgs seen for call_method yet
-        # # if self.config:
-        # #     layer = self.scopeDict[call_method_node.name][0]
-        # #     layer_key = layer.split('__')[-1]
-        # #     if layer_key and layer_key in self.config:
-        # #         cast_format = self.config[layer_key]['output_format']
-        # self.module.add_submodule(cast_name,CastTo(format=cast_format))
-        # call_method_cast_node = self.new_graph.create_node(
-        #     "call_module", cast_name, args=(call_method_node,)
-        # )
-        # self.nodeDict[call_method_cast_node.target] = call_method_cast_node
         return Proxy(call_method_node, self.tracer)
 
 

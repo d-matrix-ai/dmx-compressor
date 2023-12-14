@@ -7,6 +7,7 @@ from mltools.fx.transformer import ConfigurationTransformer, DMXAwareTransformer
 from torch.fx import GraphModule
 from torch import fx
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from .transformer import dmx_aware_mapping
 
 
 def substitute_transform(
@@ -26,6 +27,10 @@ def substitute_transform(
     Returns:
         transformed model
     """
+    mod_type = type(root).__module__ + "." + type(root).__name__
+    if mod_type in dmx_aware_mapping:
+        transformed = dmx_aware_mapping[mod_type].from_raw(root)
+        return transformed
     if hf:
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
