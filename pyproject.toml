@@ -4,20 +4,21 @@ version = "0.1.2"
 description = "d-MATRiX ML tools"
 authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>","Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>", "Zifei Xu <xuzifei@d-matrix.ai>"]
 include = [{ path = "tests", format = "sdist" }]
+
 [tool.poetry.dependencies]
-datasets = "^2.0"
+datasets = "^2.16"
 numpy = "^1.22.3"
 bidict = "^0.22.0"
 parse = "^1.19.0"
-evaluate="0.4.1"
+evaluate="^0.4.1"
 pptree = "^3.1"
 pytest = "^7.1.1"
-python = ">=3.8,<3.11"
-tqdm = "^4.64.0"
-transformers = "4.30"
-torch = ">=1.12.0, < 2.1"
-torchvision = ">=0.13.0, < 0.16.0"
-diffusers = "^0.20"
+python = ">=3.8"
+tqdm = "^4.0"
+transformers = "^4.36.0"
+torch = ">=1.12.0, <2.2"
+torchvision = ">=0.13.0, <0.17.0"
+diffusers = "^0.25"
 
 [tool.poetry-dynamic-versioning]
 vcs = "git"
