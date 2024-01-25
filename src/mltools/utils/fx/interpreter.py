@@ -275,7 +275,7 @@ class MetadataInterpreter(fx.Interpreter):
         self.nodes.append(
             InfoNode(
                 target_name,
-                [(str(id(target_name))), print_out],
+                [(str(id(target_name))), ""],
                 {"fillcolor": color, "shape": "circle"},
             )
         )
