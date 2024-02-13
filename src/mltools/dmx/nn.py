@@ -395,27 +395,15 @@ class Linear(DmxModule, torch.nn.Linear):
 
     @staticmethod
     def from_raw(raw: torch.nn.Module) -> DmxModule:
-        initial_dmx = Linear(raw.in_features, raw.out_features, bias=raw.bias != None)
-        initial_dmx.update_params_with_raw(raw)
-        return initial_dmx
-
-
-class HFTransformersConv1D(DmxModule, transformers.pytorch_utils.Conv1D):
-    def __init__(self, nf: int, nx: int) -> None:
-        super().__init__(nf, nx)
-
-    def _forward(self, _input: Tensor) -> Tensor:
-        size_out = _input.size()[:-1] + (self.nf,)
-        _output = torch.addmm(
-            self._bias, _input.view(-1, _input.size(-1)), self._weight
-        )
-        _output = _output.view(size_out)
-        return _output
-
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
-        initial_dmx = HFTransformersConv1D(raw.weight.shape[1], raw.weight.shape[0])
-        initial_dmx.update_params_with_raw(raw)
+        if isinstance(raw, transformers.pytorch_utils.Conv1D):
+            initial_dmx = Linear(
+                raw.weight.shape[0], raw.weight.shape[1], bias=raw.bias != None
+            )
+            initial_dmx.weight.data = raw.weight.data.t()
+            initial_dmx.bias = raw.bias
+        else:
+            initial_dmx = Linear(raw.in_features, raw.out_features, bias=raw.bias != None)
+            initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
 
