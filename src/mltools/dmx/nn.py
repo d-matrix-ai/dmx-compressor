@@ -419,6 +419,57 @@ class HFTransformersConv1D(DmxModule, transformers.pytorch_utils.Conv1D):
         return initial_dmx
 
 
+class Embedding(DmxModule, torch.nn.Embedding):
+    r"""
+    An extension of PyTorch's Embedding layer to support DmxModule configurations.
+
+    Args:
+        num_embeddings (int): size of the dictionary of embeddings
+        embedding_dim (int): the size of each embedding vector
+        **kwargs: Additional keyword arguments inherited from torch.nn.Embedding.
+
+    Attributes:
+        _weight (Tensor):the learnable weights of the module of shape (num_embeddings, embedding_dim).
+
+    Methods:
+        _forward (_input: Tensor) -> Tensor: Computes the forward pass of the embedding layer.
+    """
+
+    def __init__(
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        **kwargs,
+    ) -> None:
+        super().__init__(num_embeddings, embedding_dim, **kwargs)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = F.embedding(
+            _input,
+            self._weight,
+            self.padding_idx,
+            self.max_norm,
+            self.norm_type,
+            self.scale_grad_by_freq,
+            self.sparse,
+        )
+        return _output
+
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = Embedding(
+            num_embeddings=raw.num_embeddings,
+            embedding_dim=raw.embedding_dim,
+            padding_idx=raw.padding_idx,
+            max_norm=raw.max_norm,
+            norm_type=raw.norm_type,
+            scale_grad_by_freq=raw.scale_grad_by_freq,
+            sparse=raw.sparse,
+        )
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
+
 class Conv1d(DmxModule, torch.nn.Conv1d):
     r"""
     An extension of PyTorch's Conv1d layer to support DmxModule configurations.
