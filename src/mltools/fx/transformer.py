@@ -31,7 +31,7 @@ dmx_aware_mapping = {
     "transformers.activations.FastGELUActivation": dmx.nn.GELU,
     "transformers.activations.QuickGELUActivation": dmx.nn.GELU,
     "transformers.activations.ClippedGELUActivation": dmx.nn.GELU,
-    "transformers.pytorch_utils.Conv1D": dmx.nn.HFTransformersConv1D,
+    "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
     "transformers.models.bloom.modeling_bloom.BloomGelu": dmx.nn.GELU,
     "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.HFTransformersT5LayerNorm,
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,

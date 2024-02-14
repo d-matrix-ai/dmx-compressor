@@ -3,7 +3,6 @@ from typing import Optional
 import torch
 import warnings
 from contextlib import contextmanager
-import transformers
 from mltools.numerical.smoothquant import SmoothQuant
 from mltools.numerical.observer import HistogramObserver
 
@@ -138,7 +137,6 @@ class LayerReconstructionMixin:
             self,
             (
                 torch.nn.Linear,
-                transformers.pytorch_utils.Conv1D,
                 torch.nn.Conv2d,
             ),
         ):
@@ -187,13 +185,7 @@ class OptimalBrainCompressor:
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         tmp = inp.shape[0]
-        if isinstance(
-            self.module,
-            (
-                torch.nn.Linear,
-                transformers.pytorch_utils.Conv1D,
-            ),
-        ):
+        if isinstance(self.module, torch.nn.Linear):
             if len(inp.shape) == 3:
                 inp = inp.reshape((-1, inp.shape[-1]))
             inp = inp.t()
@@ -226,8 +218,6 @@ class OptimalBrainCompressor:
         W = self.module.weight.data.clone()
         if isinstance(self.module, torch.nn.Conv2d):
             W = W.flatten(1)
-        if isinstance(self.module, transformers.pytorch_utils.Conv1D):
-            W = W.t()
         W = W.float()
         ncols = W.shape[1]
 
@@ -273,8 +263,6 @@ class OptimalBrainCompressor:
 
         torch.cuda.synchronize()
 
-        if isinstance(self.module, transformers.pytorch_utils.Conv1D):
-            Q = Q.t()
         self.module.weight.data = Q.reshape(self.module.weight.shape).to(
             self.module.weight.data.dtype
         )
