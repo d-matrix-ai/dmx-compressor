@@ -257,7 +257,7 @@ class SmoothQuant(nn.Module):
         """
         if self.enabled[0] == 1:
             sz = self._proper_shape(a, self.a_ch_axis)
-            a = a / self.scale.view(sz).to(a.device)
+            a = a.to(self.scale.device) / self.scale.view(sz)
         return a
 
     def scale_b(self, b: torch.Tensor) -> torch.Tensor:
@@ -272,7 +272,7 @@ class SmoothQuant(nn.Module):
         """
         if self.enabled[0] == 1:
             sz = self._proper_shape(b, self.b_ch_axis)
-            b = b * self.scale.view(sz).to(b.device)
+            b = b.to(self.scale.device) * self.scale.view(sz)
         return b
 
     def _maxabs(self, x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -299,12 +299,23 @@ class SmoothQuant(nn.Module):
             a_maxabs (Tensor): the maximum value of absolute of input A
             b_maxabs (Tensor): the maximum value of absolute of input B
         """
-        b_maxabs = b_maxabs.clamp(min=self.scale_min)  # to prevent division-by-zero
+        b_maxabs = b_maxabs.to(self.scale_min.device).clamp(
+            min=self.scale_min
+        )  # to prevent division-by-zero
+        _device = self.migration_strength.device
         _scale = (
-            (a_maxabs**self.migration_strength)
-            / (b_maxabs ** (1.0 - self.migration_strength))
-        ).clamp(min=self.scale_min)
-        self.scale = 2 ** _scale.log2().round() if self.pow2[0] == 1 else _scale
+            (
+                (a_maxabs.to(_device) ** self.migration_strength)
+                / (b_maxabs.to(_device) ** (1.0 - self.migration_strength))
+            )
+            .to(self.scale_min.device)
+            .clamp(min=self.scale_min)
+        )
+        self.scale = (
+            2 ** _scale.to(self.pow2[0].device).log2().round()
+            if self.pow2[0] == 1
+            else _scale
+        )
 
     def forward(self, a: torch.Tensor, b: torch.Tensor) -> None:
         """
