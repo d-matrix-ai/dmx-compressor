@@ -212,7 +212,7 @@ class DmxModule(
             *args (Optional[Tuple]): variable length of args
             **kwargs (Optional[Dict]): variable length of kwargs
         """
-        _device = input.device
+        _dtype, _device = input.dtype, input.device
         if hasattr(self, "weight") and self.weight != None:
             weight_device = self.weight.device
             input = input.to(weight_device)
@@ -227,7 +227,7 @@ class DmxModule(
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
-        return output.to(_device)
+        return output.to(_dtype).to(_device)
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
         """
