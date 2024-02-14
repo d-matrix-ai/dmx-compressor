@@ -227,7 +227,11 @@ class DmxModule(
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
-        return output.to(_dtype).to(_device)
+        if self.align_boundary_dtype:
+            output = output.to(_dtype)
+        if self.align_boundary_device:
+            output = output.to(_device)
+        return output
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
         """
@@ -430,6 +434,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
         **kwargs,
     ) -> None:
         super().__init__(num_embeddings, embedding_dim, **kwargs)
+        self.align_boundary_dtype = False  # special treatment for sparse layers
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = F.embedding(

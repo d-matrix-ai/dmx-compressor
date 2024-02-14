@@ -232,6 +232,8 @@ class NumericalCastMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.align_boundary_dtype = True
+        self.align_boundary_device = True
         self.infer_ch_axis()
         self.init_casts()
         self.init_smoothquant()
