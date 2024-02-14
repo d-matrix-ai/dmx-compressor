@@ -12,6 +12,7 @@ from mltools import dmx
 import inspect
 
 dmx_aware_mapping = {
+    "torch.nn.modules.sparse.Embedding": dmx.nn.Embedding,
     "torch.nn.modules.linear.Linear": dmx.nn.Linear,
     "torch.nn.modules.conv.Conv1d": dmx.nn.Conv1d,
     "torch.nn.modules.conv.Conv2d": dmx.nn.Conv2d,
