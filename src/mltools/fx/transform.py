@@ -31,6 +31,7 @@ def substitute_transform(
     if mod_type in dmx_aware_mapping:
         transformed = dmx_aware_mapping[mod_type].from_raw(root)
         return transformed
+    root = remove_new_forward(root)
     if hf:
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
@@ -48,9 +49,12 @@ def remove_new_forward(model):
     This function removes the .forward attributes assigned to submodules of model which is added for model parallelization,
     but it causes trouble with fx tracing.
     """
-    for n, m in model.named_modules():
-        if "forward" in m.__dict__.keys():
-            m.__dict__.pop("forward")
+    for m in model.modules():
+        if hasattr(m, "_old_forward"):
+            m.forward = m._old_forward
+    if hasattr(model, "_old_forward"):
+        model.forward = model._old_forward
+    return model
 
 
 def cast_input_output_transform(
