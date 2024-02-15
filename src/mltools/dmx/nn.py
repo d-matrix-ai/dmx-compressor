@@ -436,6 +436,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
         **kwargs,
     ) -> None:
         super().__init__(num_embeddings, embedding_dim, **kwargs)
+        self.align_boundary_dtype = False  # special treatment for sparse layers
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = F.embedding(
