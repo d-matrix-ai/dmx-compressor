@@ -8,6 +8,7 @@ from torch.fx import GraphModule
 from torch import fx
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from .transformer import dmx_aware_mapping
+from transformers.models.gpt2 import GPT2LMHeadModel
 
 
 def substitute_transform(
@@ -49,6 +50,8 @@ def remove_new_forward(model):
     This function removes the .forward attributes assigned to submodules of model which is added for model parallelization,
     but it causes trouble with fx tracing.
     """
+    if isinstance(model, GPT2LMHeadModel):
+        return model
     for m in model.modules():
         if hasattr(m, "_old_forward"):
             m.forward = m._old_forward
