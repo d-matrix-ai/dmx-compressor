@@ -200,7 +200,7 @@ class MetadataInterpreter(fx.Interpreter):
                 else:
                     self.edges[kwargNode.name].args.insert(1, str(id(target_name)))
                     name = kwargNode.name
-                print_out = self.process_edge_metadata(name, argNode.name)
+                print_out = self.process_edge_metadata(name, kwargNode.name)
                 self.edges[name].args[-1] += print_out
 
     # Main Node running APIs
