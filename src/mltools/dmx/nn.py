@@ -212,7 +212,7 @@ class DmxModule(
             *args (Optional[Tuple]): variable length of args
             **kwargs (Optional[Dict]): variable length of kwargs
         """
-        _device = input.device
+        _dtype, _device = input.dtype, input.device
         if hasattr(self, "weight") and self.weight != None:
             weight_device = self.weight.device
             input = input.to(weight_device)
@@ -227,7 +227,11 @@ class DmxModule(
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
-        return output.to(_device)
+        if self.align_boundary_dtype:
+            output = output.to(_dtype)
+        if self.align_boundary_device:
+            output = output.to(_device)
+        return output
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
         """
@@ -239,7 +243,7 @@ class DmxModule(
         state_dic = self.state_dict()
         for key, val in raw.state_dict().items():
             state_dic[key] = val.to(val.device)
-        self.load_state_dict(state_dic)
+        self.load_state_dict(state_dic, assign=True)
         # Inherit device from raw module
         for n, m in raw.named_parameters():
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -402,7 +406,9 @@ class Linear(DmxModule, torch.nn.Linear):
             initial_dmx.weight.data = raw.weight.data.t()
             initial_dmx.bias = raw.bias
         else:
-            initial_dmx = Linear(raw.in_features, raw.out_features, bias=raw.bias != None)
+            initial_dmx = Linear(
+                raw.in_features, raw.out_features, bias=raw.bias != None
+            )
             initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -430,6 +436,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
         **kwargs,
     ) -> None:
         super().__init__(num_embeddings, embedding_dim, **kwargs)
+        self.align_boundary_dtype = False  # special treatment for sparse layers
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = F.embedding(
@@ -1102,9 +1109,11 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
             bn_training = (self.running_mean is None) and (self.running_var is None)
         _output = F.batch_norm(
             _input,
-            self.running_mean
-            if not self.training or self.track_running_stats
-            else None,
+            (
+                self.running_mean
+                if not self.training or self.track_running_stats
+                else None
+            ),
             self.running_var if not self.training or self.track_running_stats else None,
             self._weight,
             self._bias,
