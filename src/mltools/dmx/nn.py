@@ -271,38 +271,38 @@ class DmxModuleConfig(dict):
         cc.instance = module.__class__
         if isinstance(module, DmxModule):
             if module.input_format is not None and (
-                freeze or module.input_format != "SAME"
+                freeze or not isinstance(module.input_format, Same)
             ):
                 cc.input_format = module.input_format
             if module.residual_format is not None and (
-                freeze or module.residual_format != "SAME"
+                freeze or not isinstance(module.residual_format, Same)
             ):
                 cc.residual_format = module.residual_format
             if module.multiplier_format is not None and (
-                freeze or module.multiplier_format != "SAME"
+                freeze or not isinstance(module.multiplier_format, Same)
             ):
                 cc.multiplier_format = module.multiplier_format
             if module.output_format is not None and (
-                freeze or module.output_format != "SAME"
+                freeze or not isinstance(module.output_format, Same)
             ):
                 cc.output_format = module.output_format
             if module.accum_format is not None and (
-                freeze or module.accum_format != "SAME"
+                freeze or not isinstance(module.accum_format, Same)
             ):
                 cc.accum_format = module.accum_format
             if module.weight_format is not None and (
-                freeze or module.weight_format != "SAME"
+                freeze or not isinstance(module.weight_format, Same)
             ):
                 cc.weight_format = module.weight_format
             if module.bias_format is not None and (
-                freeze or module.bias_format != "SAME"
+                freeze or not isinstance(module.bias_format, Same)
             ):
                 cc.bias_format = module.bias_format
             if module.weight_sparseness is not None and (
-                freeze or module.weight_sparseness != "DENSE"
+                freeze or not isinstance(module.weight_sparseness, Dense)
             ):
                 cc.weight_sparseness = module.weight_sparseness
-            if freeze or module.approximation_function != "NONE":
+            if freeze or not isinstance(module.approximation_function, NoApproximation):
                 cc.approximation_function = module.approximation_function
             if module.state_dict_url is not None:
                 cc.state_dict_url = module.state_dict_url
@@ -381,7 +381,7 @@ class Linear(DmxModule, torch.nn.Linear):
         super().__init__(in_features, out_features, bias=bias, **kwargs)
 
     def _forward(self, _input: Tensor) -> Tensor:
-        if self.accum_format == "SAME":
+        if isinstance(self.accum_format, Same):
             _weight = self._weight.to(_input.dtype)
             _bias = None if self._bias is None else self._bias.to(_input.dtype)
             _output = torch.nn.functional.linear(_input, _weight, _bias)
