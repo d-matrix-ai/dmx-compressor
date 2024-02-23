@@ -3,7 +3,7 @@ from . import nn
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction
-from .model import Model, aware, DmxConfig, DmxConfigRule
+from .model import Model, DmxConfig, DmxConfigRule
 from .nn import *
 
 # Numerical format aliases
