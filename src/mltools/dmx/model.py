@@ -1,69 +1,11 @@
 import re
 import torch
-import transformers
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, Sequence
-import inspect
-from torch.fx import GraphModule
-from torch import fx
+from typing import Any, Dict, List, Optional, Union, Sequence
 from mltools import dmx
 from mltools.dmx.nn import *
-from mltools.numerical import CastTo, Quantize, DeQuantize
 from mltools.fx.transform import substitute_transform
-from mltools.fx.transformer import DMXAwareTransformer
-
-
-def aware(patch_hf_transformers: bool = True):
-    """This function will monkey patch torch.nn modules to dmx versions.
-
-    Args:
-        patch_hf_transformers: Also patch HuggingFace transformer modules
-    """
-    # add new torch.nn modules for dmx
-    torch.nn.CastTo = CastTo
-    torch.nn.Sparsify = Sparsify
-    torch.nn.Approximate = Approximate
-    # overload existing torch.nn.quantized modules for dmx
-    torch.nn.quantized.Quantize = Quantize
-    torch.nn.quantized.DeQuantize = DeQuantize
-    # overload existing torch.nn modules for dmx
-    torch.nn.Linear = Linear
-    torch.nn.Conv1d = Conv1d
-    torch.nn.Conv2d = Conv2d
-    torch.nn.ConvTranspose2d = ConvTranspose2d
-    torch.nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
-    torch.nn.MaxPool2d = MaxPool2d
-    torch.nn.BatchNorm2d = BatchNorm2d
-    torch.nn.GroupNorm = GroupNorm
-    torch.nn.LayerNorm = LayerNorm
-    torch.nn.Dropout = Dropout
-    torch.nn.Softmax = Softmax
-    torch.nn.ReLU = ReLU
-    torch.nn.ReLU6 = ReLU6
-    torch.nn.SiLU = SiLU
-    torch.nn.Tanh = Tanh
-    torch.nn.GELU = GELU
-    torch.nn.Embedding = Embedding
-    # overload huggingface transformers modules
-    if patch_hf_transformers:
-        transformers.activations.NewGELUActivation = GELU
-        transformers.activations.GELUActivation = GELU
-        transformers.activations.FastGELUActivation = GELU
-        transformers.activations.QuickGELUActivation = GELU
-        transformers.activations.ClippedGELUActivation = GELU
-        # modeling_gpt2
-        transformers.pytorch_utils.Conv1D = Linear
-        # modeling_bloom
-        transformers.models.bloom.modeling_bloom.BloomGelu = GELU
-        # modeling_t5
-        transformers.models.t5.modeling_t5.T5LayerNorm = HFTransformersT5LayerNorm
-        # modelling_llama
-        transformers.activations.SiLUActivation = SiLU
-        transformers.models.llama.modeling_llama.LlamaRMSNorm = (
-            HFTransformersLlamaRMSNorm
-        )
-        transformers.activations.SiLUActivation = SiLU
 
 
 class Model(torch.nn.Module):
@@ -78,7 +20,6 @@ class Model(torch.nn.Module):
         body (Any): the main module of the model.
         head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
         tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
-        monkey_patched (Optional[bool]): If false, body will be fx transformed. Defaults to True.
         hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
 
     Attributes:
@@ -93,22 +34,17 @@ class Model(torch.nn.Module):
         body,
         head=torch.nn.Identity(),
         tail=torch.nn.Identity(),
-        monkey_patched: bool = True,
         hf: bool = False,
         input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> None:
         super().__init__()
-        self.body = (
-            body
-            if monkey_patched
-            else substitute_transform(
-                body, hf=hf, input_names=input_names, concrete_args=concrete_args
-            )
+        self.body = substitute_transform(
+            body, hf=hf, input_names=input_names, concrete_args=concrete_args
         )
         self.head = head
         self.tail = tail
-        self.monkey_patched = monkey_patched
 
     def forward(self, input):
         r"""Runs a forward pass of the model on input and returns the output
@@ -123,9 +59,7 @@ class Model(torch.nn.Module):
         output = self.head(input)
         if isinstance(output, torch.Tensor):
             output = (output,)
-        if not self.monkey_patched:
-            # sig = inspect.signature(self.body.forward)
-            output = [out for out in output if out is not None]
+        output = [out for out in output if out is not None]
         output = self.body(*output)
         output = self.tail(output)
         return output
