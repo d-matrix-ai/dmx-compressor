@@ -16,11 +16,23 @@ task_input_name_lookup = {
     ]
 }
 
+
 def load_config(repo_name, config_name, revision):
-    file_path = hf_hub_download(repo_id=repo_name, filename=f"configs/{config_name}.yaml", revision=revision)
+    file_path = hf_hub_download(
+        repo_id=repo_name, filename=f"configs/{config_name}.yaml", revision=revision
+    )
     return file_path
 
-def eval_text_generation(model, dataset, metric, revision, column_name=None, dataset_version=None, dataset_split="test"):
+
+def eval_text_generation(
+    model,
+    dataset,
+    metric,
+    revision,
+    column_name=None,
+    dataset_version=None,
+    dataset_split="test",
+):
     dataset_column_mapping = {
         "wikitext": "text",
         "ptb_text_only": "sentence",
@@ -30,15 +42,28 @@ def eval_text_generation(model, dataset, metric, revision, column_name=None, dat
     if not column_name and dataset in dataset_column_mapping:
         column_name = dataset_column_mapping[dataset]
     if not column_name:
-        raise ValueError(f"Column name not found for dataset '{dataset}'. Please provide the column_name.")
-    
+        raise ValueError(
+            f"Column name not found for dataset '{dataset}'. Please provide the column_name."
+        )
+
     metric = evaluate.load(metric, module_type="metric")
     dataset = load_dataset(dataset, dataset_version, split=dataset_split)
-    results = metric.compute(model=model, revision=revision, references=dataset[column_name])
+    results = metric.compute(
+        model=model, revision=revision, references=dataset[column_name]
+    )
     return results
 
-def eval(model, dataset, metric, revision, task, column_name=None, dataset_version=None, dataset_split="test"):
-    
+
+def eval(
+    model,
+    dataset,
+    metric,
+    revision,
+    task,
+    column_name=None,
+    dataset_version=None,
+    dataset_split="test",
+):
     task_eval_mapping = {
         "text-generation": eval_text_generation,
         # Add more tasks here
@@ -48,7 +73,10 @@ def eval(model, dataset, metric, revision, task, column_name=None, dataset_versi
         raise ValueError(f"Unsupported task type '{task}'.")
 
     eval_function = task_eval_mapping[task]
-    return eval_function(model, dataset, metric, revision, column_name, dataset_version, dataset_split)
+    return eval_function(
+        model, dataset, metric, revision, column_name, dataset_version, dataset_split
+    )
+
 
 def pipeline(
     *args,
@@ -64,7 +92,14 @@ def pipeline(
     )
     pipe.model.transform(config)
     pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": eval(
-        pipe.model.body, dataset, metric, pipe.revision, pipe.task, column_name, dataset_version, dataset_split
+        pipe.model.body,
+        dataset,
+        metric,
+        pipe.revision,
+        pipe.task,
+        column_name,
+        dataset_version,
+        dataset_split,
     )
-    
+
     return pipe
