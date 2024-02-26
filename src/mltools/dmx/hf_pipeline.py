@@ -1,7 +1,7 @@
 from typing import Any, Optional
 import transformers
 from transformers import pipeline as hfpipeline
-from .model import Model
+from .model import Model, DmxConfig
 import requests
 import evaluate
 import os
@@ -87,10 +87,11 @@ def pipeline(
     pipe.revision = kwargs.get("revision", "main")
     pipe.task = kwargs.get("task")
     config = load_config(kwargs.get("model"), dmx_config, pipe.revision)
+    config = DmxConfig.from_yaml(config)
     pipe.model = Model(
         pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
     )
-    pipe.model.transform(config)
+    pipe.model.transform(config["model"])
     pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": eval(
         pipe.model.body,
         dataset,
