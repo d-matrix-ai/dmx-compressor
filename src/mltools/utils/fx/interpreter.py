@@ -3,9 +3,6 @@ import torch
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
-from graphviz import Digraph
-from mltools.fx.transformer import NodeDictTransformer
-from mltools.fx.tracer import QuantTracer
 from mltools.functional.approximate import NoApproximation
 from mltools import dmx
 

@@ -3,11 +3,11 @@ import torch.nn as nn
 
 from mltools.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
 from ..fx import QuantTracer, InputOutputTransformer
-from mltools.fx.transformer import ConfigurationTransformer, DMXAwareTransformer
+from mltools.fx import ConfigurationTransformer, DMXAwareTransformer
+from mltools.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from torch import fx
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-from .transformer import dmx_aware_mapping
 
 
 def substitute_transform(
