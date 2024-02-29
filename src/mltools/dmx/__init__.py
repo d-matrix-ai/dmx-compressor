@@ -26,6 +26,7 @@ format = SimpleNamespace(
     BFP16_128_LD=Format.from_shorthand("BFP[8|8]{128,-1}(SN)"),
     BFP16_128_FD=Format.from_shorthand("BFP[8|8]{128,1}(SN)"),
     BFP16_64_LD=Format.from_shorthand("BFP[8|8]{64,-1}(SN)"),
+    BFP16_64_PD=Format.from_shorthand("BFP[8|8]{64,-2}(SN)"),
     BFP16_64_FD=Format.from_shorthand("BFP[8|8]{64,1}(SN)"),
     BFP16_32_LD=Format.from_shorthand("BFP[8|8]{32,-1}(SN)"),
     BFP16_32_FD=Format.from_shorthand("BFP[8|8]{32,1}(SN)"),
@@ -182,7 +183,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.ActActMatMul,),
             module_config=dict(
                 input_format=format.BFP16_64_LD,
-                multiplier_format=format.BFP16_64_LD,
+                multiplier_format=format.BFP16_64_PD,
                 output_format=format.FLOAT16,
             ),
         ),
