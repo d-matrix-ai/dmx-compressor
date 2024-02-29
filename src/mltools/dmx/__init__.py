@@ -146,6 +146,7 @@ default_approx = SimpleNamespace(
     HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("NONE"),
 )
 
+# Automatic configuration rules
 config_rules = SimpleNamespace(
     BASELINE=[],
     BASIC=[
