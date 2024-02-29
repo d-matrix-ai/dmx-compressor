@@ -245,6 +245,14 @@ config_rules = SimpleNamespace(
             ),
         ),
         DmxConfigRule(
+            module_types=(nn.Softmax,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.SOFTMAX,
+            ),
+        ),
+        DmxConfigRule(
             module_types=(nn.LayerNorm,),
             module_config=dict(
                 input_format=format.FLOAT16,
