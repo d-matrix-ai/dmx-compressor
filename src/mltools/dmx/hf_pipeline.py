@@ -29,9 +29,9 @@ def dmx_transform(pipe, dmx_config_name):
         pipe.model.transform(config["model"])
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
-            from . import dmx_config_rules
+            from . import config_rules
             pipe.model.transform(
-                pipe.baseline_config, *eval(f"dmx_config_rules.{dmx_config_name}")
+                pipe.baseline_config, *eval(f"config_rules.{dmx_config_name}")
             )
         else:
             raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
