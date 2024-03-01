@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 RANDOM_SEED = 0
 torch.manual_seed(RANDOM_SEED)
-dmx.aware(patch_hf_transformers=True)
 
 
 @dataclass(frozen=True)
@@ -162,19 +161,6 @@ test_cases = [
         _bops=3631680.0,
     ),
     TestCase(
-        layer_type=dmx.nn.HFTransformersConv1D,
-        layer_dims=(16, 32, None, None, None, None),
-        input_dims=(16, None),
-        weight_sparseness=sparse.Dense(),
-        input_format=dmx.format.BFLOAT8,
-        weight_format=dmx.format.AFLOAT8,
-        # --------------------------------
-        _weight_elem_count=512.0,
-        _weight_size_in_bytes=512.0,
-        _flops=8192.0,
-        _bops=524288.0,
-    ),
-    TestCase(
         layer_type=dmx.nn.Conv1d,
         layer_dims=(8, 16, (3,), 1, 2, "same"),
         input_dims=(16, (10,)),
@@ -218,11 +204,6 @@ def _create_module(cls, layer_dims, weight_sparseness, input_format, weight_form
             stride=stride,
             groups=groups,
             padding=padding,
-        )
-    elif cls == dmx.nn.HFTransformersConv1D:
-        _module = cls(
-            nf=ch_out,
-            nx=ch_in,
         )
     else:
         raise ValueError("unsupported module class {cls}")
