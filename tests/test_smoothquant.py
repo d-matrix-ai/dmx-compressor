@@ -6,7 +6,6 @@ from mltools import dmx
 RANDOM_SEED = 0
 
 torch.manual_seed(RANDOM_SEED)
-dmx.aware(patch_hf_transformers=True)
 
 
 BATCH_SIZE = 2
@@ -24,8 +23,6 @@ def _create_module(cls):
         return cls(IN_DIM, 2, KER_SIZE)
     elif cls == dmx.nn.Conv2d:
         return cls(IN_DIM, OUT_DIM, KER_SIZE, KER_SIZE)
-    elif cls == dmx.nn.HFTransformersConv1D:
-        return cls(OUT_DIM, IN_DIM)
     else:
         raise ValueError("unsupported module class {cls}")
 
@@ -57,7 +54,6 @@ def _create_test_input(module: torch.nn.Module, scaler: float):
         dmx.nn.Linear,
         dmx.nn.Conv1d,
         dmx.nn.Conv2d,
-        dmx.nn.HFTransformersConv1D,
     ),
 )
 @pytest.mark.parametrize("dynamic", (True, False))
