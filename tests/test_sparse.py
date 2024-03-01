@@ -6,7 +6,6 @@ from mltools.sparse import Sparsify, Sparseness
 
 RANDOM_SEED = 0
 
-dmx.aware()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(RANDOM_SEED)
 
