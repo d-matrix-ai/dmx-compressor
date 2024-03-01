@@ -1,11 +1,8 @@
-from typing import Any, Optional
+from typing import Optional
 import transformers
 from transformers import pipeline as hfpipeline
 from .model import Model, DmxConfig
-import requests
 import evaluate
-import os
-import yaml
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 
@@ -17,11 +14,27 @@ task_input_name_lookup = {
 }
 
 
-def load_config(repo_name, config_name, revision):
-    file_path = hf_hub_download(
-        repo_id=repo_name, filename=f"configs/{config_name}.yaml", revision=revision
-    )
-    return file_path
+def get_config_file(repo_name, revision, config_name):
+    filename = f"configs/{config_name}.yaml"
+    try:
+        return hf_hub_download(repo_id=repo_name, filename=filename, revision=revision)
+    except:
+        return None
+
+
+def dmx_transform(pipe, dmx_config_name):
+    config_file = get_config_file(pipe.model_name, pipe.revision, dmx_config_name)
+    if config_file is not None:
+        config = DmxConfig.from_yaml(config_file)
+        pipe.model.transform(config["model"])
+    else:
+        if dmx_config_name in ["BASELINE", "BASIC"]:
+            from . import config_rules
+            pipe.model.transform(
+                pipe.baseline_config, *eval(f"config_rules.{dmx_config_name}")
+            )
+        else:
+            raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
 
 
 def eval_text_generation(
@@ -54,7 +67,7 @@ def eval_text_generation(
     return results
 
 
-def eval(
+def pipe_eval(
     model,
     dataset,
     metric,
@@ -84,15 +97,14 @@ def pipeline(
     **kwargs,
 ):
     pipe = hfpipeline(*args, **kwargs)
-    pipe.revision = kwargs.get("revision", "main")
     pipe.task = kwargs.get("task")
-    config = load_config(kwargs.get("model"), dmx_config, pipe.revision)
-    config = DmxConfig.from_yaml(config)
+    pipe.model_name = kwargs.get("model")
+    pipe.revision = kwargs.get("revision", "main")
     pipe.model = Model(
         pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
     )
-    pipe.model.transform(config["model"])
-    pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": eval(
+    pipe.baseline_config = pipe.model.dmx_config
+    pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model.body,
         dataset,
         metric,
@@ -102,5 +114,7 @@ def pipeline(
         dataset_version,
         dataset_split,
     )
+
+    dmx_transform(pipe, dmx_config)
 
     return pipe

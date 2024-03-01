@@ -26,6 +26,7 @@ format = SimpleNamespace(
     BFP16_128_LD=Format.from_shorthand("BFP[8|8]{128,-1}(SN)"),
     BFP16_128_FD=Format.from_shorthand("BFP[8|8]{128,1}(SN)"),
     BFP16_64_LD=Format.from_shorthand("BFP[8|8]{64,-1}(SN)"),
+    BFP16_64_PD=Format.from_shorthand("BFP[8|8]{64,-2}(SN)"),
     BFP16_64_FD=Format.from_shorthand("BFP[8|8]{64,1}(SN)"),
     BFP16_32_LD=Format.from_shorthand("BFP[8|8]{32,-1}(SN)"),
     BFP16_32_FD=Format.from_shorthand("BFP[8|8]{32,1}(SN)"),
@@ -131,11 +132,150 @@ sparseness = SimpleNamespace(
 
 # Default approximation function aliases
 default_approx = SimpleNamespace(
-    SOFTMAX=ApproximationFunction.from_shorthand("SOFTMAX(vsimd)"),
-    GELU=ApproximationFunction.from_shorthand("GELU(vsimd)"),
-    LAYERNORM=ApproximationFunction.from_shorthand("LAYERNORM(vsimd)"),
-    T5LAYERNORM=ApproximationFunction.from_shorthand("NONE"),
-    LLAMALAYERNORM=ApproximationFunction.from_shorthand("NONE"),
+    RELU=ApproximationFunction.from_shorthand("NONE"),
+    RELU6=ApproximationFunction.from_shorthand("NONE"),
+    SILU=ApproximationFunction.from_shorthand("NONE"),
+    SOFTMAX=ApproximationFunction.from_shorthand("NONE"),
+    GELU=ApproximationFunction.from_shorthand("NONE"),
+    TANH=ApproximationFunction.from_shorthand("NONE"),
+    BATCHNORM2D=ApproximationFunction.from_shorthand("NONE"),
+    LAYERNORM=ApproximationFunction.from_shorthand("NONE"),
+    GROUPNORM=ApproximationFunction.from_shorthand("NONE"),
+    RMSNORM=ApproximationFunction.from_shorthand("NONE"),
     LLAMAROTARYEMBEDDINGREFACTORED=ApproximationFunction.from_shorthand("NONE"),
-    HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("HFDIFFUSERSTIMESTEPS(vsimd)"),
+    HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("NONE"),
+)
+
+# Automatic configuration rules
+config_rules = SimpleNamespace(
+    BASELINE=[],
+    BASIC=[
+        DmxConfigRule(
+            module_types=(nn.Linear,),
+            module_config=dict(
+                input_format=format.BFP16_64_LD,
+                weight_format=format.BFP16_64_LD,
+                bias_format=format.BFP32_1,
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.Conv1d,
+                nn.Conv2d,
+                nn.ConvTranspose2d,
+            ),
+            module_config=dict(
+                input_format=format.BFP16_64_FD,
+                weight_format=format.BFP16_64_FD,
+                bias_format=format.BFP32_1,
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ResAdd,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                residual_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ActActMatMul,),
+            module_config=dict(
+                input_format=format.BFP16_64_LD,
+                multiplier_format=format.BFP16_64_PD,
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Embedding,),
+            module_config=dict(
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.MaxPool2d,
+                nn.AdaptiveAvgPool2d,
+                nn.AvgPool2d,
+            ),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ReLU,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.RELU,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ReLU6,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.RELU6,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.GELU,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.GELU,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.SiLU,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.SILU,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Tanh,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.TANH,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Softmax,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.SOFTMAX,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.LayerNorm,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.LAYERNORM,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.BatchNorm2d,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.BATCHNORM2D,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.GroupNorm,),
+            module_config=dict(
+                input_format=format.FLOAT16,
+                output_format=format.FLOAT16,
+                approximation_function=default_approx.GROUPNORM,
+            ),
+        ),
+    ],
 )
