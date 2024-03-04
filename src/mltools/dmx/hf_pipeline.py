@@ -104,7 +104,7 @@ def pipeline(
         pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
     )
     pipe.baseline_config = pipe.model.dmx_config
-    pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
+    pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model.body,
         dataset,
         metric,
