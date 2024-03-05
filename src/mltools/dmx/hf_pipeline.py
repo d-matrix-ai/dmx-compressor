@@ -94,17 +94,24 @@ def pipe_eval(
 def pipeline(
     *args,
     dmx_config: Optional[str] = None,
+    trust_remote_code: bool = True,
+    device_map: Optional[str] = "auto",
     **kwargs,
 ):
+    kwargs.update({
+        "trust_remote_code": trust_remote_code,
+        "device_map": device_map,
+    })
     pipe = hfpipeline(*args, **kwargs)
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
+
     pipe.model = Model(
         pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
     )
     pipe.baseline_config = pipe.model.dmx_config
-    pipe.eval = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
+    pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model.body,
         dataset,
         metric,
