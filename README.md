@@ -76,7 +76,7 @@ See advanced topics below for further details.
 Use method `model.transform()` to set these configurations, through application of configuration rules.  
 See advanced topics for engineering of configuration rules.  
 
-We provide two predefined rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's Corsair hardware, _e.g._ 
+We provide two predefined rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
 
 ```python
 model = model.transform(model.dmx_config, *dmx.config_rules.BASIC)
@@ -92,7 +92,7 @@ from mltools.dmx import pipeline
 pipe = pipeline(
     task="text-generation",
     model="openai-community/gpt2-xl",
-    dmx_config="BASIC",  # make the model deployable on Corsair backend
+    dmx_config="BASIC",  # make the model deployable on d-Matrix backend
     ...
 )
 
