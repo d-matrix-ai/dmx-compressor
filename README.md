@@ -76,7 +76,7 @@ See advanced topics below for further details.
 Use method `model.transform()` to set these configurations, through application of configuration rules. 
 See advanced topics for engineering of configuration rules.  
 
-We provide two predefined rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
+There are two predefined special rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
 
 ```python
 model = model.transform(model.dmx_config, *dmx.config_rules.BASIC)
