@@ -73,7 +73,7 @@ Now `model` is functionally equivalent to `Net()`, and all `torch` functionaliti
 See advanced topics below for further details. 
 
 `model.dmx_config` is a dictionary that contains all, and only those, configurations that affect the functional behavior of the model.  
-Use method `model.transform()` to set these configurations, through application of configuration rules.  
+Use method `model.transform()` to set these configurations, through application of configuration rules. 
 See advanced topics for engineering of configuration rules.  
 
 We provide two predefined rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
