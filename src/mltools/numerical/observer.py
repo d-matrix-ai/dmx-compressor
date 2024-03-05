@@ -33,9 +33,10 @@ class DMXObserverBase(ObserverBase):
         qscheme: torch.qscheme = torch.per_tensor_affine,
         factory_kwargs: Optional[dict] = None,
         eps: float = torch.finfo(torch.float32).eps,
+        **kwargs,
     ) -> None:
         assert isinstance(dtype, Format), f"illegal format {dtype}"
-        super().__init__(dtype=dtype)
+        super().__init__(dtype=dtype, **kwargs)
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
         self.qscheme = qscheme
         assert self.qscheme in (
