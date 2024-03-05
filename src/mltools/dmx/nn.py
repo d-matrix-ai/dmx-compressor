@@ -984,61 +984,61 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         return initial_dmx
 
 
-class HFTransformersT5LayerNorm(
-    DmxModule, transformers.models.t5.modeling_t5.T5LayerNorm
-):
-    r"""
-    An extension of the Hugging Face Transformers T5 LayerNorm layer to support DmxModule configurations.
-    This module applies RMS-based layer normalization over the input tensor.
-    The layer normalization is parameterized by the `hidden_size` and optional `eps` value for numerical stability.
-
-    Args:
-        hidden_size (int): The size of the hidden layer (number of hidden units).
-        eps (float, optional): A small constant added to the denominator for numerical stability. Defaults to 1e-6.
-
-    Methods:
-        _forward (_input: Tensor) -> Tensor: Computes the forward pass of the layer normalization.
-    """
-
-    def __init__(
-        self,
-        hidden_size: int,
-        eps: float = 1e-6,
-    ) -> None:
-        super().__init__(hidden_size, eps=eps)
-
-    def _forward(self, _input: Tensor) -> Tensor:
-        _output = self.approx_forward((_input,))
-        return _output
-
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+class _RMSNorm(torch.nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
         """
-        Creates a new LayerNorm object (DmxModule) from a given PyTorch LayerNorm layer.
+        Taken from facebookresearch/llama/model.py
+        Initialize the RMSNorm normalization layer.
 
         Args:
-            raw (torch.nn.Module): A PyTorch LayerNorm layer to be converted.
+            dim (int): The dimension of the input tensor.
+            eps (float, optional): A small value added to the denominator for numerical stability. Default is 1e-6.
+
+        Attributes:
+            eps (float): A small value added to the denominator for numerical stability.
+            weight (nn.Parameter): Learnable scaling parameter.
+
+        """
+        super().__init__()
+        self.eps = eps
+        self.weight = torch.nn.Parameter(torch.ones(dim))
+
+    def _norm(self, x):
+        """
+        Apply the RMSNorm normalization to the input tensor.
+
+        Args:
+            x (torch.Tensor): The input tensor.
 
         Returns:
-            DmxModule: A LayerNorm object that has the same configuration as the input PyTorch LayerNorm layer.
+            torch.Tensor: The normalized tensor.
+
         """
-        initial_dmx = HFTransformersT5LayerNorm(
-            raw.weight.shape, eps=raw.variance_epsilon
-        )
-        initial_dmx.update_params_with_raw(raw)
-        return initial_dmx
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+
+    def forward(self, x):
+        """
+        Forward pass through the RMSNorm layer.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor after applying RMSNorm.
+
+        """
+        output = self._norm(x.float()).type_as(x)
+        return output * self.weight
 
 
-class HFTransformersLlamaRMSNorm(
-    DmxModule, transformers.models.llama.modeling_llama.LlamaRMSNorm
-):
+class RMSNorm(DmxModule, _RMSNorm):
     r"""
-    An extension of the Hugging Face Transformers Llama RMSNorm layer to support DmxModule configurations.
+    An extension of RMSNorm layer to support DmxModule configurations.
     This module performs RMS-based layer normalization on the input tensor.
     The layer normalization is characterized by the `hidden_size` and an optional `eps` value for numerical stability.
 
     Args:
-        hidden_size (int): The size of the hidden layer (number of hidden units).
+        dim (int): The size of the hidden layer (number of hidden units).
         eps (float, optional): A small constant added to the denominator for numerical stability. Defaults to 1e-6.
 
     Methods:
@@ -1047,10 +1047,10 @@ class HFTransformersLlamaRMSNorm(
 
     def __init__(
         self,
-        hidden_size: int,
+        dim: int,
         eps: float = 1e-6,
     ) -> None:
-        super().__init__(hidden_size, eps=eps)
+        super().__init__(dim, eps=eps)
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
