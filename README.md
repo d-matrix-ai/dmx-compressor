@@ -91,7 +91,7 @@ from mltools.dmx import pipeline
 
 pipe = pipeline(
     task="text-generation",
-    model="gpt2-xl",
+    model="openai-community/gpt2-xl",
     dmx_config="BASIC",  # make the model deployable on Corsair backend
     ...
 )
