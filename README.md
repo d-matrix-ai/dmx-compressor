@@ -35,7 +35,9 @@ This project contains tools for deep neural net co-design for custom hardware ac
 
   - [Overview](#overview)
   - [Getting started](#getting-started)
-  - [API in a nutshell](#api-in-a-nutshell)
+  - [Usage](#usage)
+    - [Basic API](basic-api)
+    - [Hugging Face pipeline API](hugging-face-pipeline-api)
   - [Next steps](#next-steps)
 
 ---
@@ -55,31 +57,47 @@ In addition, the project provides a set of optimization tools for co-design usin
 `pip install dmx-mltools`
 
 
-## API in a nutshell
+## Usage
 
-Given a PyTorch training/evaluation script, use the high-level API through two steps.
+### Basic API
 
-1. Monkey-patch PyTorch to be dmx-aware.  This is done by adding
+Given a PyTorch model, _e.g._ `Net()`, wrap it in a `dmx.Model` container: 
 
-    ```python
-    from mltools import dmx
-    dmx.aware()
-    ```
-    to the head of the script.  
-    
-    This augments `torch.nn` with the abovementioned features, while retaining all PyTorch functionalities, _i.e._
+```python
+from mltools import dmx
 
-    - all valid PyTorch model definitions remain valid and
-    - all PyTorch models remain functionally equivalent, in both forward and backward passes, to those in native PyTorch.
+model = dmx.Model(Net())
+```
 
-2. Wrap a DNN in a `dmx.Model` container, _e.g._
-   
-    ```python
-    model = dmx.Model(Net())
-    ```
+Now `model` is functionally equivalent to `Net()`, and all `torch` functionalities still available, but now `model` is ready for co-design configuration and/or optimization, at training time or post-training. 
+See advanced topics below for further details. 
 
-    After this point, `model` is functionally equivalent to `Net()`, and all `torch` functionalities still available, but now `model` is ready for co-design configuration and/or optimization, at training time or post-training. 
-    See advanced topics below for further details. 
+`model.dmx_config` is a dictionary that contains all, and only those, configurations that affect the functional behavior of the model.  
+Use method `model.transform()` to set these configurations, through application of configuration rules. 
+See advanced topics for engineering of configuration rules.  
+
+We provide two predefined rule sets `dmx.config_rules.BASELINE` and `dmx.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
+
+```python
+model = model.transform(model.dmx_config, *dmx.config_rules.BASIC)
+```
+
+### Hugging Face pipeline API
+
+To leverage the popularity of [Hugging Face's pipeline API for inference](https://huggingface.co/docs/transformers/en/pipeline_tutorial), we extend `transformers.pipeline()` to `dmx.pipeline()`, which retains all existing functionality of pipelines while enabling model transformation and configuration for deployment on d-Matrix hardware.  
+
+```python
+from mltools.dmx import pipeline
+
+pipe = pipeline(
+    task="text-generation",
+    model="openai-community/gpt2-xl",
+    dmx_config="BASIC",  # make the model deployable on d-Matrix backend
+    ...
+)
+
+# Deploy pipe the same way as Hugging Face provides.
+```
 
 
 ## Next steps

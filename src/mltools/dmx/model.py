@@ -64,26 +64,27 @@ class Model(torch.nn.Module):
         output = self.tail(output)
         return output
 
-    def transform(self, config="configs/dmx.yaml", *rules):
+    def transform(self, config: Optional[Union[dict, str]], *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
 
         NOTE: only staticly declared DmxModule(s) are to be transformed
 
         Args:
-            config (Optional[str]): config file to be used for transformation. Defaults to "configs/dmx.yaml".
+            config (Optional[Union[DmxConfig, str]]): DmxConfig to be used for transformation. 
             *rules (List[DmxConfigRule]): variable length of list of configuration rules on top of config.
 
         Returns:
             Returns the transformed model
 
         """
-        if isinstance(config, str):
-            config = DmxConfig.from_yaml(config)
+        if config is not None:
+            if isinstance(config, str):
+                config = DmxConfig.from_yaml(config)
 
-        for n, m in self.named_dmx_modules():
-            if n in config:
-                m.transform(config[n])
+            for n, m in self.named_dmx_modules():
+                if n in config:
+                    m.transform(config[n])
 
         for _r in rules:
             _r.apply_to(self)
