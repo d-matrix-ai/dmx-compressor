@@ -69,7 +69,7 @@ from mltools import dmx
 model = dmx.Model(Net())
 ```
 
-Here `model` is functionally equivalent to `Net()`, and all `torch` functionalities are still available, making `model` ready for co-design configuration and/or optimization, at training time or post-training. 
+Here `model` is functionally equivalent to `Net()`, and all `torch` functionalities are still available, but `model` is equipped with d-Matrix specific features, making it ready for co-design configuration and/or optimization, at training time or post-training. 
 See advanced topics below for further details. 
 
 `model.dmx_config` is a dictionary that contains all, and only those, configurations that affect the functional behavior of the model.  
