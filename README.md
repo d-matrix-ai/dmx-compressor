@@ -70,9 +70,9 @@ model = dmx.Model(Net())
 ```
 
 Here `model` is functionally equivalent to `Net()`, and all `torch` functionalities are still available, but `model` is equipped with d-Matrix specific features, making it ready for co-design configuration and/or optimization, at training time or post-training. 
-See advanced topics below for further details. 
+See advanced topics for further details. 
 
-`model.dmx_config` is a dictionary that contains all, and only those, configurations that affect the functional behavior of the model, different from the behavior of the original `Net()`.  
+`model.dmx_config` is a dictionary that contains all, and only those, configurations that affect the functional behavior of the model, different from the behavior of the original `Net()`. 
 Use method `model.transform()` to set these configurations, through application of configuration rules. 
 See advanced topics for engineering of configuration rules.  
 
