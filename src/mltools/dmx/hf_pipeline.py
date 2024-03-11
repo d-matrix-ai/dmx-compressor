@@ -30,6 +30,7 @@ def dmx_transform(pipe, dmx_config_name):
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
             from . import config_rules
+
             pipe.model.transform(
                 pipe.baseline_config, *eval(f"config_rules.{dmx_config_name}")
             )
@@ -49,6 +50,8 @@ def eval_text_generation(
     dataset_column_mapping = {
         "wikitext": "text",
         "ptb_text_only": "sentence",
+        "lambada": "text",
+        "EleutherAI/lambada_openai": "text",
         # Add more datasets and their respective column names here
     }
 
@@ -98,10 +101,12 @@ def pipeline(
     device_map: Optional[str] = "auto",
     **kwargs,
 ):
-    kwargs.update({
-        "trust_remote_code": trust_remote_code,
-        "device_map": device_map,
-    })
+    kwargs.update(
+        {
+            "trust_remote_code": trust_remote_code,
+            "device_map": device_map,
+        }
+    )
     pipe = hfpipeline(*args, **kwargs)
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
