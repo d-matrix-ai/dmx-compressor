@@ -6,6 +6,7 @@ import torch
 from torch import fx
 from .. import numerical
 from .. import sparse
+import warnings
 
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
@@ -15,7 +16,8 @@ import transformers
 from transformers.utils.fx import (
     HFTracer,
     get_concrete_args,
-    check_if_model_is_supported,
+    is_model_supported,
+    _SUPPORTED_MODELS,
 )
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
@@ -74,7 +76,6 @@ def hf_symbolic_trace(
     model: PreTrainedModel,
     input_names: Optional[List[str]] = None,
     concrete_args: Optional[Dict[str, Any]] = None,
-    disable_check: bool = False,
     tracer_cls: Type[DmxHFTracer] = DmxHFTracer,
 ) -> GraphModule:
     """
@@ -114,8 +115,11 @@ def hf_symbolic_trace(
         concrete_args.update()
     else:
         concrete_args = get_concrete_args(model, input_names)
-    if not disable_check:
-        check_if_model_is_supported(model)
+    if not is_model_supported(model):
+        supported_model_names = ", ".join(_SUPPORTED_MODELS)
+        warnings.warn(
+            f"Model {model.__class__.__name__} is not supported yet, supported models: {supported_model_names}"
+        )
     # Tracing.
     tracer = tracer_cls()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
