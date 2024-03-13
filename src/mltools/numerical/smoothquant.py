@@ -1,5 +1,7 @@
+from typing import Union
 import torch
 import torch.nn as nn
+from .format import Format
 
 
 class SmoothQuant(nn.Module):
@@ -21,8 +23,8 @@ class SmoothQuant(nn.Module):
         `migration_strength` (float): controls how much quantization difficulty
             we want to migrate from input A to input B, should be between 0 and 1,
             default is 0.5.
-        `pow2` (bool): If set to True, the scaling factors will be rounded to the
-            nearest power of 2, default is False.
+        `scale_format` (str or dmx.Format): the numerical format to
+            store and compute the scaler, default is "SAME".
         `scale_min`(float): minimum epsilon value used to prevent division by zero
             calculating the scaling factors, default is 1e-5.
 
@@ -36,8 +38,8 @@ class SmoothQuant(nn.Module):
         `migration_strength` (float): controls how much quantization difficulty
             we want to migrate from input A to input B, should be between 0 and 1,
             default is 0.5.
-        `pow2` (bool): If set to True, the scaling factors will be rounded to the
-            nearest power of 2, default is False.
+        `scale_format` (str or dmx.Format): the numerical format to
+            store and compute the scaler, default is "SAME".
         `scale_min` (float): minimum epsilon value used to prevent division by zero
             calculating the scaling factors, default is 1e-5.
         `enabled` (bool): If set to True, smoothQuant will be enabled for both
@@ -57,13 +59,12 @@ class SmoothQuant(nn.Module):
         a_dynamic: bool = False,
         b_dynamic: bool = False,
         migration_strength: float = 0.5,
-        pow2: bool = False,
+        scale_format: Union[str, Format] = "SAME",
         scale_min: float = 1e-5,
     ) -> None:
         super().__init__()
         self.a_ch_axis = a_ch_axis
         self.b_ch_axis = b_ch_axis
-        self.register_buffer("pow2", torch.tensor([int(pow2)], dtype=torch.long))
         self.register_buffer(
             "a_dynamic", torch.tensor([int(a_dynamic)], dtype=torch.long)
         )
@@ -76,6 +77,11 @@ class SmoothQuant(nn.Module):
         self.register_buffer("scale", torch.empty(0))
         self.register_buffer("a_maxabs", torch.empty(0), persistent=False)
         self.register_buffer("b_maxabs", torch.empty(0))
+
+        from .cast import CastTo
+
+        self.scale_cast = CastTo()
+        self.set_scale_format(scale_format)
 
     @torch.jit.export
     def enable(self, enabled: bool = True) -> None:
@@ -109,15 +115,15 @@ class SmoothQuant(nn.Module):
         self.b_dynamic[0] = 1 if b_dynamic else 0
 
     @torch.jit.export
-    def set_pow2(self, pow2: bool = True) -> None:
+    def set_scale_format(self, format: Union[str, Format] = "SAME") -> None:
         """
-        Sets/resets the pow2 flag.
+        Sets/resets the scale_format.
 
         Args:
-            pow2 (bool): if set to True, the scaling factors will be rounded to the
-                nearest power of 2, default is True.
+            `format` (str or dmx.Format): the numerical format to
+        store and compute the scaler, default is "SAME".
         """
-        self.pow2[0] = 1 if pow2 else 0
+        self.scale_cast.set_format(format)
 
     @torch.jit.export
     def set_migration_strength(self, migration_strength: float) -> None:
@@ -311,11 +317,7 @@ class SmoothQuant(nn.Module):
             .to(self.scale_min.device)
             .clamp(min=self.scale_min)
         )
-        self.scale = (
-            2 ** _scale.to(self.pow2[0].device).log2().round()
-            if self.pow2[0] == 1
-            else _scale
-        )
+        self.scale = self.scale_cast(_scale)
 
     def forward(self, a: torch.Tensor, b: torch.Tensor) -> None:
         """
@@ -362,7 +364,7 @@ class SmoothQuant(nn.Module):
         """
         Returns the extra representation of smoothQuant
         """
-        return f"migration_strength = {self.migration_strength.item()}, a_ch_axis = {self.a_ch_axis}, b_ch_axis = {self.b_ch_axis}, pow2 = {self.pow2.bool().item()}, dynamic = ({self.a_dynamic.bool().item()}, {self.b_dynamic.bool().item()})"
+        return f"migration_strength = {self.migration_strength.item()}, a_ch_axis = {self.a_ch_axis}, b_ch_axis = {self.b_ch_axis}, scale_format = {self.scale_cast.format}, dynamic = ({self.a_dynamic.bool().item()}, {self.b_dynamic.bool().item()})"
 
 
 class ActivationWeightSmoothQuant(SmoothQuant):
@@ -375,8 +377,8 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         `migration_strength` (float): controls how much quantization difficulty
             we want to migrate from activations to weights, should be between
             0 and 1, default is 0.5.
-        `pow2` (bool): If set to True, the scaling factors will be rounded to
-            the nearest power of 2, default is False.
+        `scale_format` (str or dmx.Format): the numerical format to
+            store and compute the scaler, default is "SAME".
         `dynamic` (bool): If set to True, the maximum value of activations will
             be calculated dynamically, default is False.
         `scale_min`(float): minimum epsilon value used to prevent division by
@@ -394,7 +396,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         ch_axis: int,
         w_ch_axis: int,
         migration_strength: float = 0.5,
-        pow2: bool = False,
+        scale_format: Union[str, Format] = "SAME",
         dynamic: bool = False,
         scale_min: float = 1e-5,
     ) -> None:
@@ -402,7 +404,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
             a_ch_axis=ch_axis,
             b_ch_axis=w_ch_axis,
             migration_strength=migration_strength,
-            pow2=pow2,
+            scale_format=scale_format,
             a_dynamic=dynamic,
             b_dynamic=False,
             scale_min=scale_min,
@@ -533,4 +535,4 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         """
         Returns the extra representation of Activation x Weight smoothQuant
         """
-        return f"migration_strength = {self.migration_strength.item()}, ch_axis = {self.ch_axis}, w_ch_axis = {self.w_ch_axis}, pow2 = {self.pow2.bool().item()}, dynamic = {self.dynamic.bool().item()}"
+        return f"migration_strength = {self.migration_strength.item()}, ch_axis = {self.ch_axis}, w_ch_axis = {self.w_ch_axis}, scale_format = {self.scale_cast.format}, dynamic = {self.dynamic.bool().item()}"

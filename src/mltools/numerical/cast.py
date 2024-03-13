@@ -289,12 +289,12 @@ class NumericalCastMixin:
     def init_smoothquant(
         self,
         migration_strength: float = 0.5,
-        pow2: bool = False,
+        scale_format: Union[str, Format] = "SAME",
         dynamic: bool = False,
     ) -> None:
         self.smoothquant = (
             ActivationWeightSmoothQuant(
-                self.ch_axis, self.w_ch_axis, migration_strength, pow2, dynamic
+                self.ch_axis, self.w_ch_axis, migration_strength, scale_format, dynamic
             )
             if self.ch_axis is not None and self.w_ch_axis is not None
             else None

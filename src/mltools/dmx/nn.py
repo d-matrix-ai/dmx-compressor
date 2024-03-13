@@ -94,6 +94,8 @@ class DmxModule(
             self.weight_cast.set_format(format=config["weight_format"])
         if self.bias_cast is not None and "bias_format" in config:
             self.bias_cast.set_format(format=config["bias_format"])
+        if self.smoothquant is not None and "smoothquant_scale_Format" in config:
+            self.smoothquant.set_scale_format(format=config["smoothquant_scale_Format"])
         # sparsity transformation
         if self.weight_sparsifier is not None and "weight_sparseness" in config:
             self.weight_sparsifier.configure(sparseness=config["weight_sparseness"])
@@ -298,6 +300,10 @@ class DmxModuleConfig(dict):
                 freeze or not isinstance(module.bias_format, Same)
             ):
                 cc.bias_format = module.bias_format
+            if module.smoothquant is not None and (
+                freeze or not isinstance(module.smoothquant.scale_cast.format, Same)
+            ):
+                cc.smoothquant_scale_format = module.smoothquant.scale_cast.format
             if module.weight_sparseness is not None and (
                 freeze or not isinstance(module.weight_sparseness, Dense)
             ):
