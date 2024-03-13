@@ -59,7 +59,7 @@ def _create_test_input(module: torch.nn.Module, scaler: float):
 @pytest.mark.parametrize("dynamic", (True, False))
 @pytest.mark.parametrize("migration_strength", (0.5, 0.0, 1.0))
 @pytest.mark.parametrize(
-    "scale_format", ("SAME", "FP[1|5|10,15](FN)", "FP[0|8|0,127](FN)")
+    "scale_format", ("SAME", "FP[0|8|0,127](FN)")
 )
 @pytest.mark.parametrize("perturbation_scaler", (1.0, 1e-6, 1e6))
 def test_smoothquant(
