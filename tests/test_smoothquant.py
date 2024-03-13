@@ -58,17 +58,19 @@ def _create_test_input(module: torch.nn.Module, scaler: float):
 )
 @pytest.mark.parametrize("dynamic", (True, False))
 @pytest.mark.parametrize("migration_strength", (0.5, 0.0, 1.0))
-@pytest.mark.parametrize("pow2", (True, False))
+@pytest.mark.parametrize(
+    "scale_format", ("SAME", "FP[1|5|10,15](FN)", "FP[0|8|0,127](FN)")
+)
 @pytest.mark.parametrize("perturbation_scaler", (1.0, 1e-6, 1e6))
 def test_smoothquant(
-    module_cls, dynamic, migration_strength, pow2, perturbation_scaler
+    module_cls, dynamic, migration_strength, scale_format, perturbation_scaler
 ):
     module = _create_module(module_cls)
     assert module.smoothquant.enabled[0] == 0  # disabled
 
     module.smoothquant.set_dynamic(dynamic)
     module.smoothquant.set_migration_strength(migration_strength)
-    module.smoothquant.set_pow2(pow2)
+    module.smoothquant.set_scale_format(scale_format)
 
     x_ref = _create_test_input(module, perturbation_scaler).requires_grad_()
     x = x_ref.clone().detach().requires_grad_()
