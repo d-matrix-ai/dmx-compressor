@@ -130,3 +130,7 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
+
+
+class DmxBaseAutoModelMixin:
+    pass

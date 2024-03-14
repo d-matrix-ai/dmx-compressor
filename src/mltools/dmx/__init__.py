@@ -4,7 +4,7 @@ from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction
 from .model import Model, DmxConfig, DmxConfigRule
-from .hf_pipeline import pipeline
+from .hf import pipeline
 from .nn import *
 
 # Numerical format aliases
