@@ -22,17 +22,16 @@ dmx_aware_mapping = {
     "torch.nn.modules.activation.SiLU": dmx.nn.SiLU,
     "torch.nn.modules.activation.Tanh": dmx.nn.Tanh,
     "torch.nn.modules.activation.GELU": dmx.nn.GELU,
+    "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
     "transformers.activations.NewGELUActivation": dmx.nn.GELU,
     "transformers.activations.GELUActivation": dmx.nn.GELU,
     "transformers.activations.FastGELUActivation": dmx.nn.GELU,
     "transformers.activations.QuickGELUActivation": dmx.nn.GELU,
     "transformers.activations.ClippedGELUActivation": dmx.nn.GELU,
-    "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
     "transformers.models.bloom.modeling_bloom.BloomGelu": dmx.nn.GELU,
-    "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.HFTransformersT5LayerNorm,
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,
-    "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.HFTransformersLlamaRMSNorm,
-    "transformers.activations.SiLUActivation": dmx.nn.SiLU,
+    "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
+    "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
 }
 
 dmx_aware_functional_mappings = {
