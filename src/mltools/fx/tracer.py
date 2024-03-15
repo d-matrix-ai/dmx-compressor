@@ -115,11 +115,7 @@ def hf_symbolic_trace(
         concrete_args.update()
     else:
         concrete_args = get_concrete_args(model, input_names)
-    if not is_model_supported(model):
-        supported_model_names = ", ".join(_SUPPORTED_MODELS)
-        warnings.warn(
-            f"Model {model.__class__.__name__} is not supported yet, supported models: {supported_model_names}"
-        )
+
     # Tracing.
     tracer = tracer_cls()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
