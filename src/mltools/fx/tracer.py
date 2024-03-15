@@ -6,7 +6,6 @@ import torch
 from torch import fx
 from .. import numerical
 from .. import sparse
-import warnings
 
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
@@ -16,8 +15,6 @@ import transformers
 from transformers.utils.fx import (
     HFTracer,
     get_concrete_args,
-    is_model_supported,
-    _SUPPORTED_MODELS,
 )
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
