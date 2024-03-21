@@ -38,9 +38,12 @@ class Model(torch.nn.Module):
         hf: bool = False,
         input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
+        attributes_to_retain: List[str] = [],
         **kwargs,
     ) -> None:
         super().__init__()
+        for _a in attributes_to_retain:
+            setattr(self, _a, getattr(body, _a))
         self.body = substitute_transform(
             body, hf=hf, input_names=input_names, concrete_args=concrete_args
         )
@@ -72,7 +75,7 @@ class Model(torch.nn.Module):
         NOTE: only staticly declared DmxModule(s) are to be transformed
 
         Args:
-            config (Optional[Union[DmxConfig, str]]): DmxConfig to be used for transformation. 
+            config (Optional[Union[DmxConfig, str]]): DmxConfig to be used for transformation.
             *rules (List[DmxConfigRule]): variable length of list of configuration rules on top of config.
 
         Returns:

@@ -6,12 +6,19 @@ import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 
-task_input_name_lookup = {
-    transformers.pipelines.text_generation.TextGenerationPipeline: [
+TASK_TO_INPUT_NAMES_LUT = {
+    "text-generation": [
         "input_ids",
         "labels",
     ]
 }
+HF_MODEL_ATTRIBUTE_TO_RETAIN = [
+    "name_or_path",
+    "config",
+    "generation_config",
+    "hf_device_map",
+    "can_generate",
+]
 
 
 def get_config_file(repo_name, revision, config_name):
@@ -105,15 +112,18 @@ def pipeline(
         {
             "trust_remote_code": trust_remote_code,
             "device_map": device_map,
+            # "input_names": TASK_TO_INPUT_NAMES_LUT[kwargs["task"]],
         }
     )
     pipe = hfpipeline(*args, **kwargs)
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-
     pipe.model = Model(
-        pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
+        pipe.model,
+        hf=True,
+        input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
+        attributes_to_retain=HF_MODEL_ATTRIBUTE_TO_RETAIN,
     )
     pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
@@ -130,7 +140,3 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
-
-
-class DmxBaseAutoModelMixin:
-    pass
