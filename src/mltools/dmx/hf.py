@@ -112,7 +112,6 @@ def pipeline(
         {
             "trust_remote_code": trust_remote_code,
             "device_map": device_map,
-            # "input_names": TASK_TO_INPUT_NAMES_LUT[kwargs["task"]],
         }
     )
     pipe = hfpipeline(*args, **kwargs)
