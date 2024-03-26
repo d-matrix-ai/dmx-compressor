@@ -139,3 +139,12 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
+
+
+class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel):
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        _model = super().from_pretrained(*args, **kwargs)
+        
+        return _model
+    
