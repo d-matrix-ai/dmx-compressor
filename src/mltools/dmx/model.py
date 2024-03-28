@@ -9,65 +9,7 @@ from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import get_op_set_from
 
 
-class Model(torch.nn.Module):
-    r"""
-    Container for a DNN model to be deployed
-    - body to be mapped on device
-    - head and tail to be executed on host, corresponding to pre- and post-processing
-    - equipped with dmx-aware transformation
-    Inherited from torch.nn.Module.
-
-    Args:
-        body (Any): the main module of the model.
-        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
-        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
-        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
-
-    Attributes:
-        body: the main module of the model.
-        head: preprocessing module before main module.
-        tail: postprocessing module after main module.
-
-    """
-
-    def __init__(
-        self,
-        body,
-        head=torch.nn.Identity(),
-        tail=torch.nn.Identity(),
-        hf: bool = False,
-        input_names: Optional[List[str]] = None,
-        concrete_args: Optional[Dict[str, Any]] = None,
-        attributes_to_retain: List[str] = [],
-        **kwargs,
-    ) -> None:
-        super().__init__()
-        for _a in attributes_to_retain:
-            setattr(self, _a, getattr(body, _a))
-        self.body = substitute_transform(
-            body, hf=hf, input_names=input_names, concrete_args=concrete_args
-        )
-        self.head = head
-        self.tail = tail
-
-    def forward(self, input):
-        r"""Runs a forward pass of the model on input and returns the output
-
-        Args:
-            input: A tensor or iterable that will be passed to the model
-
-        Returns:
-            output of a forward pass
-
-        """
-        output = self.head(input)
-        if isinstance(output, torch.Tensor):
-            output = (output,)
-        output = [out for out in output if out is not None]
-        output = self.body(*output)
-        output = self.tail(output)
-        return output
-
+class DmxModelMixin:
     def transform(self, config: Optional[Union[dict, str]], *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
@@ -112,7 +54,7 @@ class Model(torch.nn.Module):
 
     def named_dmx_modules(self):
         r""" "Returns a list of named modules that are dmx configurable"""
-        return ((n, m) for n, m in self.body.named_modules() if is_configurable(m))
+        return ((n, m) for n, m in self.named_modules() if is_configurable(m))
 
     def freeze(self, config_file="./config.yaml"):
         """
@@ -254,6 +196,66 @@ class Model(torch.nn.Module):
         )
 
 
+class Model(torch.nn.Module, DmxModelMixin):
+    r"""
+    Container for a DNN model to be deployed
+    - body to be mapped on device
+    - head and tail to be executed on host, corresponding to pre- and post-processing
+    - equipped with dmx-aware transformation
+    Inherited from torch.nn.Module.
+
+    Args:
+        body (Any): the main module of the model.
+        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
+        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
+        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
+
+    Attributes:
+        body: the main module of the model.
+        head: preprocessing module before main module.
+        tail: postprocessing module after main module.
+
+    """
+
+    def __init__(
+        self,
+        body,
+        head=torch.nn.Identity(),
+        tail=torch.nn.Identity(),
+        hf: bool = False,
+        input_names: Optional[List[str]] = None,
+        concrete_args: Optional[Dict[str, Any]] = None,
+        attributes_to_retain: List[str] = [],
+        **kwargs,
+    ) -> None:
+        super().__init__()
+        for _a in attributes_to_retain:
+            setattr(self, _a, getattr(body, _a))
+        self.body = substitute_transform(
+            body, hf=hf, input_names=input_names, concrete_args=concrete_args
+        )
+        self.head = head
+        self.tail = tail
+
+    def forward(self, input):
+        r"""Runs a forward pass of the model on input and returns the output
+
+        Args:
+            input: A tensor or iterable that will be passed to the model
+
+        Returns:
+            output of a forward pass
+
+        """
+        output = self.head(input)
+        if isinstance(output, torch.Tensor):
+            output = (output,)
+        output = [out for out in output if out is not None]
+        output = self.body(*output)
+        output = self.tail(output)
+        return output
+
+
 class DmxConfig(dict):
     r"""
     This is a dict of Dmx-specific configurations for a dmx.Model
@@ -364,7 +366,7 @@ class DmxConfigRule(SimpleNamespace):
             model_or_config (Union[Model, DmxConfig]): Model or DmxConfig to apply transformation on.
         """
         target_module_names = self.names_in(model_or_config)
-        if isinstance(model_or_config, Model):
+        if isinstance(model_or_config, torch.nn.Module):
             for n, m in model_or_config.named_dmx_modules():
                 if n in target_module_names and type(m) in self.module_types:
                     m.transform(self.module_config)

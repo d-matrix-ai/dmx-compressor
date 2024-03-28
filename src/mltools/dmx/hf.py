@@ -1,7 +1,10 @@
-from typing import Optional
+from mltools.dmx.nn import DmxModule
+from mltools.fx.transform import substitute_transform
+import torch
+from typing import Optional, Union
 import transformers
 from transformers import pipeline as hfpipeline
-from .model import Model, DmxConfig
+from .model import DmxModelMixin, DmxConfig
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
@@ -118,15 +121,9 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-    pipe.model = Model(
-        pipe.model,
-        hf=True,
-        input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
-        attributes_to_retain=HF_MODEL_ATTRIBUTE_TO_RETAIN,
-    )
     pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
-        pipe.model.body,
+        pipe.model,
         dataset,
         metric,
         pipe.revision,
@@ -141,10 +138,9 @@ def pipeline(
     return pipe
 
 
-class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel):
+class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         _model = super().from_pretrained(*args, **kwargs)
-        
+        _model.base_model = substitute_transform(_model.base_model, hf=True)
         return _model
-    
