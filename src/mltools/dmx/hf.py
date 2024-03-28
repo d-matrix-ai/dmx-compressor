@@ -15,13 +15,6 @@ TASK_TO_INPUT_NAMES_LUT = {
         "labels",
     ]
 }
-HF_MODEL_ATTRIBUTE_TO_RETAIN = [
-    "name_or_path",
-    "config",
-    "generation_config",
-    "hf_device_map",
-    "can_generate",
-]
 
 
 def get_config_file(repo_name, revision, config_name):
