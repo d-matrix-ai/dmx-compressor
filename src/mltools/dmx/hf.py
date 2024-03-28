@@ -1,5 +1,9 @@
 from typing import Optional
 from transformers import pipeline as hfpipeline
+from mltools.fx.transform import substitute_transform
+import transformers
+from transformers import pipeline as hfpipeline
+from .model import DmxModelMixin, DmxConfig
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
@@ -131,3 +135,11 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
+
+
+class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        _model = super().from_pretrained(*args, **kwargs)
+        _model.base_model = substitute_transform(_model.base_model, hf=True)
+        return _model
