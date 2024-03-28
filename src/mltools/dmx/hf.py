@@ -129,9 +129,26 @@ def pipeline(
     return pipe
 
 
+def _get_submodules(model, key):
+    parent = model.get_submodule(".".join(key.split(".")[:-1]))
+    target_name = key.split(".")[-1]
+    target = model.get_submodule(key)
+    return parent, target, target_name
+
+
 class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         _model = super().from_pretrained(*args, **kwargs)
-        _model.base_model = substitute_transform(_model.base_model, hf=True)
+        # _model.base_model = substitute_transform(_model.base_model, hf=True)
+        for _n, _ in _model.named_children():
+            parent, target, target_name = _get_submodules(_model, _n)
+            transformed_target = substitute_transform(
+                target,
+                hf=True,
+                # input_names=["input_ids"]
+                # if target_name == _model.base_model_prefix
+                # else None,
+            )
+            setattr(parent, target_name, transformed_target)
         return _model
