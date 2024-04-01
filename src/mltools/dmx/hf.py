@@ -142,10 +142,9 @@ class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMi
                 lambda _m: substitute_transform(
                     _m,
                     hf=True,
-                    # input_names=["input_ids"]
-                    # if target_name == _model.base_model_prefix
-                    # else None,
+                    input_names=["input_ids"] if _n == _model.base_model_prefix else None,
                 ),
             )
+            print(f"******** Transformed _model.{_n}")
 
         return _model
