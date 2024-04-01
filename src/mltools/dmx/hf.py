@@ -145,6 +145,6 @@ class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMi
                     input_names=["input_ids"] if _n == _model.base_model_prefix else None,
                 ),
             )
-            print(f"******** Transformed _model.{_n}")
+            print(f"******** Transformed _model.{_n} ********")
 
         return _model
