@@ -1,4 +1,6 @@
-from typing import Optional
+import torch
+from inspect import signature
+from typing import Union, Optional, get_origin, get_args
 import transformers
 from transformers import pipeline as hfpipeline
 import evaluate
@@ -11,7 +13,7 @@ TASK_TO_INPUT_NAMES_LUT = {
     "text-generation": [
         "input_ids",
         "labels",
-    ]
+    ]  # is this correct?  text generation could need KV cache
 }
 
 
@@ -129,22 +131,49 @@ def pipeline(
     return pipe
 
 
+class SubstituteTransformedModule(torch.nn.Module):
+    def __init__(self, mod, input_names=None) -> None:
+        super().__init__()
+        self.mod_signature = signature(mod.forward)
+        self.gmod = substitute_transform(
+            mod,
+            hf=True,
+            input_names=input_names,
+        )  # this adds another level of hierarchy, not ideal
+        self.gmod_signature = signature(self.gmod.forward)
+
+    def forward(self, *args, **kwargs):
+        _argument_dict = self.mod_signature.bind(*args, **kwargs).arguments
+        _argument_dict = {
+            k: v
+            for k, v in _argument_dict.items()
+            if k in self.gmod_signature.parameters.keys()
+        }
+        _output = self.gmod(**_argument_dict)
+        _output_cls = self.mod_signature.return_annotation
+        if get_origin(_output_cls) is Union:  # this is still error-prone
+            _output_cls = get_args(_output_cls)[1]
+            assert issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
+        return _output_cls(_output)
+
+
 class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         _model = super().from_pretrained(*args, **kwargs)
 
         from mltools.utils import transform_submodule
+
         for _n, _ in _model.named_children():
             transform_submodule(
                 _model,
                 _n,
-                lambda _m: substitute_transform(
+                lambda _m: SubstituteTransformedModule(
                     _m,
-                    hf=True,
-                    input_names=["input_ids"] if _n == _model.base_model_prefix else None,
+                    input_names=["input_ids"]  # how do we not hard-code this?
+                    if _n == _model.base_model_prefix
+                    else None,
                 ),
             )
-            print(f"******** Transformed _model.{_n} ********")
 
         return _model
