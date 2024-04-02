@@ -135,21 +135,21 @@ class SubstituteTransformedModule(torch.nn.Module):
     def __init__(self, mod, input_names=None) -> None:
         super().__init__()
         self.mod_signature = signature(mod.forward)
-        self.gmod = substitute_transform(
+        self._gm_ = substitute_transform(
             mod,
             hf=True,
             input_names=input_names,
         )  # this adds another level of hierarchy, not ideal
-        self.gmod_signature = signature(self.gmod.forward)
+        self.gm_signature = signature(self._gm_.forward)
 
     def forward(self, *args, **kwargs):
         _argument_dict = self.mod_signature.bind(*args, **kwargs).arguments
         _argument_dict = {
             k: v
             for k, v in _argument_dict.items()
-            if k in self.gmod_signature.parameters.keys()
+            if k in self.gm_signature.parameters.keys()
         }
-        _output = self.gmod(**_argument_dict)
+        _output = self._gm_(**_argument_dict)
         _output_cls = self.mod_signature.return_annotation
         if get_origin(_output_cls) is Union:  # this is still error-prone
             _output_cls = get_args(_output_cls)[1]
