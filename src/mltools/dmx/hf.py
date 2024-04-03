@@ -1,4 +1,5 @@
 import torch
+import functools
 from inspect import signature
 from typing import Union, Optional, get_origin, get_args
 import transformers
@@ -132,48 +133,63 @@ def pipeline(
 
 
 class SubstituteTransformedModule(torch.nn.Module):
-    def __init__(self, mod, input_names=None) -> None:
-        super().__init__()
-        self.mod_signature = signature(mod.forward)
-        self._gm_ = substitute_transform(
+    @classmethod
+    def from_raw(cls, mod, input_names=None):
+        _mod_signature = signature(mod.forward)
+        _gm = substitute_transform(
             mod,
             hf=True,
             input_names=input_names,
-        )  # this adds another level of hierarchy, not ideal
-        self.gm_signature = signature(self._gm_.forward)
+        )
+        _gm_signature = signature(_gm.forward)
+        _gm._old_forward = _gm.forward
 
-    def forward(self, *args, **kwargs):
-        _argument_dict = self.mod_signature.bind(*args, **kwargs).arguments
-        _argument_dict = {
-            k: v
-            for k, v in _argument_dict.items()
-            if k in self.gm_signature.parameters.keys()
-        }
-        _output = self._gm_(**_argument_dict)
-        _output_cls = self.mod_signature.return_annotation
-        if get_origin(_output_cls) is Union:  # this is still error-prone
-            _output_cls = get_args(_output_cls)[1]
-            assert issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
-        return _output_cls(_output)
+        def new_forward(_self, *args, **kwargs):
+            _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
+            _argument_dict = {
+                k: v
+                for k, v in _argument_dict.items()
+                if k in _gm_signature.parameters.keys()
+            }
+            _output = _self._old_forward(**_argument_dict)
+            _output_cls = _mod_signature.return_annotation
+            if get_origin(_output_cls) is Union:  # this is still error-prone
+                _output_cls = get_args(_output_cls)[1]
+                assert issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
+            return _output_cls(_output)
+
+        if "GraphModuleImpl" in str(type(_gm)):
+            _gm.__class__.forward = functools.update_wrapper(
+                functools.partial(new_forward, _gm), _gm._old_forward
+            )
+        else:
+            _gm.forward = functools.update_wrapper(
+                functools.partial(new_forward, _gm), _gm._old_forward
+            )
+        mod.forward = _gm.forward
+        return mod
+
+
+def transform_children(_model):
+    from mltools.utils import transform_submodule
+
+    for _n, _ in _model.named_children():
+        transform_submodule(
+            _model,
+            _n,
+            lambda _m: SubstituteTransformedModule.from_raw(
+                _m,
+                input_names=["input_ids"]  # how do we not hard-code this?
+                if _n == _model.base_model_prefix
+                else None,
+            ),
+        )
+    return _model
 
 
 class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         _model = super().from_pretrained(*args, **kwargs)
-
-        from mltools.utils import transform_submodule
-
-        for _n, _ in _model.named_children():
-            transform_submodule(
-                _model,
-                _n,
-                lambda _m: SubstituteTransformedModule(
-                    _m,
-                    input_names=["input_ids"]  # how do we not hard-code this?
-                    if _n == _model.base_model_prefix
-                    else None,
-                ),
-            )
-
+        _model = transform_children(_model)
         return _model
