@@ -1,5 +1,7 @@
+from logging import warning
 import torch
 import functools
+import warnings
 from inspect import signature
 from typing import Union, Optional, get_origin, get_args
 import transformers
@@ -14,7 +16,7 @@ TASK_TO_INPUT_NAMES_LUT = {
     "text-generation": [
         "input_ids",
         "labels",
-    ]  # is this correct?  text generation could need KV cache
+    ],  # is this correct?  text generation could need KV cache
 }
 
 
@@ -115,6 +117,10 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
+    pipe.model = DmxModel.from_raw(
+        pipe.model,
+        input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
+    )
     pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
@@ -132,17 +138,19 @@ def pipeline(
     return pipe
 
 
-class SubstituteTransformedModule(torch.nn.Module):
+class DmxModel(torch.nn.Module):
     @classmethod
     def from_raw(cls, mod, input_names=None):
+        mod.__class__.__bases__ += (DmxModelMixin,)
         _mod_signature = signature(mod.forward)
         _gm = substitute_transform(
             mod,
             hf=True,
             input_names=input_names,
+            concrete_args=dict(use_cache=False),
         )
         _gm_signature = signature(_gm.forward)
-        _gm._old_forward = _gm.forward
+        _gm.old_forward = _gm.forward
 
         def new_forward(_self, *args, **kwargs):
             _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
@@ -151,7 +159,7 @@ class SubstituteTransformedModule(torch.nn.Module):
                 for k, v in _argument_dict.items()
                 if k in _gm_signature.parameters.keys()
             }
-            _output = _self._old_forward(**_argument_dict)
+            _output = _self.old_forward(**_argument_dict)
             _output_cls = _mod_signature.return_annotation
             if get_origin(_output_cls) is Union:  # this is still error-prone
                 _output_cls = get_args(_output_cls)[1]
@@ -160,22 +168,21 @@ class SubstituteTransformedModule(torch.nn.Module):
 
         if "GraphModuleImpl" in str(type(_gm)):
             _gm.__class__.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm._old_forward
+                functools.partial(new_forward, _gm), _gm.old_forward
             )
         else:
             _gm.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm._old_forward
+                functools.partial(new_forward, _gm), _gm.old_forward
             )
         mod._gm = _gm
+        mod.old_forward = mod.forward
         mod.forward = _gm.forward
+
+        _mod_args = tuple(_mod_signature.parameters.keys())
+        _gm_args = tuple(_gm_signature.parameters.keys())
+        if _mod_args != _gm_args:
+            warnings.warn(
+                f"GraphModule input signature is incomplete: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
+            )
+
         return mod
-
-
-class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
-    @classmethod
-    def from_pretrained(cls, *args, **kwargs):
-        _model = super().from_pretrained(*args, **kwargs)
-        _model = SubstituteTransformedModule.from_raw(
-            _model, input_names=["input_ids", "labels"]
-        )
-        return _model
