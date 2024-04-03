@@ -166,30 +166,16 @@ class SubstituteTransformedModule(torch.nn.Module):
             _gm.forward = functools.update_wrapper(
                 functools.partial(new_forward, _gm), _gm._old_forward
             )
+        mod._gm = _gm
         mod.forward = _gm.forward
         return mod
-
-
-def transform_children(_model):
-    from mltools.utils import transform_submodule
-
-    for _n, _ in _model.named_children():
-        transform_submodule(
-            _model,
-            _n,
-            lambda _m: SubstituteTransformedModule.from_raw(
-                _m,
-                input_names=["input_ids"]  # how do we not hard-code this?
-                if _n == _model.base_model_prefix
-                else None,
-            ),
-        )
-    return _model
 
 
 class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         _model = super().from_pretrained(*args, **kwargs)
-        _model = transform_children(_model)
+        _model = SubstituteTransformedModule.from_raw(
+            _model, input_names=["input_ids", "labels"]
+        )
         return _model
