@@ -2,7 +2,7 @@ import torch
 import re
 import functools
 import warnings
-from inspect import signature
+from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, List, Optional, Union, Sequence, get_origin, get_args
@@ -295,7 +295,9 @@ class DmxModel(torch.nn.Module):
                     assert issubclass(
                         _output_cls, transformers.modeling_utils.ModelOutput
                     )
-                return _output_cls(_output)
+                if _output_cls is not _empty:
+                    _output = _output_cls(_output)
+                return _output
 
             if "GraphModuleImpl" in str(type(_gm)):
                 _gm.__class__.forward = functools.update_wrapper(
