@@ -273,7 +273,9 @@ def _Model(
 class DmxModel(torch.nn.Module):
     @classmethod
     def from_torch(cls, model: torch.nn.Module, input_names=None) -> torch.nn.Module:
-        model.__class__.__bases__ += (DmxModelMixin,)
+        breakpoint()
+        if not DmxModelMixin in model.__class__.__bases__:
+            model.__class__.__bases__ += (DmxModelMixin,)
         _mod_signature = signature(model.forward)
         _gm = substitute_transform(
             model,

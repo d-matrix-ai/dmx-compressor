@@ -1,7 +1,4 @@
-from logging import warning
-import torch
 from typing import Optional
-import transformers
 from transformers import pipeline as hfpipeline
 import evaluate
 from datasets import load_dataset
