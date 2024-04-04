@@ -148,3 +148,15 @@ def get_op_set_from(gm: torch.fx.GraphModule):
     Returns a set of ops from a GraphModule
     """
     return set(t for _, t in _extract_ops(gm))
+
+
+def gap_analysis(source, target): 
+    r"Print commonality and differences between new and existing op sets"
+    known = target.intersection(source)
+    unknown = target.difference(source)
+    print(f"""Known ops (n = {len(known)}):
+    {known}
+    """)
+    print(f"""Unknown ops (n = {len(unknown)}):
+    {unknown}
+    """)

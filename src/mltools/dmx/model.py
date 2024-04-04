@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union, Sequence
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
+from mltools.fx.transformer import get_op_set_from
 
 
 class Model(torch.nn.Module):
@@ -90,6 +91,11 @@ class Model(torch.nn.Module):
             _r.apply_to(self)
 
         return self
+
+    @property
+    def op_set(self):
+        r"Returns a set of unique ops present in the model"
+        return get_op_set_from(self.body)
 
     @property
     def dmx_config(self):
