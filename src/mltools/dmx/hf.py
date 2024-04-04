@@ -9,7 +9,7 @@ TASK_TO_INPUT_NAMES_LUT = {
     "text-generation": [
         "input_ids",
         "labels",
-    ],  # is this correct?  text generation could need KV cache
+    ],  # TODO: is this correct?  text generation could need KV cache
 }
 
 

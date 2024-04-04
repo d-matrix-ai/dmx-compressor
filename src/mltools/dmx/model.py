@@ -232,9 +232,6 @@ class Model(torch.nn.Module, DmxModelMixin):
         **kwargs,
     ) -> None:
         super().__init__()
-        # self.body = substitute_transform(
-        #     body, hf=hf, input_names=input_names, concrete_args=concrete_args
-        # )
         self.body = DmxModel.from_torch(
             body, hf=hf, input_names=input_names, concrete_args=concrete_args
         )
