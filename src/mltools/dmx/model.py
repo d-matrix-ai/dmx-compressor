@@ -201,7 +201,7 @@ class DmxModelMixin:
 
 class Model(torch.nn.Module, DmxModelMixin):
     r"""
-    [TO BE DEPRECATED]
+    [TO BE DEPRECATED] this is here only to be backward-compatible
     Container for a DNN model to be deployed
     - body to be mapped on device
     - head and tail to be executed on host, corresponding to pre- and post-processing
@@ -232,7 +232,10 @@ class Model(torch.nn.Module, DmxModelMixin):
         **kwargs,
     ) -> None:
         super().__init__()
-        self.body = substitute_transform(
+        # self.body = substitute_transform(
+        #     body, hf=hf, input_names=input_names, concrete_args=concrete_args
+        # )
+        self.body = DmxModel.from_torch(
             body, hf=hf, input_names=input_names, concrete_args=concrete_args
         )
         self.head = head
@@ -257,67 +260,61 @@ class Model(torch.nn.Module, DmxModelMixin):
         return output
 
 
-def _Model(
-    body,
-    head=torch.nn.Identity(),
-    tail=torch.nn.Identity(),
-    hf: bool = False,
-    input_names: Optional[List[str]] = None,
-    concrete_args: Optional[Dict[str, Any]] = None,
-    **kwargs,
-):
-    # to be backward-compatible
-    pass
-
-
 class DmxModel(torch.nn.Module):
     @classmethod
-    def from_torch(cls, model: torch.nn.Module, input_names=None) -> torch.nn.Module:
-        breakpoint()
+    def from_torch(
+        cls,
+        model: torch.nn.Module,
+        hf: bool = False,
+        input_names: Optional[List[str]] = None,
+        concrete_args: Optional[Dict[str, Any]] = None,
+    ) -> torch.nn.Module:
         if not DmxModelMixin in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
-        _mod_signature = signature(model.forward)
-        _gm = substitute_transform(
-            model,
-            hf=True,
-            input_names=input_names,
-            concrete_args=dict(use_cache=False),
-        )
-        _gm_signature = signature(_gm.forward)
-        _gm.old_forward = _gm.forward
-
-        def new_forward(_self, *args, **kwargs):
-            _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
-            _argument_dict = {
-                k: v
-                for k, v in _argument_dict.items()
-                if k in _gm_signature.parameters.keys()
-            }
-            _output = _self.old_forward(**_argument_dict)
-            _output_cls = _mod_signature.return_annotation
-            if get_origin(_output_cls) is Union:  # this is still error-prone
-                _output_cls = get_args(_output_cls)[1]
-                assert issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
-            return _output_cls(_output)
-
-        if "GraphModuleImpl" in str(type(_gm)):
-            _gm.__class__.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm.old_forward
+            _mod_signature = signature(model.forward)
+            _gm = substitute_transform(
+                model,
+                hf=hf,
+                input_names=input_names,
+                concrete_args=concrete_args,
             )
-        else:
-            _gm.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm.old_forward
-            )
-        model._gm = _gm
-        model.old_forward = model.forward
-        model.forward = _gm.forward
+            _gm_signature = signature(_gm.forward)
+            _gm.old_forward = _gm.forward
 
-        _mod_args = tuple(_mod_signature.parameters.keys())
-        _gm_args = tuple(_gm_signature.parameters.keys())
-        if _mod_args != _gm_args:
-            warnings.warn(
-                f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
-            )
+            def new_forward(_self, *args, **kwargs):
+                _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
+                _argument_dict = {
+                    k: v
+                    for k, v in _argument_dict.items()
+                    if k in _gm_signature.parameters.keys()
+                }
+                _output = _self.old_forward(**_argument_dict)
+                _output_cls = _mod_signature.return_annotation
+                if get_origin(_output_cls) is Union:  # this is still error-prone
+                    _output_cls = get_args(_output_cls)[1]
+                    assert issubclass(
+                        _output_cls, transformers.modeling_utils.ModelOutput
+                    )
+                return _output_cls(_output)
+
+            if "GraphModuleImpl" in str(type(_gm)):
+                _gm.__class__.forward = functools.update_wrapper(
+                    functools.partial(new_forward, _gm), _gm.old_forward
+                )
+            else:
+                _gm.forward = functools.update_wrapper(
+                    functools.partial(new_forward, _gm), _gm.old_forward
+                )
+            model._gm = _gm
+            model.old_forward = model.forward
+            model.forward = _gm.forward
+
+            _mod_args = tuple(_mod_signature.parameters.keys())
+            _gm_args = tuple(_gm_signature.parameters.keys())
+            if _mod_args != _gm_args:
+                warnings.warn(
+                    f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
+                )
 
         return model
 
