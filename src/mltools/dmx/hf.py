@@ -1,16 +1,12 @@
 from logging import warning
 import torch
-import functools
-import warnings
-from inspect import signature
-from typing import Union, Optional, get_origin, get_args
+from typing import Optional
 import transformers
 from transformers import pipeline as hfpipeline
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
-from mltools.fx.transform import substitute_transform
-from .model import DmxModelMixin, DmxConfig
+from .model import DmxModel, DmxConfig
 
 TASK_TO_INPUT_NAMES_LUT = {
     "text-generation": [
@@ -117,7 +113,7 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-    pipe.model = DmxModel.from_raw(
+    pipe.model = DmxModel.from_torch(
         pipe.model,
         input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
     )
@@ -136,53 +132,3 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
-
-
-class DmxModel(torch.nn.Module):
-    @classmethod
-    def from_raw(cls, mod, input_names=None):
-        mod.__class__.__bases__ += (DmxModelMixin,)
-        _mod_signature = signature(mod.forward)
-        _gm = substitute_transform(
-            mod,
-            hf=True,
-            input_names=input_names,
-            concrete_args=dict(use_cache=False),
-        )
-        _gm_signature = signature(_gm.forward)
-        _gm.old_forward = _gm.forward
-
-        def new_forward(_self, *args, **kwargs):
-            _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
-            _argument_dict = {
-                k: v
-                for k, v in _argument_dict.items()
-                if k in _gm_signature.parameters.keys()
-            }
-            _output = _self.old_forward(**_argument_dict)
-            _output_cls = _mod_signature.return_annotation
-            if get_origin(_output_cls) is Union:  # this is still error-prone
-                _output_cls = get_args(_output_cls)[1]
-                assert issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
-            return _output_cls(_output)
-
-        if "GraphModuleImpl" in str(type(_gm)):
-            _gm.__class__.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm.old_forward
-            )
-        else:
-            _gm.forward = functools.update_wrapper(
-                functools.partial(new_forward, _gm), _gm.old_forward
-            )
-        mod._gm = _gm
-        mod.old_forward = mod.forward
-        mod.forward = _gm.forward
-
-        _mod_args = tuple(_mod_signature.parameters.keys())
-        _gm_args = tuple(_gm_signature.parameters.keys())
-        if _mod_args != _gm_args:
-            warnings.warn(
-                f"GraphModule input signature is incomplete: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
-            )
-
-        return mod
