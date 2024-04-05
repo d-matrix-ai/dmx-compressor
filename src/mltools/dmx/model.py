@@ -1,11 +1,10 @@
 import torch
 import re
-import functools
-import warnings
-from inspect import signature, _empty
+from collections import deque
+from inspect import signature
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, List, Optional, Union, Sequence, get_origin, get_args
+from typing import Any, Dict, Optional, Union, Sequence
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
@@ -13,6 +12,10 @@ from mltools.fx.transformer import get_op_set_from
 
 
 class DmxModelMixin:
+    _dmx_transformations_to_be_applied: deque = (
+        deque()
+    )  # stores (config, rules) to be applied
+
     def transform(self, config: Optional[Union[dict, str]], *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
@@ -27,16 +30,19 @@ class DmxModelMixin:
             Returns the transformed model
 
         """
-        if config is not None:
-            if isinstance(config, str):
-                config = DmxConfig.from_yaml(config)
+        if not self.transformed:
+            self._dmx_transformations_to_be_applied.append((config, rules))
+        else:
+            if config is not None:
+                if isinstance(config, str):
+                    config = DmxConfig.from_yaml(config)
 
-            for n, m in self.named_dmx_modules():
-                if n in config:
-                    m.transform(config[n])
+                for n, m in self.named_dmx_modules():
+                    if n in config:
+                        m.transform(config[n])
 
-        for _r in rules:
-            _r.apply_to(self)
+            for _r in rules:
+                _r.apply_to(self)
 
         return self
 
@@ -231,9 +237,7 @@ class Model(torch.nn.Module, DmxModelMixin):
         **kwargs,
     ) -> None:
         super().__init__()
-        self.body = DmxModel.from_torch(
-            body, hf=hf, concrete_args=concrete_args
-        )
+        self.body = DmxModel.from_torch(body, hf=hf, concrete_args=concrete_args)
         self.head = head
         self.tail = tail
 
@@ -276,6 +280,10 @@ class DmxModel(torch.nn.Module):
             _model.old_forward = _model.forward
             _model.forward = _model._gm.forward
             _model.transformed = True
+            _model.baseline_config = _model.dmx_config  # BASELINE config recorded
+            while len(_model._dmx_transformations_to_be_applied) != 0:
+                _config, _rules = _model._dmx_transformations_to_be_applied.popleft()
+                _model.transform(_config, *_rules)
 
     @classmethod
     def from_torch(

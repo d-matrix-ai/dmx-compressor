@@ -26,10 +26,8 @@ def dmx_transform(pipe, dmx_config_name):
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
             from . import config_rules
-
-            pipe.model.transform(
-                pipe.baseline_config, *eval(f"config_rules.{dmx_config_name}")
-            )
+            # NOTE: assuming pipe.model is in BASELINE mode
+            pipe.model.transform(None, *eval(f"config_rules.{dmx_config_name}"))
         else:
             raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
 
@@ -112,7 +110,6 @@ def pipeline(
         hf=True,
         concrete_args=None,
     )
-    pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
         dataset,
