@@ -227,13 +227,12 @@ class Model(torch.nn.Module, DmxModelMixin):
         head=torch.nn.Identity(),
         tail=torch.nn.Identity(),
         hf: bool = False,
-        input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__()
         self.body = DmxModel.from_torch(
-            body, hf=hf, input_names=input_names, concrete_args=concrete_args
+            body, hf=hf, concrete_args=concrete_args
         )
         self.head = head
         self.tail = tail
@@ -269,7 +268,9 @@ class DmxModel(torch.nn.Module):
             _model._gm = substitute_transform(
                 _model,
                 hf=_model.hf,
-                input_names=signature(_model.forward).bind(*args, **kwargs).arguments.keys(),
+                input_names=signature(_model.forward)
+                .bind(*args, **kwargs)
+                .arguments.keys(),
                 concrete_args=_model.concrete_args,
             )
             _model.old_forward = _model.forward
@@ -281,7 +282,6 @@ class DmxModel(torch.nn.Module):
         cls,
         model: torch.nn.Module,
         hf: bool = False,
-        input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
         if not DmxModelMixin in model.__class__.__bases__:
