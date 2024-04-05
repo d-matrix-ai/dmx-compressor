@@ -1,16 +1,15 @@
 from typing import Optional
-import transformers
 from transformers import pipeline as hfpipeline
-from .model import Model, DmxConfig
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
+from .model import DmxModel, DmxConfig
 
-task_input_name_lookup = {
-    transformers.pipelines.text_generation.TextGenerationPipeline: [
+TASK_TO_INPUT_NAMES_LUT = {
+    "text-generation": [
         "input_ids",
         "labels",
-    ]
+    ],  # TODO: is this correct?  text generation could need KV cache
 }
 
 
@@ -111,13 +110,15 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-
-    pipe.model = Model(
-        pipe.model, hf=True, input_names=task_input_name_lookup[type(pipe)]
+    pipe.model = DmxModel.from_torch(
+        pipe.model,
+        hf=True,
+        input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
+        concrete_args=None,
     )
     pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
-        pipe.model.body,
+        pipe.model,
         dataset,
         metric,
         pipe.revision,

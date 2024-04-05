@@ -1,70 +1,18 @@
-import re
 import torch
+import re
+import functools
+import warnings
+from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, List, Optional, Union, Sequence
+from typing import Any, Dict, List, Optional, Union, Sequence, get_origin, get_args
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import get_op_set_from
 
 
-class Model(torch.nn.Module):
-    r"""
-    Container for a DNN model to be deployed
-    - body to be mapped on device
-    - head and tail to be executed on host, corresponding to pre- and post-processing
-    - equipped with dmx-aware transformation
-    Inherited from torch.nn.Module.
-
-    Args:
-        body (Any): the main module of the model.
-        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
-        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
-        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
-
-    Attributes:
-        body: the main module of the model.
-        head: preprocessing module before main module.
-        tail: postprocessing module after main module.
-
-    """
-
-    def __init__(
-        self,
-        body,
-        head=torch.nn.Identity(),
-        tail=torch.nn.Identity(),
-        hf: bool = False,
-        input_names: Optional[List[str]] = None,
-        concrete_args: Optional[Dict[str, Any]] = None,
-        **kwargs,
-    ) -> None:
-        super().__init__()
-        self.body = substitute_transform(
-            body, hf=hf, input_names=input_names, concrete_args=concrete_args
-        )
-        self.head = head
-        self.tail = tail
-
-    def forward(self, input):
-        r"""Runs a forward pass of the model on input and returns the output
-
-        Args:
-            input: A tensor or iterable that will be passed to the model
-
-        Returns:
-            output of a forward pass
-
-        """
-        output = self.head(input)
-        if isinstance(output, torch.Tensor):
-            output = (output,)
-        output = [out for out in output if out is not None]
-        output = self.body(*output)
-        output = self.tail(output)
-        return output
-
+class DmxModelMixin:
     def transform(self, config: Optional[Union[dict, str]], *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
@@ -72,7 +20,7 @@ class Model(torch.nn.Module):
         NOTE: only staticly declared DmxModule(s) are to be transformed
 
         Args:
-            config (Optional[Union[DmxConfig, str]]): DmxConfig to be used for transformation. 
+            config (Optional[Union[DmxConfig, str]]): DmxConfig to be used for transformation.
             *rules (List[DmxConfigRule]): variable length of list of configuration rules on top of config.
 
         Returns:
@@ -95,7 +43,7 @@ class Model(torch.nn.Module):
     @property
     def op_set(self):
         r"Returns a set of unique ops present in the model"
-        return get_op_set_from(self.body)
+        return get_op_set_from(self._gm)
 
     @property
     def dmx_config(self):
@@ -109,7 +57,7 @@ class Model(torch.nn.Module):
 
     def named_dmx_modules(self):
         r""" "Returns a list of named modules that are dmx configurable"""
-        return ((n, m) for n, m in self.body.named_modules() if is_configurable(m))
+        return ((n, m) for n, m in self.named_modules() if is_configurable(m))
 
     def freeze(self, config_file="./config.yaml"):
         """
@@ -160,13 +108,13 @@ class Model(torch.nn.Module):
         )
 
     @contextmanager
-    def keep_dmx_config(self) -> None:
+    def keep_dmx_config(self):
         _dmx_config = self.dmx_config
         yield self
         self.transform(_dmx_config)
 
     @contextmanager
-    def counting_flops(self, zero: bool = True) -> None:
+    def counting_flops(self, zero: bool = True):
         with ExitStack() as stack:
             yield [
                 stack.enter_context(m.counting_flops(zero))
@@ -187,7 +135,7 @@ class Model(torch.nn.Module):
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
-    ) -> None:
+    ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
         with ExitStack() as stack:
@@ -203,7 +151,7 @@ class Model(torch.nn.Module):
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
-    ) -> None:
+    ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
         with ExitStack() as stack:
@@ -220,7 +168,7 @@ class Model(torch.nn.Module):
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
-    ) -> None:
+    ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
         with ExitStack() as stack:
@@ -238,7 +186,7 @@ class Model(torch.nn.Module):
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
         **hyperparams,
-    ) -> None:
+    ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
         with ExitStack() as stack:
@@ -249,6 +197,130 @@ class Model(torch.nn.Module):
         self._save_specific_layers_state_dict_and_register_urls(
             specific_layers, save_checkpoint_to
         )
+
+
+class Model(torch.nn.Module, DmxModelMixin):
+    r"""
+    [TO BE DEPRECATED] this is here only to be backward-compatible
+    Container for a DNN model to be deployed
+    - body to be mapped on device
+    - head and tail to be executed on host, corresponding to pre- and post-processing
+    - equipped with dmx-aware transformation
+    Inherited from torch.nn.Module.
+
+    Args:
+        body (Any): the main module of the model.
+        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
+        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
+        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
+
+    Attributes:
+        body: the main module of the model.
+        head: preprocessing module before main module.
+        tail: postprocessing module after main module.
+
+    """
+
+    def __init__(
+        self,
+        body,
+        head=torch.nn.Identity(),
+        tail=torch.nn.Identity(),
+        hf: bool = False,
+        input_names: Optional[List[str]] = None,
+        concrete_args: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+        self.body = DmxModel.from_torch(
+            body, hf=hf, input_names=input_names, concrete_args=concrete_args
+        )
+        self.head = head
+        self.tail = tail
+
+    def forward(self, input):
+        r"""Runs a forward pass of the model on input and returns the output
+
+        Args:
+            input: A tensor or iterable that will be passed to the model
+
+        Returns:
+            output of a forward pass
+
+        """
+        output = self.head(input)
+        if isinstance(output, torch.Tensor):
+            output = (output,)
+        output = [out for out in output if out is not None]
+        output = self.body(*output)
+        output = self.tail(output)
+        return output
+    
+    @property
+    def op_set(self):
+        r"Returns a set of unique ops present in the model"
+        return get_op_set_from(self.body._gm)
+
+
+class DmxModel(torch.nn.Module):
+    @classmethod
+    def from_torch(
+        cls,
+        model: torch.nn.Module,
+        hf: bool = False,
+        input_names: Optional[List[str]] = None,
+        concrete_args: Optional[Dict[str, Any]] = None,
+    ) -> torch.nn.Module:
+        if not DmxModelMixin in model.__class__.__bases__:
+            model.__class__.__bases__ += (DmxModelMixin,)
+            _mod_signature = signature(model.forward)
+            _gm = substitute_transform(
+                model,
+                hf=hf,
+                input_names=input_names,
+                concrete_args=concrete_args,
+            )
+            _gm_signature = signature(_gm.forward)
+            _gm.old_forward = _gm.forward
+
+            def new_forward(_self, *args, **kwargs):
+                _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
+                _argument_dict = {
+                    k: v
+                    for k, v in _argument_dict.items()
+                    if k in _gm_signature.parameters.keys()
+                }
+                _output = _self.old_forward(**_argument_dict)
+                _output_cls = _mod_signature.return_annotation
+                if get_origin(_output_cls) is Union:  # this is still error-prone
+                    _output_cls = get_args(_output_cls)[1]
+                    assert issubclass(
+                        _output_cls, transformers.modeling_utils.ModelOutput
+                    )
+                if _output_cls is not _empty:
+                    _output = _output_cls(_output)
+                return _output
+
+            if "GraphModuleImpl" in str(type(_gm)):
+                _gm.__class__.forward = functools.update_wrapper(
+                    functools.partial(new_forward, _gm), _gm.old_forward
+                )
+            else:
+                _gm.forward = functools.update_wrapper(
+                    functools.partial(new_forward, _gm), _gm.old_forward
+                )
+            model._gm = _gm
+            model.old_forward = model.forward
+            model.forward = _gm.forward
+
+            _mod_args = tuple(_mod_signature.parameters.keys())
+            _gm_args = tuple(_gm_signature.parameters.keys())
+            if _mod_args != _gm_args:
+                warnings.warn(
+                    f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
+                )
+
+        return model
 
 
 class DmxConfig(dict):
@@ -361,7 +433,7 @@ class DmxConfigRule(SimpleNamespace):
             model_or_config (Union[Model, DmxConfig]): Model or DmxConfig to apply transformation on.
         """
         target_module_names = self.names_in(model_or_config)
-        if isinstance(model_or_config, Model):
+        if isinstance(model_or_config, torch.nn.Module):
             for n, m in model_or_config.named_dmx_modules():
                 if n in target_module_names and type(m) in self.module_types:
                     m.transform(self.module_config)
