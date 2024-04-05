@@ -263,6 +263,15 @@ class Model(torch.nn.Module, DmxModelMixin):
 
 
 class DmxModel(torch.nn.Module):
+    @staticmethod
+    def _check_signatures(_mod_signature, _gm_signature):
+        _mod_args = tuple(_mod_signature.parameters.keys())
+        _gm_args = tuple(_gm_signature.parameters.keys())
+        if _mod_args != _gm_args:
+            warnings.warn(
+                f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
+            )
+
     @classmethod
     def from_torch(
         cls,
@@ -273,6 +282,7 @@ class DmxModel(torch.nn.Module):
     ) -> torch.nn.Module:
         if not DmxModelMixin in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
+
             _mod_signature = signature(model.forward)
             _gm = substitute_transform(
                 model,
@@ -281,8 +291,9 @@ class DmxModel(torch.nn.Module):
                 concrete_args=concrete_args,
             )
             _gm_signature = signature(_gm.forward)
-            _gm.old_forward = _gm.forward
+            cls._check_signatures(_mod_signature, _gm_signature)
 
+            _gm.old_forward = _gm.forward
             def new_forward(_self, *args, **kwargs):
                 _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
                 _argument_dict = {
@@ -300,7 +311,6 @@ class DmxModel(torch.nn.Module):
                 if _output_cls is not _empty:
                     _output = _output_cls(_output)
                 return _output
-
             if "GraphModuleImpl" in str(type(_gm)):
                 _gm.__class__.forward = functools.update_wrapper(
                     functools.partial(new_forward, _gm), _gm.old_forward
@@ -309,16 +319,10 @@ class DmxModel(torch.nn.Module):
                 _gm.forward = functools.update_wrapper(
                     functools.partial(new_forward, _gm), _gm.old_forward
                 )
+            
             model._gm = _gm
             model.old_forward = model.forward
             model.forward = _gm.forward
-
-            _mod_args = tuple(_mod_signature.parameters.keys())
-            _gm_args = tuple(_gm_signature.parameters.keys())
-            if _mod_args != _gm_args:
-                warnings.warn(
-                    f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
-                )
 
         return model
 
