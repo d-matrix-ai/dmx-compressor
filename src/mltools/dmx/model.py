@@ -43,7 +43,7 @@ class DmxModelMixin:
     @property
     def op_set(self):
         r"Returns a set of unique ops present in the model"
-        return get_op_set_from(self.body)
+        return get_op_set_from(self._gm)
 
     @property
     def dmx_config(self):
@@ -255,6 +255,11 @@ class Model(torch.nn.Module, DmxModelMixin):
         output = self.body(*output)
         output = self.tail(output)
         return output
+    
+    @property
+    def op_set(self):
+        r"Returns a set of unique ops present in the model"
+        return get_op_set_from(self.body._gm)
 
 
 class DmxModel(torch.nn.Module):
