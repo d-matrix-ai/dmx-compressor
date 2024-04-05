@@ -289,14 +289,13 @@ class DmxModel(torch.nn.Module):
     def from_torch(
         cls,
         model: torch.nn.Module,
-        hf: bool = False,
         concrete_args: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
         if not DmxModelMixin in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
             model._gm = None
             model.transformed = False
-            model.hf = hf
+            model.hf = model.__class__.__module__.startswith("transformers.models")
             model.concrete_args = concrete_args
             model.register_forward_pre_hook(
                 cls._jit_substitute_transform,
