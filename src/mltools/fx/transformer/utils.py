@@ -128,3 +128,35 @@ def get_name_for_func_nodes(
         num += 1
         candidate = f"{base}_{num}"
     return candidate
+
+
+def _extract_ops(gm: torch.fx.GraphModule):
+    r"""
+    A generator that gathers ops from a GraphModule
+    """
+    for _op in gm.graph.nodes:
+        if _op.op == "call_module":
+            yield _op.name, (gm.get_submodule(_op.target).__class__)
+        if _op.op == "call_method":
+            yield _op.name, getattr(torch.Tensor, _op.target)
+        if _op.op == "call_function":
+            yield _op.name, _op.target
+
+
+def get_op_set_from(gm: torch.fx.GraphModule):
+    r"""
+    Returns a set of ops from a GraphModule
+    """
+    return set(t for _, t in _extract_ops(gm))
+
+
+def gap_analysis(source, target): 
+    r"Print commonality and differences between new and existing op sets"
+    known = target.intersection(source)
+    unknown = target.difference(source)
+    print(f"""Known ops (n = {len(known)}):
+    {known}
+    """)
+    print(f"""Unknown ops (n = {len(unknown)}):
+    {unknown}
+    """)
