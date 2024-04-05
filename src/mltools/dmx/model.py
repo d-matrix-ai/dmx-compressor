@@ -295,7 +295,7 @@ class DmxModel(torch.nn.Module):
             model.__class__.__bases__ += (DmxModelMixin,)
             model._gm = None
             model.transformed = False
-            model.hf = model.__class__.__module__.startswith("transformers.models")
+            model.hf = model.__class__.__module__.startswith("transformers")
             model.concrete_args = concrete_args
             model.register_forward_pre_hook(
                 cls._jit_substitute_transform,
