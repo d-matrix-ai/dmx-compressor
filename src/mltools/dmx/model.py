@@ -237,7 +237,7 @@ class Model(torch.nn.Module, DmxModelMixin):
         **kwargs,
     ) -> None:
         super().__init__()
-        self.body = DmxModel.from_torch(body, hf=hf, concrete_args=concrete_args)
+        self.body = DmxModel.from_torch(body, concrete_args=concrete_args)
         self.head = head
         self.tail = tail
 
