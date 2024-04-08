@@ -143,11 +143,11 @@ def _extract_ops(gm: torch.fx.GraphModule):
             yield _op.name, _op.target
 
 
-def get_op_set_from(gm: torch.fx.GraphModule):
+def get_op_set_from(gm: Optional[torch.fx.GraphModule]):
     r"""
     Returns a set of ops from a GraphModule
     """
-    return set(t for _, t in _extract_ops(gm))
+    return set(t for _, t in _extract_ops(gm)) if gm is not None else set()
 
 
 def gap_analysis(source, target): 

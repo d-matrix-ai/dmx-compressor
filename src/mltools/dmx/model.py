@@ -1,11 +1,10 @@
 import torch
 import re
-import functools
-import warnings
-from inspect import signature, _empty
+from collections import deque
+from inspect import signature
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, List, Optional, Union, Sequence, get_origin, get_args
+from typing import Any, Dict, Optional, Union, Sequence
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
@@ -13,6 +12,10 @@ from mltools.fx.transformer import get_op_set_from
 
 
 class DmxModelMixin:
+    _dmx_transformations_to_be_applied: deque = (
+        deque()
+    )  # stores (config, rules) to be applied
+
     def transform(self, config: Optional[Union[dict, str]], *rules):
         r"""
         Transform with Dmx-specific numerics/sparsity/logics
@@ -27,16 +30,19 @@ class DmxModelMixin:
             Returns the transformed model
 
         """
-        if config is not None:
-            if isinstance(config, str):
-                config = DmxConfig.from_yaml(config)
+        if not self.transformed:
+            self._dmx_transformations_to_be_applied.append((config, rules))
+        else:
+            if config is not None:
+                if isinstance(config, str):
+                    config = DmxConfig.from_yaml(config)
 
-            for n, m in self.named_dmx_modules():
-                if n in config:
-                    m.transform(config[n])
+                for n, m in self.named_dmx_modules():
+                    if n in config:
+                        m.transform(config[n])
 
-        for _r in rules:
-            _r.apply_to(self)
+            for _r in rules:
+                _r.apply_to(self)
 
         return self
 
@@ -227,14 +233,11 @@ class Model(torch.nn.Module, DmxModelMixin):
         head=torch.nn.Identity(),
         tail=torch.nn.Identity(),
         hf: bool = False,
-        input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.body = DmxModel.from_torch(
-            body, hf=hf, input_names=input_names, concrete_args=concrete_args
-        )
+        self.body = DmxModel.from_torch(body, concrete_args=concrete_args)
         self.head = head
         self.tail = tail
 
@@ -255,7 +258,7 @@ class Model(torch.nn.Module, DmxModelMixin):
         output = self.body(*output)
         output = self.tail(output)
         return output
-    
+
     @property
     def op_set(self):
         r"Returns a set of unique ops present in the model"
@@ -263,62 +266,42 @@ class Model(torch.nn.Module, DmxModelMixin):
 
 
 class DmxModel(torch.nn.Module):
+    @staticmethod
+    def _jit_substitute_transform(_model, args, kwargs):
+        if not _model.transformed:
+            _model._gm = substitute_transform(
+                _model,
+                hf=_model.hf,
+                input_names=signature(_model.forward)
+                .bind(*args, **kwargs)
+                .arguments.keys(),
+                concrete_args=_model.concrete_args,
+            )
+            _model.old_forward = _model.forward
+            _model.forward = _model._gm.forward
+            _model.transformed = True
+            _model.baseline_config = _model.dmx_config  # BASELINE config recorded
+            while len(_model._dmx_transformations_to_be_applied) != 0:
+                _config, _rules = _model._dmx_transformations_to_be_applied.popleft()
+                _model.transform(_config, *_rules)
+
     @classmethod
     def from_torch(
         cls,
         model: torch.nn.Module,
-        hf: bool = False,
-        input_names: Optional[List[str]] = None,
         concrete_args: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
         if not DmxModelMixin in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
-            _mod_signature = signature(model.forward)
-            _gm = substitute_transform(
-                model,
-                hf=hf,
-                input_names=input_names,
-                concrete_args=concrete_args,
+            model._gm = None
+            model.transformed = False
+            model.hf = model.__class__.__module__.startswith("transformers")
+            model.concrete_args = concrete_args
+            model.register_forward_pre_hook(
+                cls._jit_substitute_transform,
+                prepend=True,
+                with_kwargs=True,
             )
-            _gm_signature = signature(_gm.forward)
-            _gm.old_forward = _gm.forward
-
-            def new_forward(_self, *args, **kwargs):
-                _argument_dict = _mod_signature.bind(*args, **kwargs).arguments
-                _argument_dict = {
-                    k: v
-                    for k, v in _argument_dict.items()
-                    if k in _gm_signature.parameters.keys()
-                }
-                _output = _self.old_forward(**_argument_dict)
-                _output_cls = _mod_signature.return_annotation
-                if get_origin(_output_cls) is Union:  # this is still error-prone
-                    _output_cls = get_args(_output_cls)[1]
-                    assert issubclass(
-                        _output_cls, transformers.modeling_utils.ModelOutput
-                    )
-                if _output_cls is not _empty:
-                    _output = _output_cls(_output)
-                return _output
-
-            if "GraphModuleImpl" in str(type(_gm)):
-                _gm.__class__.forward = functools.update_wrapper(
-                    functools.partial(new_forward, _gm), _gm.old_forward
-                )
-            else:
-                _gm.forward = functools.update_wrapper(
-                    functools.partial(new_forward, _gm), _gm.old_forward
-                )
-            model._gm = _gm
-            model.old_forward = model.forward
-            model.forward = _gm.forward
-
-            _mod_args = tuple(_mod_signature.parameters.keys())
-            _gm_args = tuple(_gm_signature.parameters.keys())
-            if _mod_args != _gm_args:
-                warnings.warn(
-                    f"GraphModule input signature is modified: \n\tmodel._gm.forward: {_gm_args} \n\tmodel.forward: {_mod_args}"
-                )
 
         return model
 

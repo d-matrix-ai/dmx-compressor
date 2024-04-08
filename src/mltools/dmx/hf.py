@@ -1,16 +1,13 @@
 from typing import Optional
 from transformers import pipeline as hfpipeline
+from mltools.fx.transform import substitute_transform
+import transformers
+from transformers import pipeline as hfpipeline
+from .model import DmxModelMixin, DmxConfig
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 from .model import DmxModel, DmxConfig
-
-TASK_TO_INPUT_NAMES_LUT = {
-    "text-generation": [
-        "input_ids",
-        "labels",
-    ],  # TODO: is this correct?  text generation could need KV cache
-}
 
 
 def get_config_file(repo_name, revision, config_name):
@@ -29,10 +26,8 @@ def dmx_transform(pipe, dmx_config_name):
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
             from . import config_rules
-
-            pipe.model.transform(
-                pipe.baseline_config, *eval(f"config_rules.{dmx_config_name}")
-            )
+            # NOTE: assuming pipe.model is in BASELINE mode
+            pipe.model.transform(None, *eval(f"config_rules.{dmx_config_name}"))
         else:
             raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
 
@@ -112,11 +107,8 @@ def pipeline(
     pipe.revision = kwargs.get("revision", "main")
     pipe.model = DmxModel.from_torch(
         pipe.model,
-        hf=True,
-        input_names=TASK_TO_INPUT_NAMES_LUT[pipe.task],
         concrete_args=None,
     )
-    pipe.baseline_config = pipe.model.dmx_config
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
         dataset,
@@ -131,3 +123,11 @@ def pipeline(
     dmx_transform(pipe, dmx_config)
 
     return pipe
+
+
+class DmxPreTrainedModel(transformers.modeling_utils.PreTrainedModel, DmxModelMixin):
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        _model = super().from_pretrained(*args, **kwargs)
+        _model.base_model = substitute_transform(_model.base_model, hf=True)
+        return _model
