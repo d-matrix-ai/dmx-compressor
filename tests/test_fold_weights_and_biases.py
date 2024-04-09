@@ -77,7 +77,7 @@ def _create_input(batch_size: int = 1):
 
 
 def _create_model(transformations):
-    _model = dmx.Model(Lenet5())
+    _model = dmx.DmxModel.from_torch(Lenet5())
     conv_quantize_input.apply_to(_model)
     fc_quantize_input.apply_to(_model)
     for tr in transformations:
@@ -135,3 +135,16 @@ def test_fold_weights_and_biases(dmx_transformations):
     with torch.no_grad():
         y = model(x)
     assert torch.all(y == y_ref)
+
+
+# if __name__ == "__main__":
+#     x = _create_input()
+#     model = _create_model((conv_quantize_weight,))
+#     with torch.no_grad():
+#         y_ref = model(x)
+#     breakpoint()
+#     model.fold_weights_and_biases()
+#     assert _check_if_folded(model)
+#     with torch.no_grad():
+#         y = model(x)
+#     assert torch.all(y == y_ref)
