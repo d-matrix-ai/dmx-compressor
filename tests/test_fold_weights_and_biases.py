@@ -77,7 +77,7 @@ def _create_input(batch_size: int = 1):
 
 
 def _create_model(transformations):
-    _model = dmx.Model(Lenet5())
+    _model = dmx.DmxModel.from_torch(Lenet5())
     conv_quantize_input.apply_to(_model)
     fc_quantize_input.apply_to(_model)
     for tr in transformations:
