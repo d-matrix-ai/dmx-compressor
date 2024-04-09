@@ -135,16 +135,3 @@ def test_fold_weights_and_biases(dmx_transformations):
     with torch.no_grad():
         y = model(x)
     assert torch.all(y == y_ref)
-
-
-# if __name__ == "__main__":
-#     x = _create_input()
-#     model = _create_model((conv_quantize_weight,))
-#     with torch.no_grad():
-#         y_ref = model(x)
-#     breakpoint()
-#     model.fold_weights_and_biases()
-#     assert _check_if_folded(model)
-#     with torch.no_grad():
-#         y = model(x)
-#     assert torch.all(y == y_ref)
