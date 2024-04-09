@@ -4,7 +4,7 @@ from collections import deque
 from inspect import signature
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, Optional, Union, Sequence
+from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
@@ -269,6 +269,14 @@ class DmxModel(torch.nn.Module):
     @staticmethod
     def _jit_substitute_transform(_model, args, kwargs):
         if not _model.transformed:
+            _mod_signature = signature(_model.forward)
+            _output_cls = _mod_signature.return_annotation
+            if get_origin(_output_cls) is Union:  # NOTE: this is error-prone
+                _output_cls = get_args(_output_cls)[1]
+                assert issubclass(
+                    _output_cls, transformers.modeling_utils.ModelOutput
+                )  # NOTE: using this to guard against abuse
+            _model.output_cls = _output_cls  # record the output class
             _model._gm = substitute_transform(
                 _model,
                 hf=_model.hf,
@@ -278,7 +286,9 @@ class DmxModel(torch.nn.Module):
                 concrete_args=_model.concrete_args,
             )
             _model.old_forward = _model.forward
-            _model.forward = _model._gm.forward
+            _model.forward = lambda *_args, **_kwargs: _model.output_cls(
+                _model._gm.forward(*_args, **_kwargs)
+            )
             _model.transformed = True
             _model.baseline_config = _model.dmx_config  # BASELINE config recorded
             while len(_model._dmx_transformations_to_be_applied) != 0:
