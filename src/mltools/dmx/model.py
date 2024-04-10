@@ -16,9 +16,9 @@ class DmxModelMixin:
         deque()
     )  # stores (config, rules) to be applied
 
-    def transform(self, config: Optional[Union[dict, str]], *rules):
+    def configure(self, config: Optional[Union[dict, str]], *rules):
         r"""
-        Transform with Dmx-specific numerics/sparsity/logics
+        Configure Dmx-specific numerics/sparsity/logics
 
         NOTE: only staticly declared DmxModule(s) are to be transformed
 
@@ -39,12 +39,14 @@ class DmxModelMixin:
 
                 for n, m in self.named_dmx_modules():
                     if n in config:
-                        m.transform(config[n])
+                        m.configure(config[n])
 
             for _r in rules:
                 _r.apply_to(self)
 
         return self
+
+    transform = configure  # NOTE: to be deprecated
 
     @property
     def op_set(self):
