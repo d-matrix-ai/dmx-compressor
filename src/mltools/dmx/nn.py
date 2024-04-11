@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
+from torch.fx import Graph, GraphModule, symbolic_trace
 import transformers
 
 from mltools.numerical import (
@@ -347,6 +348,19 @@ class ResAdd(DmxModule, torch.nn.Module):
         _input = _input.to(_residual.device)
         _output = _input + _residual
         return _output
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        class Add(torch.nn.Module):
+            def forward(self, x):
+                return torch.add(x[0], x[1])
+
+        initial_dmx = Add()
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return initial_dmx, graph
+
 
 
 class ActActMatMul(DmxModule, torch.nn.Module):
@@ -402,7 +416,6 @@ class Linear(DmxModule, torch.nn.Linear):
                 _output = torch.add(_product, self._bias)
             else:
                 _output = _product
-
         return _output
 
     @staticmethod
@@ -419,6 +432,15 @@ class Linear(DmxModule, torch.nn.Linear):
             )
             initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        initial_dmx = torch.nn.Linear(self.in_features, self.out_features, bias=self.bias != None)
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return initial_dmx, graph
 
 
 class Embedding(DmxModule, torch.nn.Embedding):
@@ -990,6 +1012,14 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         initial_dmx.update_params_with_raw(raw)
         initial_dmx.type(raw.weight.dtype)
         return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        initial_dmx = torch.nn.LayerNorm(self.normalized_shape, eps=self.eps, elementwise_affine=self.elementwise_affine)
+        graph = self.initial_dmx_graph
+        return initial_dmx, graph
 
 
 class _RMSNorm(torch.nn.Module):

@@ -7,47 +7,47 @@ import torch
 from mltools import dmx
 
 dmx_aware_mapping = {
-    "torch.nn.modules.sparse.Embedding": dmx.nn.Embedding,
+    # "torch.nn.modules.sparse.Embedding": dmx.nn.Embedding,
     "torch.nn.modules.linear.Linear": dmx.nn.Linear,
-    "torch.nn.modules.conv.Conv1d": dmx.nn.Conv1d,
-    "torch.nn.modules.conv.Conv2d": dmx.nn.Conv2d,
-    "torch.nn.modules.pooling.AdaptiveAvgPool2d": dmx.nn.AdaptiveAvgPool2d,
-    "torch.nn.modules.pooling.MaxPool2d": dmx.nn.MaxPool2d,
-    "torch.nn.modules.batchnorm.BatchNorm2d": dmx.nn.BatchNorm2d,
-    "torch.nn.modules.normalization.LayerNorm": dmx.nn.LayerNorm,
-    "torch.nn.modules.dropout.Dropout": dmx.nn.Dropout,
-    "torch.nn.modules.activation.Softmax": dmx.nn.Softmax,
-    "torch.nn.modules.activation.ReLU": dmx.nn.ReLU,
-    "torch.nn.modules.activation.ReLU6": dmx.nn.ReLU6,
-    "torch.nn.modules.activation.SiLU": dmx.nn.SiLU,
-    "torch.nn.modules.activation.Tanh": dmx.nn.Tanh,
-    "torch.nn.modules.activation.GELU": dmx.nn.GELU,
-    "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
-    "transformers.activations.NewGELUActivation": dmx.nn.GELU,
-    "transformers.activations.GELUActivation": dmx.nn.GELU,
-    "transformers.activations.FastGELUActivation": dmx.nn.GELU,
-    "transformers.activations.QuickGELUActivation": dmx.nn.GELU,
-    "transformers.activations.ClippedGELUActivation": dmx.nn.GELU,
-    "transformers.models.bloom.modeling_bloom.BloomGelu": dmx.nn.GELU,
-    "transformers.activations.SiLUActivation": dmx.nn.SiLU,
-    "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
-    "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
+    # "torch.nn.modules.conv.Conv1d": dmx.nn.Conv1d,
+    # "torch.nn.modules.conv.Conv2d": dmx.nn.Conv2d,
+    # "torch.nn.modules.pooling.AdaptiveAvgPool2d": dmx.nn.AdaptiveAvgPool2d,
+    # "torch.nn.modules.pooling.MaxPool2d": dmx.nn.MaxPool2d,
+    # "torch.nn.modules.batchnorm.BatchNorm2d": dmx.nn.BatchNorm2d,
+    # "torch.nn.modules.normalization.LayerNorm": dmx.nn.LayerNorm,
+    # "torch.nn.modules.dropout.Dropout": dmx.nn.Dropout,
+    # "torch.nn.modules.activation.Softmax": dmx.nn.Softmax,
+    # "torch.nn.modules.activation.ReLU": dmx.nn.ReLU,
+    # "torch.nn.modules.activation.ReLU6": dmx.nn.ReLU6,
+    # "torch.nn.modules.activation.SiLU": dmx.nn.SiLU,
+    # "torch.nn.modules.activation.Tanh": dmx.nn.Tanh,
+    # "torch.nn.modules.activation.GELU": dmx.nn.GELU,
+    # "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
+    # "transformers.activations.NewGELUActivation": dmx.nn.GELU,
+    # "transformers.activations.GELUActivation": dmx.nn.GELU,
+    # "transformers.activations.FastGELUActivation": dmx.nn.GELU,
+    # "transformers.activations.QuickGELUActivation": dmx.nn.GELU,
+    # "transformers.activations.ClippedGELUActivation": dmx.nn.GELU,
+    # "transformers.models.bloom.modeling_bloom.BloomGelu": dmx.nn.GELU,
+    # "transformers.activations.SiLUActivation": dmx.nn.SiLU,
+    # "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
+    # "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
 }
 
 dmx_aware_functional_mappings = {
-    "torch.nn.functional.relu": dmx.nn.ReLU,
-    "torch.nn.functional.relu6": dmx.nn.ReLU6,
-    "torch.nn.functional.silu": dmx.nn.SiLU,
-    "torch.nn.functional.tanh": dmx.nn.Tanh,
-    "torch.nn.functional.gelu": dmx.nn.GELU,
-    "torch.nn.functional.softmax": dmx.nn.Softmax,
-    "torch.nn.functional.dropout": dmx.nn.Dropout,
-    "torch.matmul": dmx.nn.ActActMatMul,
+    # "torch.nn.functional.relu": dmx.nn.ReLU,
+    # "torch.nn.functional.relu6": dmx.nn.ReLU6,
+    # "torch.nn.functional.silu": dmx.nn.SiLU,
+    # "torch.nn.functional.tanh": dmx.nn.Tanh,
+    # "torch.nn.functional.gelu": dmx.nn.GELU,
+    # "torch.nn.functional.softmax": dmx.nn.Softmax,
+    # "torch.nn.functional.dropout": dmx.nn.Dropout,
+    # "torch.matmul": dmx.nn.ActActMatMul,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)
-dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
+# dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
 
 
 def process_args(args):

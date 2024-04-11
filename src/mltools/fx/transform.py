@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from mltools.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
-from ..fx import QuantTracer, InputOutputTransformer
+from ..fx import QuantTracer, InputOutputTransformer, QdQTransformer
 from mltools.fx import ConfigurationTransformer, DMXAwareTransformer
 from mltools.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
@@ -36,11 +36,32 @@ def substitute_transform(
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
         gm, tracer = symbolic_trace(root, concrete_args)
+
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
+    # Copy over all object attributes (i.e. config files)
     for key, val in root.__dict__.items():
         if key not in transformed.__dict__ and key != "forward":
             transformed.__dict__[key] = val
+    return transformed
+
+def qDq_transform(
+    root: torch.fx.GraphModule,
+):
+    """
+    A function that transforms the model by substituting torch.nn.modules and activation functions to dmx.nn.modules.
+
+    Args:
+        root (torch.nn.Module): model/module to transform
+        concrete_args (Dict[str,Any], optional): concrete arguments to be used for tracer. Defaults to None.
+        hf (bool, optional): True if root is a huggingface model. Defaults to False
+
+    Returns:
+        transformed model
+    """
+    transformer = QdQTransformer(root)
+    transformed = transformer.transform()
+    transformed.recompile()
     return transformed
 
 
@@ -96,7 +117,7 @@ def configure_transform(gm: torch.fx.GraphModule, scopeDict: dict, cfg: str):
         Configure_transform will only change existing ops and will not add any additional ops.
         Hence it is recommened to pass in a cfg file for cast_input_output_transform to make sure all necessary ops are added.
 
-    Args:
+    rgs:
         gm (torch.fx.GraphModule): Graphmodule to apply changes on
         scopeDict (dict): Dictionary that maps node name to scope
         cfg (str): config file for setting the added ops formats.

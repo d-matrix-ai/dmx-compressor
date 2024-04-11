@@ -108,7 +108,7 @@ class CastTo(FakeQuantize):
         return sc.to(x.device), zp.to(x.device)
 
     def forward(self, x):
-        self.physical_dtype = x.dtype
+        # self.physical_dtype = x.dtype
         if self.observer_enabled[0] == 1 and x is not None:
             self._observer_step(x)
         if self.fake_quant_enabled[0] == 1:
@@ -137,8 +137,8 @@ class CastTo(FakeQuantize):
     def extra_repr(self):
         return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}"
 
-
-class Quantize(nn.Module):
+from torch_mlir_e2e_test.annotations import export
+class Quantize(torch.nn.quantized.Quantize):
     r"""Drop-in replacement of torch.nn.quantized.Quantize
     that supports both torch.dtype and numerical.Format
 
@@ -152,40 +152,13 @@ class Quantize(nn.Module):
     """
 
     def __init__(self, scale, zero_point, dtype: Union[torch.dtype, Format]):
-        super().__init__()
-        self.register_buffer("scale", torch.tensor([scale]))
-        self.register_buffer("zero_point", torch.tensor([zero_point]))
-        self.dtype = dtype
+        super().__init__(scale, zero_point, dtype)
 
+    @export
     def forward(self, x):
-        if isinstance(self.dtype, torch.dtype):
-            return torch.quantize_per_tensor(
-                x, float(self.scale), int(self.zero_point), self.dtype
-            )
-        elif isinstance(self.dtype, Format):
-            return CastToFormat.apply(
-                x.div_(self.scale).add_(self.zero_point), self.dtype
-            )
-        else:
-            raise ValueError
+        return torch.ops.dmx.quantize(x)
 
-    @staticmethod
-    def from_float(mod):
-        assert hasattr(mod, "activation_post_process")
-        scale, zero_point = mod.activation_post_process.calculate_qparams()
-        return Quantize(
-            scale.float().item(),
-            zero_point.float().item(),
-            mod.format,
-        )
-
-    def extra_repr(self):
-        return "scale={}, zero_point={}, dtype={}".format(
-            self.scale, self.zero_point, repr(self.dtype)
-        )
-
-
-class DeQuantize(nn.Module):
+class DeQuantize(torch.nn.quantized.DeQuantize):
     r"""Drop-in replacement of torch.nn.quantized.DeQuantize
     that supports both torch.dtype and numerical.Format
 
@@ -200,30 +173,9 @@ class DeQuantize(nn.Module):
 
     def __init__(self, scale=None, zero_point=None, dtype=None):
         super().__init__()
-        if scale is not None:
-            self.register_buffer("scale", torch.tensor([scale]))
-        if zero_point is not None:
-            self.register_buffer("zero_point", torch.tensor([zero_point]))
 
-    def forward(self, xq):
-        if not hasattr(self, "dtype"):
-            return xq.dequantize()
-        elif isinstance(self.dtype, Format):
-            return xq.sub_(self.zero_point).mul_(self.scale)
-        else:
-            raise ValueError
-
-    @staticmethod
-    def from_float(mod):
-        if isinstance(mod.format, torch.dtype):
-            return DeQuantize()
-        elif isinstance(mod.format, Format):
-            return DeQuantize(
-                scale=mod.scale.float().item(),
-                zero_point=mod.zero_point.float().item(),
-                dtype=mod.format,
-            )
-
+    def forward(self, x):
+        return torch.ops.dmx.dequantize(x)
 
 class NumericalCastMixin:
     r"""
