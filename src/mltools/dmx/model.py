@@ -274,7 +274,7 @@ class DmxConfig(dict):
     """
 
     @classmethod
-    def from_model(cls, model: Model, freeze=False):
+    def from_model(cls, model: torch.nn.Module, freeze=False):
         """
         A function that stores state and ops format of the model in a DmxConfig object
 
@@ -466,7 +466,7 @@ class DmxPipelineMixin:
             tr = [] if dmx_transformation_dict is None else dmx_transformation_dict[_n]
             _m.transform(dmx_config_dict[_n], *tr)
 
-    transform = configure
+    transform = configure  # NOTE: to be deprecated
     
     @contextmanager
     def counting_flops(self, zero: bool = True) -> None:
