@@ -180,6 +180,8 @@ class OptimalBrainCompressor:
 
     def measure_hessian(self, inp):
         # TODO: clean up ugliness
+        self._inp = inp
+
         if self.H is None:
             self.H = torch.zeros(1).to(inp.device)
         if len(inp.shape) == 2:
@@ -222,7 +224,7 @@ class OptimalBrainCompressor:
         ncols = W.shape[1]
 
         H = self.H
-        del self.H
+        # del self.H
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
@@ -236,6 +238,9 @@ class OptimalBrainCompressor:
         H = torch.cholesky_inverse(H)
         H = torch.linalg.cholesky(H, upper=True)
         Hinv = H
+
+        if torch.any(torch.isnan(Hinv)).item():
+            breakpoint()
 
         # TODO: allow OBC candidate selection
 
@@ -263,6 +268,9 @@ class OptimalBrainCompressor:
 
         torch.cuda.synchronize()
 
+        if torch.any(torch.isnan(Q)).item():
+            breakpoint()
+            
         self.module.weight.data = Q.reshape(self.module.weight.shape).to(
             self.module.weight.data.dtype
         )

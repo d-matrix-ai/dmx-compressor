@@ -12,13 +12,13 @@ from mltools.fx.transformer import get_op_set_from
 
 
 class DmxModelMixin:
-    _dmx_transformations_to_be_applied: deque = (
+    _dmx_configurations_to_be_applied: deque = (
         deque()
     )  # stores (config, rules) to be applied
 
-    def transform(self, config: Optional[Union[dict, str]], *rules):
+    def configure(self, config: Optional[Union[dict, str]], *rules):
         r"""
-        Transform with Dmx-specific numerics/sparsity/logics
+        Configure Dmx-specific numerics/sparsity/logics
 
         NOTE: only staticly declared DmxModule(s) are to be transformed
 
@@ -31,7 +31,7 @@ class DmxModelMixin:
 
         """
         if not self.transformed:
-            self._dmx_transformations_to_be_applied.append((config, rules))
+            self._dmx_configurations_to_be_applied.append((config, rules))
         else:
             if config is not None:
                 if isinstance(config, str):
@@ -39,12 +39,14 @@ class DmxModelMixin:
 
                 for n, m in self.named_dmx_modules():
                     if n in config:
-                        m.transform(config[n])
+                        m.configure(config[n])
 
             for _r in rules:
                 _r.apply_to(self)
 
         return self
+
+    transform = configure  # NOTE: to be deprecated
 
     @property
     def op_set(self):
@@ -81,7 +83,7 @@ class DmxModelMixin:
         Args:
             config_file (Optional[str]): Path of config file to transform the model from. Defaults to "./config.yaml".
         """
-        self.transform(config_file)
+        self.configure(config_file)
 
     def print_model_tree(self, include_type=False):
         """
@@ -117,7 +119,7 @@ class DmxModelMixin:
     def keep_dmx_config(self):
         _dmx_config = self.dmx_config
         yield self
-        self.transform(_dmx_config)
+        self.configure(_dmx_config)
 
     @contextmanager
     def counting_flops(self, zero: bool = True):
@@ -299,9 +301,9 @@ class DmxModel(torch.nn.Module):
             )
             _model.transformed = True
             _model.baseline_config = _model.dmx_config  # BASELINE config recorded
-            while len(_model._dmx_transformations_to_be_applied) != 0:
-                _config, _rules = _model._dmx_transformations_to_be_applied.popleft()
-                _model.transform(_config, *_rules)
+            while len(_model._dmx_configurations_to_be_applied) != 0:
+                _config, _rules = _model._dmx_configurations_to_be_applied.popleft()
+                _model.configure(_config, *_rules)
 
     @classmethod
     def from_torch(
@@ -437,7 +439,7 @@ class DmxConfigRule(SimpleNamespace):
         if isinstance(model_or_config, torch.nn.Module):
             for n, m in model_or_config.named_dmx_modules():
                 if n in target_module_names and type(m) in self.module_types:
-                    m.transform(self.module_config)
+                    m.configure(self.module_config)
         else:
             config = model_or_config
             for n in (

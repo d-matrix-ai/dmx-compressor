@@ -71,7 +71,7 @@ class DmxModule(
         if state_dict_url is not None:
             self.load_state_dict_and_register_url(state_dict_url)
 
-    def transform(self, config) -> None:
+    def configure(self, config) -> None:
         """
         A function that changes the format of the ops and loading state dicts according to the config file.
 
@@ -109,6 +109,8 @@ class DmxModule(
             and config["state_dict_url"] != self.state_dict_url
         ):
             self.load_state_dict_and_register_url(config["state_dict_url"])
+
+    transform = configure  # NOTE: to be deprecated
 
     def load_state_dict_and_register_url(self, url: str) -> None:
         """

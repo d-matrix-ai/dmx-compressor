@@ -22,12 +22,12 @@ def dmx_transform(pipe, dmx_config_name):
     config_file = get_config_file(pipe.model_name, pipe.revision, dmx_config_name)
     if config_file is not None:
         config = DmxConfig.from_yaml(config_file)
-        pipe.model.transform(config["model"])
+        pipe.model.configure(config["model"])
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
             from . import config_rules
             # NOTE: assuming pipe.model is in BASELINE mode
-            pipe.model.transform(None, *eval(f"config_rules.{dmx_config_name}"))
+            pipe.model.configure(None, *eval(f"config_rules.{dmx_config_name}"))
         else:
             raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
 
