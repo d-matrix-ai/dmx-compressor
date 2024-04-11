@@ -208,70 +208,6 @@ class DmxModelMixin:
         )
 
 
-class Model(torch.nn.Module, DmxModelMixin):
-    r"""
-    [TO BE DEPRECATED] this is here only to be backward-compatible
-    Container for a DNN model to be deployed
-    - body to be mapped on device
-    - head and tail to be executed on host, corresponding to pre- and post-processing
-    - equipped with dmx-aware transformation
-    Inherited from torch.nn.Module.
-
-    Args:
-        body (Any): the main module of the model.
-        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
-        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
-        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
-
-    Attributes:
-        body: the main module of the model.
-        head: preprocessing module before main module.
-        tail: postprocessing module after main module.
-
-    """
-
-    def __init__(
-        self,
-        body,
-        head=torch.nn.Identity(),
-        tail=torch.nn.Identity(),
-        hf: bool = False,
-        concrete_args: Optional[Dict[str, Any]] = None,
-        **kwargs,
-    ) -> None:
-        super().__init__()
-        self.body = DmxModel.from_torch(body, concrete_args=concrete_args)
-        self.head = head
-        self.tail = tail
-
-    def forward(self, input):
-        r"""Runs a forward pass of the model on input and returns the output
-
-        Args:
-            input: A tensor or iterable that will be passed to the model
-
-        Returns:
-            output of a forward pass
-
-        """
-        output = self.head(input)
-        if isinstance(output, torch.Tensor):
-            output = (output,)
-        output = [out for out in output if out is not None]
-        output = self.body(*output)
-        output = self.tail(output)
-        return output
-
-    @property
-    def op_set(self):
-        r"Returns a set of unique ops present in the model"
-        return get_op_set_from(self.body._gm)
-    
-    @property
-    def transformed(self) -> bool:
-        return self.body.transformed
-
-
 class DmxModel(torch.nn.Module):
     @staticmethod
     def _jit_substitute_transform(_model, args, kwargs):
@@ -456,3 +392,124 @@ class DmxConfigRule(SimpleNamespace):
 
 # alias for backward compatibility, to be deprecated
 DmxTransformation = DmxConfigRule
+
+
+class Model(torch.nn.Module, DmxModelMixin):
+    r"""
+    [TO BE DEPRECATED] this is here only to be backward-compatible
+    Container for a DNN model to be deployed
+    - body to be mapped on device
+    - head and tail to be executed on host, corresponding to pre- and post-processing
+    - equipped with dmx-aware transformation
+    Inherited from torch.nn.Module.
+
+    Args:
+        body (Any): the main module of the model.
+        head (Optional[Any]): preprocessing module before main module. Defaults to torch.nn.Identity.
+        tail (Optional[Any]): postprocessing module after main module. Defaults to torch.nn.Identity.
+        hf (Optional[bool]): If true, body would be treated as a huggingface model for fx transformation.
+
+    Attributes:
+        body: the main module of the model.
+        head: preprocessing module before main module.
+        tail: postprocessing module after main module.
+
+    """
+
+    def __init__(
+        self,
+        body,
+        head=torch.nn.Identity(),
+        tail=torch.nn.Identity(),
+        hf: bool = False,
+        concrete_args: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+        self.body = DmxModel.from_torch(body, concrete_args=concrete_args)
+        self.head = head
+        self.tail = tail
+
+    def forward(self, input):
+        r"""Runs a forward pass of the model on input and returns the output
+
+        Args:
+            input: A tensor or iterable that will be passed to the model
+
+        Returns:
+            output of a forward pass
+
+        """
+        output = self.head(input)
+        if isinstance(output, torch.Tensor):
+            output = (output,)
+        output = [out for out in output if out is not None]
+        output = self.body(*output)
+        output = self.tail(output)
+        return output
+
+    @property
+    def op_set(self):
+        r"Returns a set of unique ops present in the model"
+        return get_op_set_from(self.body._gm)
+
+
+class DmxPipelineMixin:
+    def configure(
+        self,
+        dmx_config_dict: Dict[str, Optional[dmx.DmxConfig]],
+        dmx_transformation_dict: Optional[
+            Dict[str, Optional[dmx.DmxConfigRule]]
+        ] = None,
+    ) -> None:
+        for _n, _m in self.named_dmx_models():
+            tr = [] if dmx_transformation_dict is None else dmx_transformation_dict[_n]
+            _m.transform(dmx_config_dict[_n], *tr)
+
+    transform = configure
+    
+    @contextmanager
+    def counting_flops(self, zero: bool = True) -> None:
+        with ExitStack() as stack:
+            yield [
+                stack.enter_context(_m.counting_flops(zero))
+                for _, _m in self.named_dmx_models()
+            ]
+
+    def eval(self):
+        for _m in self.model_dict.values():
+            _m.eval()
+
+    @property
+    def dmx_config_dict(self) -> Dict[str, dmx.DmxConfig]:
+        return {n: m.dmx_config for n, m in self.named_dmx_models()}
+
+    def named_dmx_modules(self):
+        return (
+            (f"{_model_name}.{_module_name}", _module)
+            for _model_name, _model in self.named_dmx_models()
+            for _module_name, _module in _model.named_dmx_modules()
+        )
+
+    def get_model_by_name(self, model_name: str) -> torch.nn.Module:
+        return self.model_dict[model_name]
+
+
+class DmxSimplePipeline(DmxPipelineMixin):
+    def __init__(self, model_dict: OrderedDict) -> None:
+        self.model_dict = model_dict
+
+    def __call__(self, *args, **kwargs):
+        return torch.nn.Sequential(*[m for m in self.model_dict.values()])(
+            *args, **kwargs
+        )
+
+    def named_dmx_models(self):
+        r"Returns a generator of named DmxModel instances"
+        return ((n, m) for n, m in self.model_dict.items() if isinstance(m, dmx.Model))
+
+    def to(self, torch_device: Optional[Union[str, torch.device]] = None):
+        if torch_device is not None:
+            for _n, _m in self.named_dmx_models():
+                _m.to(torch_device)
+        return self
