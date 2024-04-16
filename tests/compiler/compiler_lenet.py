@@ -70,21 +70,24 @@ def map_gs_to_module(gs: ExportGraphSignature):
 
 
 
-def test_lenet_512():
+def get_workload_graphmodule(wl):
+    W = wl()
+    x = W.create_batch(1)
+    W.model(x)
+    m = W.model.body._gm
+    return m, x
+
+
+def test_distilgpt2():
     """
     Example:
-        >>> result = test_lenet_512(); print(result.graph.print_tabular())
+        >>> result = test_distilgpt2(); print(result.graph.print_tabular())
     """
 
     from mlreferences import distilgpt2 as wl
 
-    W = wl()
-    input_ = W.create_batch(1)
-    W.model(input_)
-    x = input_
-    m = W.model.body._gm
+    m, x = get_workload_graphmodule(wl)
     qdqm = qDq_transform(m)
-    import ipdb; ipdb.set_trace()
     prog = torch.export.export(qdqm, (x["input_ids"],))
 
     return(prog)
