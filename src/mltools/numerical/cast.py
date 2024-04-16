@@ -137,7 +137,6 @@ class CastTo(FakeQuantize):
     def extra_repr(self):
         return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}"
 
-from torch_mlir_e2e_test.annotations import export
 class Quantize(torch.nn.quantized.Quantize):
     r"""Drop-in replacement of torch.nn.quantized.Quantize
     that supports both torch.dtype and numerical.Format
@@ -154,7 +153,6 @@ class Quantize(torch.nn.quantized.Quantize):
     def __init__(self, scale, zero_point, dtype: Union[torch.dtype, Format]):
         super().__init__(scale, zero_point, dtype)
 
-    @export
     def forward(self, x):
         return torch.ops.dmx.quantize(x)
 
