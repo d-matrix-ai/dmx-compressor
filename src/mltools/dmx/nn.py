@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from functools import reduce
 from typing import Union, List, Tuple, Optional
 from collections import OrderedDict
@@ -8,6 +9,7 @@ from torch import Tensor, Size
 import torch.nn.functional as F
 from torch.fx import Graph, GraphModule, symbolic_trace
 import transformers
+from torch import export
 
 from mltools.numerical import (
     Format,
@@ -201,6 +203,21 @@ class DmxModule(
         return self.weight_hypernet(self.weight)
 
     @property
+    def weight_scale(self):
+        """
+        Returns the quantization scale of the weight matrix
+        """
+        return self.weight_cast.scale.to(self.weight.device)
+
+    @property
+    def weight_zero_point(self):
+        """
+        Returns the quantization zero_point of the weight matrix
+        """
+        return self.weight_cast.zero_point.to(self.weight.device)
+
+
+    @property
     def _bias(self):
         """
         Returns the quantized bias of the module
@@ -258,6 +275,13 @@ class DmxModule(
         self.training = raw.training
         if hasattr(raw, "dtype"):
             self.dtype = raw.dtype
+
+    @abstractmethod
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        pass
 
 
 class DmxModuleConfig(dict):
@@ -352,9 +376,23 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        pass
+        dmx_graph = torch.fx.Graph()
+        with dmx_graph.inserting_after():
+            _input = dmx_graph.placeholder('_input')
+            _residual = dmx_graph.placeholder('_residual')
+            resadd = dmx_graph.create_node('call_function', torch.add, (_input, _residual), name="resadd")
+            dmx_graph.output(resadd)
+        graph = dmx_graph
+        return graph
 
 
+class InitMatMul(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
+        _output = torch.matmul(_input, multiplier)
+        return _output
 
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
@@ -365,6 +403,53 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         _multiplier = self.multiplier_cast(multiplier)
         _output = torch.matmul(_input, _multiplier)
         return _output
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_cast.scale")
+            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+            multiplier = g.placeholder("multiplier")
+            multiplier_scale = g.get_attr("multiplier_cast.scale")
+            multiplier_zero_point = g.get_attr("multiplier_cast.zero_point")
+            multiplier_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    multiplier,
+                    multiplier_scale,
+                    multiplier_zero_point,
+                    repr(self.multiplier_cast.format),
+                ),
+            )
+            multiplier_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (multiplier_q, multiplier_scale, multiplier_zero_point),
+            )
+            _output = g.create_node(
+                "call_function", torch.matmul, (_input_dq, multiplier_dq), name="output"
+            )
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_output, _output_scale, _output_zero_point, repr(self.output_cast.format)),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_output_dq)
+        return g
 
 
 class Linear(DmxModule, torch.nn.Linear):
@@ -429,8 +514,94 @@ class Linear(DmxModule, torch.nn.Linear):
     def to_compiler_graph(self) -> Graph:
         """
         Returns a compiler friendly graph
+
+        >>> Reference:
+
+        opcode         name                   target                      args                                                       kwargs
+        -------------  ---------------------  --------------------------  ---------------------------------------------------------  --------
+        placeholder    _input                 _input                      ()                                                         {}
+        get_attr       input_cast_scale       input_cast.scale            ()                                                         {}
+        get_attr       input_cast_zero_point  input_cast.zero_point       ()                                                         {}
+        call_function  quantize               dmx.quantize                (_input, input_cast_scale, input_cast_zero_point, 'SAME')  {}
+        call_function  dequantize             dmx.dequantize              (quantize,)                                                {}
+        get_attr       _weight                _weight                     ()                                                         {}
+        get_attr       weight_scale           weight_scale                ()                                                         {}
+        get_attr       weight_zero_point      weight_zero_point           ()                                                         {}
+        call_function  quantize_1             dmx.quantize                (_weight, weight_scale, weight_zero_point, 'SAME')         {}
+        call_function  dequantize_1           dmx.dequantize              (quantize_1,)                                              {}
+        get_attr       _bias                  _bias                       ()                                                         {}
+        get_attr       bias_cast_scale        bias_cast.scale             ()                                                         {}
+        get_attr       bias_cast_zero_point   bias_cast.zero_point        ()                                                         {}
+        call_function  quantize_2             dmx.quantize                (_bias, bias_cast_scale, bias_cast_zero_point, 'SAME')     {}
+        call_function  dequantize_2           dmx.dequantize              (quantize_2,)                                              {}
+        call_function  _output                <built-in function linear>  (dequantize, dequantize_1, dequantize_2)                   {}
+        output         output                 output                      (_output,)                                                 {}
+
         """
-        pass
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            # PLACEHOLDERS
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_cast.scale")
+            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+            )
+            _input_dq = g.call_function(torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point))
+
+            # ATTRIBUTES
+
+            # _weight
+            _weight = g.get_attr("_weight")
+            _weight_scale = g.get_attr("weight_scale")
+            _weight_zero_point = g.get_attr("weight_zero_point")
+            _weight_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)),
+            )
+            _weight_dq = g.call_function(torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point))
+
+            # _bias
+            if self.bias is not None:
+                _bias = g.get_attr("_bias")
+                _bias_scale = g.get_attr("bias_cast.scale")
+                _bias_zero_point = g.get_attr("bias_cast.zero_point")
+                _bias_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
+                )
+                _bias_dq = g.call_function(torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point))
+                _output = g.create_node(
+                    "call_function",
+                    torch.nn.functional.linear,
+                    (_input_dq, _weight_dq, _bias_dq),
+                    name="_output",
+                )
+                _output_scale = g.get_attr("output_cast.scale")
+                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                )
+                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                g.output(_output_dq)
+            else:
+                _output = g.create_node(
+                    "call_function",
+                    torch.nn.functional.linear,
+                    (_input_dq, _weight_dq, None),
+                    name="_output",
+                )
+                _output_scale = g.get_attr("output_cast.scale")
+                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                )
+                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                g.output(_output_dq)
+        return g
 
 
 class Embedding(DmxModule, torch.nn.Embedding):
@@ -483,6 +654,41 @@ class Embedding(DmxModule, torch.nn.Embedding):
         )
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        # dmx_graph = torch.fx.Graph()
+        # with dmx_graph.inserting_after():
+        #     # PLACEHOLDERS
+        #     _input = dmx_graph.placeholder('_input')
+        #     _input_scale = dmx_graph.get_attr('input_cast.scale')
+        #     _input_zero_point = dmx_graph.get_attr('input_cast.zero_point')
+        #     _input_q = dmx_graph.call_function(torch.ops.dmx.quantize, (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)))
+        #     _input_dq = dmx_graph.call_function(torch.ops.dmx.dequantize, (_input_q,))
+
+        #     # ATTRIBUTES
+
+        #     # _weight
+        #     _weight = dmx_graph.get_attr('_weight')
+        #     _weight_scale = dmx_graph.get_attr('weight_scale')
+        #     _weight_zero_point = dmx_graph.get_attr('weight_zero_point')
+        #     _weight_q = dmx_graph.call_function(torch.ops.dmx.quantize, (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)))
+        #     _weight_dq = dmx_graph.call_function(torch.ops.dmx.dequantize, (_weight_q,))
+
+        initial_dmx = torch.nn.Embedding(
+            num_embeddings=self.num_embeddings,
+            embedding_dim=self.embedding_dim,
+            padding_idx=self.padding_idx,
+            max_norm=self.max_norm,
+            norm_type=self.norm_type,
+            scale_grad_by_freq=self.scale_grad_by_freq,
+            sparse=self.sparse,
+        )
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return graph
 
 
 class Conv1d(DmxModule, torch.nn.Conv1d):
@@ -949,6 +1155,17 @@ class Softmax(DmxModule, torch.nn.Softmax):
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        dmx_graph = torch.fx.Graph()
+        with dmx_graph.inserting_after():
+            _input = dmx_graph.placeholder('_input')
+            softmax = dmx_graph.create_node('call_function', torch.nn.functional.softmax, (_input,), name="softmax")
+            dmx_graph.output(softmax)
+        graph = dmx_graph
+        return graph
 
 class LayerNorm(DmxModule, torch.nn.LayerNorm):
     r"""
@@ -1007,8 +1224,18 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         """
         Returns a compiler friendly graph
         """
-        pass
-
+        dmx_graph = torch.fx.Graph()
+        with dmx_graph.inserting_after():
+            _input = dmx_graph.placeholder('_input')
+            normalized_shape = dmx_graph.get_attr('normalized_shape')
+            _weight = dmx_graph.get_attr('_weight')
+            _bias = dmx_graph.get_attr('_bias')
+            eps = dmx_graph.get_attr('eps')
+            ln_args = ((_input), normalized_shape, _weight, _bias, eps)
+            ln = dmx_graph.create_node('call_function', torch.nn.functional.layer_norm, ln_args, name="ln")
+            dmx_graph.output(ln)
+        graph = dmx_graph
+        return graph
 
 class _RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -1241,6 +1468,14 @@ class Dropout(DmxModule, torch.nn.Dropout):
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        initial_dmx = torch.nn.Dropout(p=self.p, inplace=self.inplace)
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return graph
 
 class ReLU(DmxModule, torch.nn.ReLU):
     r"""
@@ -1409,3 +1644,12 @@ class GELU(DmxModule, torch.nn.GELU):
         initial_dmx = GELU()
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        initial_dmx = torch.nn.GELU()
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return graph

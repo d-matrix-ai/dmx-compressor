@@ -13,25 +13,26 @@ from torch.library import Library, impl
 dmx = torch.library.Library("dmx", "DEF")
 
 # Quantize
-dmx.define("quantize(Tensor t) -> Tensor")
+dmx.define("quantize(Tensor t, Tensor scale, Tensor zero_point, str format) -> Tensor")
 
 @impl(dmx, "quantize", "CompositeExplicitAutograd")
-def quantize(t: torch.Tensor):
+def quantize(t: torch.Tensor, scale: torch.Tensor, zero_point: torch.Tensor, format: str):
     return t
 
 @impl(dmx, "quantize", "Meta")
-def quantize_meta(t: torch.Tensor):
+def quantize_meta(t: torch.Tensor, scale: torch.Tensor, zero_point: torch.Tensor, format: str):
+    # Set dtype for metadata to correspond to the format
     return torch.empty_like(t)
 
 # Dequantize
-dmx.define("dequantize(Tensor t) -> Tensor")
+dmx.define("dequantize(Tensor t, Tensor scale, Tensor zero_point) -> Tensor")
 
 @impl(dmx, "dequantize", "CompositeExplicitAutograd")
-def dequantize(t: torch.Tensor):
+def dequantize(t: torch.Tensor, scale: torch.Tensor, zero_point: torch.Tensor):
     return t
 
 @impl(dmx, "dequantize", "Meta")
-def dequantize_meta(t: torch.Tensor):
+def dequantize_meta(t: torch.Tensor,scale: torch.Tensor, zero_point: torch.Tensor):
     return torch.empty_like(t)
 
 # Custom_Relu

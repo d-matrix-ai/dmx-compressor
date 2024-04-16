@@ -9,9 +9,13 @@ from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
 from torch.fx import Graph, Proxy
 import torch.fx.traceback as fx_traceback
 
+import itertools
+
 from mltools import dmx
 from mltools.fx.transformer.utils import process_args
 from mltools.numerical import Quantize, DeQuantize
+
+from .utils import dmx_aware_mapping, dmx_aware_functional_mappings
 
 
 class QdQTransformer(fx.Transformer):
@@ -23,7 +27,7 @@ class QdQTransformer(fx.Transformer):
         self.module.recompile()
 
     @staticmethod
-    def my_graph_copy(
+    def substitute_compiler_graph(
         og: "Graph",
         g: "Graph",
         val_map: Dict[Node, Node],
@@ -37,6 +41,7 @@ class QdQTransformer(fx.Transformer):
             node: Node,
             curmod: torch.nn.Module,
             rootmod: torch.nn.Module,
+            target_prefix: str,
             arg_transform: Callable[[Node], "Argument"] = lambda x: x,
         ) -> Node:
             """ """
@@ -45,47 +50,20 @@ class QdQTransformer(fx.Transformer):
             assert isinstance(args, tuple)
             assert isinstance(kwargs, dict)
 
-            if node.op == "get_attr" or node.op == "call_function":
-                if node.op == "get_attr":
-                    curnode_target = target_prefix + "." + node.target
-                    curnode_target_q = curnode_target + "_q"
-                    curnode_target_dq = curnode_target + "_dq"
-                elif node.op == "call_function":
-                    curnode_target = node.target
-                    curnode_target_q = target_prefix + ".linear_q"
-                    curnode_target_dq = target_prefix + ".linear_dq"
-
-                # TODO plumb in the original scale, zero_point, dtype
-                quantize = Quantize(1, 0, torch.float16)
-                rootmod.add_submodule(curnode_target_q, quantize)
-
-                dequantize = DeQuantize(1, 0, torch.float16)
-                rootmod.add_submodule(curnode_target_dq, dequantize)
-
-                result_node = g.create_node(
-                    node.op,
-                    curnode_target,
-                    args,
-                    kwargs,
-                    node.name,
-                    node.type,
-                )
-
-                result_node = g.create_node(
-                    'call_module',
-                    curnode_target_q,
-                    (result_node,),
-                )
-
-                result_node = g.create_node(
-                    'call_module',
-                    curnode_target_dq,
-                    (result_node,),
-                )
+            if node.op == "get_attr":
+                # Fixup the target by adding in the module prefix
+                curnode_target = target_prefix + "." + node.target
             else:
-                result_node = g.create_node(
-                    node.op, node.target, args, kwargs, node.name, node.type
-                )
+                curnode_target = node.target
+
+            result_node = g.create_node(
+                node.op,
+                curnode_target,
+                args,
+                kwargs,
+                node.name,
+                node.type,
+            )
             result_node.meta = copy.copy(node.meta)
             return result_node
 
@@ -95,56 +73,39 @@ class QdQTransformer(fx.Transformer):
             if node.op == "output":
                 rv = map_arg(node.args[0], lambda n: val_map[n])
                 return rv if not return_output_node else (rv, node)
-            val_map[node] = my_node_copy(og, node, curmod, rootmod, lambda n: val_map[n])
+            val_map[node] = my_node_copy(og, node, curmod, rootmod, target_prefix, lambda n: val_map[n])
         return None
 
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
-
-        # TODO Move this to a better location
-        def lift_node(p):
-            if not isinstance(p, Proxy):
-                return p
-            else:
-                return lift_node(p.node)
-
+        """ Check if the current module that 'target' points to is in the dmx_aware_mapping
+            and substitutes in the fxir subgraph
+        """
         assert isinstance(target, str)
-
         submod = self.fetch_attr(target)
         curr_mod = submod
 
-        if isinstance(curr_mod, dmx.nn.Linear):
-            new_submod, subgraph = curr_mod.to_compiler_graph()
-            input_node = list(subgraph.nodes)[0]
-            val_map = {
-                input_node: process_args(args)[0],
-            }
-            curr_node = self.my_graph_copy(
+        dmx_module_targets = itertools.chain(dmx_aware_mapping.values(),
+                                             dmx_aware_functional_mappings.values())
+        if any(map(lambda m: isinstance(curr_mod, m), dmx_module_targets)):
+            inv_dmx_aware_mapping = {str(v): k for k, v in dmx_aware_mapping.items()}
+            subgraph = curr_mod.to_compiler_graph()
+            processed_args = process_args(args)
+            subgraph_input_nodes = filter(lambda n: n.op == "placeholder", list(subgraph.nodes))
+            val_map = {n: processed_args[i] for i, n in enumerate(subgraph_input_nodes)}
+            print(val_map)
+            curr_node = self.substitute_compiler_graph(
                 self.new_graph, subgraph, val_map, target, curr_mod, self.module, False
             )
+            if isinstance(curr_node, torch.fx.node.Node):
+                curr_node = Proxy(curr_node)
             return curr_node
-
-        # elif isinstance(curr_mod, dmx.nn.ResAdd):
-        #     new_submod, subgraph = curr_mod.to_compiler_graph()
-        #     input_node = list(subgraph.nodes)[0]
-        #     val_map = {
-        #         input_node: process_args(args)[0],
-        #     }
-        #     curr_node = self.my_graph_copy(
-        #         self.new_graph, subgraph, val_map, target, curr_mod, self.module, False
-        #     )
-        #     import ipdb; ipdb.set_trace()
-        #     return curr_node
         else:
             curr_node = self.tracer.call_module(submod, submod.forward, args, kwargs)
             return curr_node
 
     def transform(self) -> fx.GraphModule:
-        """
-        Transform ``self.module`` and return the transformed
-        ``GraphModule``.
-        """
         with fx_traceback.preserve_node_meta():
             result = super().run(enable_io_processing=False)
         if result is not None:
