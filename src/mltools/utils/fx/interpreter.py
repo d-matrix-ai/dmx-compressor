@@ -298,7 +298,7 @@ class MetadataInterpreter(fx.Interpreter):
                 setattr(self.nodes[-1], "approximator", approx_func)
                 if not isinstance(approx_func, NoApproximation):
                     print_out += "\n" + f"approximator: {repr(approx_func)}"
-            self.nodes[-1].args[-1] += print_out
+        self.nodes[-1].args[-1] += print_out
         self.add_edges(call_module_node)
         return super().call_module(target, args, kwargs)
 

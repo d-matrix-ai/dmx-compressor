@@ -117,7 +117,7 @@ def configure_transform(gm: torch.fx.GraphModule, scopeDict: dict, cfg: str):
         Configure_transform will only change existing ops and will not add any additional ops.
         Hence it is recommened to pass in a cfg file for cast_input_output_transform to make sure all necessary ops are added.
 
-    rgs:
+    Args:
         gm (torch.fx.GraphModule): Graphmodule to apply changes on
         scopeDict (dict): Dictionary that maps node name to scope
         cfg (str): config file for setting the added ops formats.

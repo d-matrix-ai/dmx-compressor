@@ -108,7 +108,7 @@ class CastTo(FakeQuantize):
         return sc.to(x.device), zp.to(x.device)
 
     def forward(self, x):
-        # self.physical_dtype = x.dtype
+        self.physical_dtype = x.dtype
         if self.observer_enabled[0] == 1 and x is not None:
             self._observer_step(x)
         if self.fake_quant_enabled[0] == 1:
