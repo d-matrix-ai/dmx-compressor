@@ -352,14 +352,7 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        class Add(torch.nn.Module):
-            def forward(self, x):
-                return torch.add(x[0], x[1])
-
-        initial_dmx = Add()
-        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
-        graph = self.initial_dmx_graph
-        return initial_dmx, graph
+        pass
 
 
 
@@ -437,10 +430,7 @@ class Linear(DmxModule, torch.nn.Linear):
         """
         Returns a compiler friendly graph
         """
-        initial_dmx = torch.nn.Linear(self.in_features, self.out_features, bias=self.bias != None)
-        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
-        graph = self.initial_dmx_graph
-        return initial_dmx, graph
+        pass
 
 
 class Embedding(DmxModule, torch.nn.Embedding):
@@ -1017,9 +1007,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         """
         Returns a compiler friendly graph
         """
-        initial_dmx = torch.nn.LayerNorm(self.normalized_shape, eps=self.eps, elementwise_affine=self.elementwise_affine)
-        graph = self.initial_dmx_graph
-        return initial_dmx, graph
+        pass
 
 
 class _RMSNorm(torch.nn.Module):
