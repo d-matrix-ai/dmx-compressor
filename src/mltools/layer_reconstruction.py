@@ -142,7 +142,12 @@ class LayerReconstructionMixin:
         ):
             if state:
                 self.obc = OptimalBrainCompressor(self)
+                #TODO: Weight Sparsifier should be handled. 
+                self.input_cast.disable_fake_quant()
+                self.weight_cast.disable_fake_quant()
             else:
+                self.input_cast.enable_fake_quant()
+                self.weight_cast.enable_fake_quant()
                 self.obc.apply(**hyperparams)
                 self.obc = None
 
