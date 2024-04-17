@@ -72,6 +72,7 @@ class Dense(Sparseness):
 
     def __init__(self, mask_gradient=False):
         super().__init__(mask_gradient)
+        self.mask_gradient = mask_gradient
         self.density = 1.0
 
     def get_mask(self, score):
@@ -86,6 +87,9 @@ class Dense(Sparseness):
 
     def __repr__(self) -> str:
         return "DENSE"
+
+    def __reduce__(self):
+        return (self.__class__, (self.mask_gradient,))
 
 
 class TopK(Sparseness):
