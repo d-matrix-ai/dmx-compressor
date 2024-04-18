@@ -12,6 +12,7 @@ from mltools.fx.transformer import get_op_set_from
 
 
 class DmxModelMixin:
+    transformed: bool= False
     _dmx_configurations_to_be_applied: deque = (
         deque()
     )  # stores (config, rules) to be applied
@@ -62,7 +63,7 @@ class DmxModelMixin:
     def dmx_module_names(self):
         r""" "Returns a list of module names listed in a dmx_config"""
         return self.dmx_config.module_names
-
+    
     def named_dmx_modules(self):
         r""" "Returns a list of named modules that are dmx configurable"""
         return ((n, m) for n, m in self.named_modules() if is_configurable(m))
@@ -265,6 +266,10 @@ class Model(torch.nn.Module, DmxModelMixin):
     def op_set(self):
         r"Returns a set of unique ops present in the model"
         return get_op_set_from(self.body._gm)
+    
+    @property
+    def transformed(self) -> bool:
+        return self.body.transformed
 
 
 class DmxModel(torch.nn.Module):
