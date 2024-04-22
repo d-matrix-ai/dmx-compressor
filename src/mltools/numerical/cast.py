@@ -85,7 +85,7 @@ class CastTo(FakeQuantize):
         Helper method for stepping observer in forward(),
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
-        self.activation_post_process(x.detach())
+        self.activation_post_process(x.detach().float())
         _scale, _zero_point = self.calculate_qparams()
         _scale, _zero_point = _scale.to(self.scale.device), _zero_point.to(
             self.zero_point.device
