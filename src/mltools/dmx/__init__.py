@@ -3,7 +3,7 @@ from . import nn
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction
-from .model import Model, DmxModel, DmxConfig, DmxConfigRule
+from .model import DmxModel, DmxConfig, DmxConfigRule, DmxPipelineMixin, DmxSimplePipeline, Model
 from .hf import pipeline, dmx_transform
 from .nn import *
 
