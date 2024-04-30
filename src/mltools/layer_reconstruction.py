@@ -82,7 +82,7 @@ class LayerReconstructionMixin:
             self.weight_cast.activation_post_process = observer_cls(
                 dtype=self.weight_cast.format,
                 qscheme=self.weight_cast.qscheme,
-                ch_axis=self.weight_cast.ch_axis,
+                ch_axis=self.wout_ch_axis,
             ).to(self.weight.device)
         else:
             warnings.warn(

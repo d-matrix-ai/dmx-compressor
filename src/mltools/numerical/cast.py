@@ -194,21 +194,24 @@ class NumericalCastMixin:
             (nn.Linear,),
         ):
             self.ch_axis = -1
-            self.w_ch_axis = -1
+            self.win_ch_axis = -1
+            self.wout_ch_axis = 0
         elif isinstance(
             self,
             (transformers.pytorch_utils.Conv1D,),
         ):
             self.ch_axis = -1
-            self.w_ch_axis = 0
+            self.win_ch_axis = 0
+            self.wout_ch_axis = -1
         elif isinstance(
             self,
             (nn.modules.conv._ConvNd,),
         ):
             self.ch_axis = 1
-            self.w_ch_axis = 1
+            self.win_ch_axis = 1
+            self.wout_ch_axis = 2
         else:
-            self.ch_axis = self.w_ch_axis = None
+            self.ch_axis = self.win_ch_axis = self.wout_ch_axis = None
 
     def init_casts(self) -> None:
         # dynamic i/o casts
@@ -230,7 +233,7 @@ class NumericalCastMixin:
         # static parameter casts
         pnames = [n for n, _ in self.named_parameters()]
         self.weight_cast = (
-            CastTo(ch_axis=self.w_ch_axis) if "weight" in pnames else None
+            CastTo(ch_axis=self.wout_ch_axis) if "weight" in pnames else None
         )
         self.bias_cast = CastTo() if "bias" in pnames else None
         self.residual_cast = None
@@ -244,9 +247,9 @@ class NumericalCastMixin:
     ) -> None:
         self.smoothquant = (
             ActivationWeightSmoothQuant(
-                self.ch_axis, self.w_ch_axis, migration_strength, scale_format, dynamic
+                self.ch_axis, self.win_ch_axis, migration_strength, scale_format, dynamic
             )
-            if self.ch_axis is not None and self.w_ch_axis is not None
+            if self.ch_axis is not None and self.win_ch_axis is not None
             else None
         )
 
@@ -256,11 +259,11 @@ class NumericalCastMixin:
 
     def check_weight_format_dim_consistency(self) -> bool:
         _good = self.weight_cast is None or self._check_format_dim_consistency(
-            self.weight_cast.format, self.w_ch_axis
+            self.weight_cast.format, self.win_ch_axis
         )
         if not _good:
             warnings.warn(
-                f"layer's weight channel axis {self.w_ch_axis} might be inconsistent with format {self.weight_format}",
+                f"layer's weight input channel axis {self.win_ch_axis} might be inconsistent with format {self.weight_format}",
                 RuntimeWarning,
             )
         return _good
