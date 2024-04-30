@@ -49,6 +49,10 @@ class Format(ABC):
             return BlockFloatingPoint.from_shorthand(sh)
         elif sh.startswith("SBFP"):
             return ScaledBlockFloatingPoint.from_shorthand(sh)
+        elif sh.startswith("MXFP"):
+            return MXFP.from_shorthand(sh)
+        elif sh.startswith("MXINT"):
+            return MXINT.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized format shorthand: {sh}")
 
@@ -406,7 +410,10 @@ class ScaledBlockFloatingPoint(Format):
 
     @property
     def bytes_per_elem(self) -> float:
-        return self.block_format.bytes_per_elem + self.scaler_format / self.block_size
+        return (
+            self.block_format.bytes_per_elem
+            + self.scaler_format.bytes_per_elem / self.block_size
+        )
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -470,7 +477,6 @@ class MXFP(Format):
     def cast(self, x: torch.Tensor) -> torch.Tensor:
         _x = x.float().transpose(self.block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
-        _x /= self.man_scaling
         _xs = torch.split(
             _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
         )  # slice to chunks
@@ -491,7 +497,10 @@ class MXFP(Format):
 
     @property
     def bytes_per_elem(self) -> float:
-        return self.element_format.bytes_per_elem + self.scaler_format / self.block_size
+        return (
+            self.element_format.bytes_per_elem
+            + self.scaler_format.bytes_per_elem / self.block_size
+        )
 
     @property
     def bit_precision(self) -> float:
@@ -500,11 +509,18 @@ class MXFP(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "MXFP<{element_format_sh}>{{{block_size:d},{block_dim:d}}}",
+            "MXFP[E{exponent:d}M{mantissa:d}]{{{block_size:d},{block_dim:d}}}",
             sh,
         )
         return cls(
-            element_format=FloatingPoint.from_shorthand(conf["element_format_sh"]),
+            element_format=FloatingPoint(
+                mantissa=conf["mantissa"],
+                exponent=conf["exponent"],
+                bias=2 ** (conf["exponent"] - 1) - 1,
+                flush_subnormal=False,
+                unsigned=False,
+                rounding="nearest",
+            ),
             block_size=conf["block_size"],
             block_dim=conf["block_dim"],
         )
@@ -513,8 +529,16 @@ class MXFP(Format):
         return f"Simulated MXFP format: element format = {self.element_format}, scaler format = {self.scaler_format},\n block size = {self.block_size}, block dimension = {self.block_dim}"
 
     def __repr__(self) -> str:
+        return f"MXFP[E{self.element_format.exponent}M{self.element_format.mantissa}]{{{self.block_size},{self.block_dim}}}"
+
+    def __reduce__(self):
         return (
-            f"MXFP<{repr(self.element_format)}>{{{self.block_size},{self.block_dim}}}"
+            self.__class__,
+            (
+                self.element_format,
+                self.block_size,
+                self.block_dim,
+            ),
         )
 
 
@@ -554,3 +578,13 @@ class MXINT(BlockFloatingPoint):
 
     def __repr__(self) -> str:
         return f"MXINT{self.precision}{{{self.block_size},{self.block_dim}}}"
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.precision,
+                self.block_size,
+                self.block_dim,
+            ),
+        )
