@@ -509,9 +509,10 @@ class MXFP(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "MXFP[E{exponent:d}M{mantissa:d}]{{{block_size:d},{block_dim:d}}}",
+            "MXFP{precision:d}[E{exponent:d}M{mantissa:d}]{{{block_size:d},{block_dim:d}}}",
             sh,
         )
+        assert conf["precision"] == conf["exponent"] + conf["mantissa"] + 1
         return cls(
             element_format=FloatingPoint(
                 mantissa=conf["mantissa"],
@@ -529,7 +530,7 @@ class MXFP(Format):
         return f"Simulated MXFP format: element format = {self.element_format}, scaler format = {self.scaler_format},\n block size = {self.block_size}, block dimension = {self.block_dim}"
 
     def __repr__(self) -> str:
-        return f"MXFP[E{self.element_format.exponent}M{self.element_format.mantissa}]{{{self.block_size},{self.block_dim}}}"
+        return f"MXFP{self.element_format.exponent+self.element_format.mantissa+1}[E{self.element_format.exponent}M{self.element_format.mantissa}]{{{self.block_size},{self.block_dim}}}"
 
     def __reduce__(self):
         return (
