@@ -92,8 +92,8 @@ def test_smoothquant(
     x_grad = x.grad
     w_grad = module.weight.grad
     w_scaled = module.smoothquant.scale_weight(module.weight)
-    w = torch.div(w_scaled.movedim(module.w_ch_axis, -1), module.smoothquant.scale)
-    w = w.movedim(-1, module.w_ch_axis)
+    w = torch.div(w_scaled.movedim(module.win_ch_axis, -1), module.smoothquant.scale)
+    w = w.movedim(-1, module.win_ch_axis)
 
     assert torch.allclose(y, y_ref, atol=1e-6, rtol=1e-3)
     assert torch.allclose(x_grad, x_ref_grad, atol=1e-6, rtol=1e-3)

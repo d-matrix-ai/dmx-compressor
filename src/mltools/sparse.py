@@ -406,12 +406,12 @@ class WeightSparseMixin:
         _good = (
             self.weight_sparsifier is None
             or self._check_sparseness_dim_consistency(
-                self.weight_sparsifier.sparseness, self.w_ch_axis
+                self.weight_sparsifier.sparseness, self.win_ch_axis
             )
         )
         if not _good:
             warnings.warn(
-                f"layer's weight channel axis {self.w_ch_axis} might be inconsistent with sparseness {self.weight_sparseness}",
+                f"layer's weight channel axis {self.win_ch_axis} might be inconsistent with sparseness {self.weight_sparseness}",
                 RuntimeWarning,
             )
         return _good

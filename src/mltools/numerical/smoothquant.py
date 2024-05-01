@@ -373,7 +373,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
 
     Args:
         `ch_axis` (int): channel axis for the input activation tensor
-        `w_ch_axis` (int): channel axis for the weight tensor
+        `win_ch_axis` (int): channel axis for the weight tensor
         `migration_strength` (float): controls how much quantization difficulty
             we want to migrate from activations to weights, should be between
             0 and 1, default is 0.5.
@@ -386,7 +386,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
 
     Attributes:
         `ch_axis` (int): channel axis for the input activation tensor
-        `w_ch_axis` (int): channel axis for the weight tensor
+        `win_ch_axis` (int): channel axis for the weight tensor
         `fused_to_weight` (bool): If set to True, the scaling factors will be
             fused to the weights, cannot be enabled when dynamic is set.
     """
@@ -394,7 +394,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
     def __init__(
         self,
         ch_axis: int,
-        w_ch_axis: int,
+        win_ch_axis: int,
         migration_strength: float = 0.5,
         scale_format: Union[str, Format] = "SAME",
         dynamic: bool = False,
@@ -402,7 +402,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
     ) -> None:
         super().__init__(
             a_ch_axis=ch_axis,
-            b_ch_axis=w_ch_axis,
+            b_ch_axis=win_ch_axis,
             migration_strength=migration_strength,
             scale_format=scale_format,
             a_dynamic=dynamic,
@@ -410,7 +410,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
             scale_min=scale_min,
         )
         self.ch_axis = ch_axis
-        self.w_ch_axis = w_ch_axis
+        self.win_ch_axis = win_ch_axis
         self.register_buffer("fused_to_weight", torch.tensor([0], dtype=torch.long))
 
     @torch.jit.export
@@ -522,7 +522,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         """
         with torch.no_grad():
             if not self.weight_maxabs_computed:
-                self.weight_maxabs = self._maxabs(wgt, self.w_ch_axis)
+                self.weight_maxabs = self._maxabs(wgt, self.win_ch_axis)
             if not self.input_maxabs_exists or self.dynamic[0] == 1:
                 self.input_maxabs = self._maxabs(inp, self.ch_axis)
             else:
@@ -535,4 +535,4 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         """
         Returns the extra representation of Activation x Weight smoothQuant
         """
-        return f"migration_strength = {self.migration_strength.item()}, ch_axis = {self.ch_axis}, w_ch_axis = {self.w_ch_axis}, scale_format = {self.scale_cast.format}, dynamic = {self.dynamic.bool().item()}"
+        return f"migration_strength = {self.migration_strength.item()}, ch_axis = {self.ch_axis}, win_ch_axis = {self.win_ch_axis}, scale_format = {self.scale_cast.format}, dynamic = {self.dynamic.bool().item()}"
