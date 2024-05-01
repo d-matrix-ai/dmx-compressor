@@ -72,6 +72,7 @@ class LayerReconstructionMixin:
         self,
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
+        group_size: int = None,
     ):
         if self.weight_cast is not None:
             if qscheme_to_overload is not None:
@@ -79,6 +80,23 @@ class LayerReconstructionMixin:
                 self.weight_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
+                self.group_num = (
+                    math.ceil(self.weight.shape[self.weight.ch_axis] // group_size)
+                    if group_size
+                    else None
+                )
+            ## TODO: add support for per group
+            if self.group_num:
+                assert torch.ao.quantization.utils.is_per_tensor(
+                    qscheme_to_overload
+                ), "group quantization is to be used with per tensor quantization"
+                self.weight_cast.activation_post_process = [
+                    observer_cls(
+                        dtype=self.weight_cast.format,
+                        qscheme=self.weight_cast.qscheme,
+                        ch_axis=self.weight_cast.ch_axis,
+                    ).to(self.weight.device)
+                ] * self.group_num
             self.weight_cast.activation_post_process = observer_cls(
                 dtype=self.weight_cast.format,
                 qscheme=self.weight_cast.qscheme,
@@ -142,7 +160,7 @@ class LayerReconstructionMixin:
         ):
             if state:
                 self.obc = OptimalBrainCompressor(self)
-                #TODO: Weight Sparsifier should be handled. 
+                # TODO: Weight Sparsifier should be handled.
                 self.input_cast.disable_fake_quant()
                 self.weight_cast.disable_fake_quant()
             else:

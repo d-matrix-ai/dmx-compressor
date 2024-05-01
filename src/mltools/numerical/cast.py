@@ -16,6 +16,7 @@ from .format import (
 )
 from .smoothquant import ActivationWeightSmoothQuant
 from .observer import DummyObserver
+import math
 
 
 class CastToFormat(Function):
@@ -63,9 +64,22 @@ class CastTo(FakeQuantize):
     TODO: special state_dict handling to include and exclude flags
     """
 
-    def __init__(self, format="SAME", observer=DummyObserver, **fake_quantize_kwargs):
+    def __init__(
+        self,
+        format="SAME",
+        observer=DummyObserver,
+        group_size=None,
+        **fake_quantize_kwargs,
+    ):
         self.set_format(format)
         super().__init__(observer=observer, dtype=self.format, **fake_quantize_kwargs)
+        if group_size:
+            assert torch.ao.quantization.utils.is_per_tensor(
+                observer
+            ), "group_size must be used with per tensor quantization scheme"
+            num_groups = math.ceil(self.weight.shape[self.weight.ch_axis] // group_size)
+            self.observer = [self.observer] * num_groups
+        self.num_groups = num_groups if group_size else None
         self.physical_dtype = None
         self.enable_fake_quant()
         self.disable_observer()
@@ -85,8 +99,21 @@ class CastTo(FakeQuantize):
         Helper method for stepping observer in forward(),
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
-        self.activation_post_process(x.detach().float())
-        _scale, _zero_point = self.calculate_qparams()
+        if self.num_groups:
+            xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+            scale, zero_point = [], []
+            for i in range(self.num_groups):
+                self.activation_post_process[i](xs[i])
+                s, zp = self.activation_post_process[i].calculate_qparams()
+                scale.append(s)
+                zero_point.append(zp)
+            _scale = torch.tensor(scale)
+            _zero_point = torch.tensor(zero_point)
+
+        else:
+            self.activation_post_process(x.detach().float())
+            _scale, _zero_point = self.calculate_qparams()
+
         _scale, _zero_point = _scale.to(self.scale.device), _zero_point.to(
             self.zero_point.device
         )
@@ -115,6 +142,37 @@ class CastTo(FakeQuantize):
             if isinstance(self.format, Format):  # d-Matrix custom format
                 if isinstance(self.format, FixedPoint):
                     sc, zp = self._get_affine_params(x)
+                    ## TODO: add support for group
+                    if self.num_groups:
+                        xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+                        for i in range(self.num_groups):
+                            xs[i] = xs[i] / sc[i] + zp[i]
+                        x = torch.cat(xs, dim=self.ch_axis)
+                    else:
+                        x = x / sc + zp
+                x = CastToFormat.apply(x, self.format)
+                if isinstance(self.format, FixedPoint):
+                    if self.num_groups:
+                        xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+                        for i in range(self.num_groups):
+                            xs[i] = (xs[i] - zp[i]) * sc[i]
+                        x = torch.cat(xs, dim=self.ch_axis)
+                    else:
+                        x = (x - zp) * sc
+            else:  # torch.dtype
+                x = super().forward(x)
+        return x
+
+    def apply_quantizer(self, x, j):
+        """
+        apply quantizer to a slice of the tensor: x, scale is depended on which column x is at in the original complete tensor
+        """
+        if self.fake_quant_enabled[0] == 1:
+            if isinstance(self.format, Format):  # d-Matrix custom format
+                if isinstance(self.format, FixedPoint):
+                    sc, zp = self.scale, self.zero_point
+                    if self.is_per_channel:
+                        sc, zp = sc[j], zp[j]
                     x = x / sc + zp
                 x = CastToFormat.apply(x, self.format)
                 if isinstance(self.format, FixedPoint):
@@ -137,6 +195,7 @@ class CastTo(FakeQuantize):
     def extra_repr(self):
         return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}"
 
+
 class Quantize(torch.nn.quantized.Quantize):
     r"""Drop-in replacement of torch.nn.quantized.Quantize
     that supports both torch.dtype and numerical.Format
@@ -156,6 +215,7 @@ class Quantize(torch.nn.quantized.Quantize):
     def forward(self, x):
         return torch.ops.dmx.quantize(x)
 
+
 class DeQuantize(torch.nn.quantized.DeQuantize):
     r"""Drop-in replacement of torch.nn.quantized.DeQuantize
     that supports both torch.dtype and numerical.Format
@@ -174,6 +234,7 @@ class DeQuantize(torch.nn.quantized.DeQuantize):
 
     def forward(self, x):
         return torch.ops.dmx.dequantize(x)
+
 
 class NumericalCastMixin:
     r"""
