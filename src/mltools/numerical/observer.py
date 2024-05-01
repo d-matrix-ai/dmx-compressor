@@ -150,6 +150,7 @@ class MinMaxObserver(DMXObserverBase):
         ch_axis: int = -1,
         factory_kwargs: Optional[Dict] = None,
         eps: Optional[float] = torch.finfo(torch.float32).eps,
+        **kwargs,
     ) -> None:
         if qscheme == torch.per_channel_affine_float_qparams:
             raise NotImplementedError(
@@ -160,6 +161,7 @@ class MinMaxObserver(DMXObserverBase):
             qscheme=qscheme,
             factory_kwargs=factory_kwargs,
             eps=eps,
+            **kwargs,
         )
         self.ch_axis = ch_axis
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
@@ -224,6 +226,7 @@ class HistogramObserver(DMXObserverBase):
         ch_axis: int = -1,  # TODO: implement for per-channel
         factory_kwargs: Optional[dict] = None,
         eps=torch.finfo(torch.float32).eps,
+        **kwargs,
     ) -> None:
         if not is_per_tensor(qscheme):
             raise NotImplementedError(
@@ -234,6 +237,7 @@ class HistogramObserver(DMXObserverBase):
             qscheme=qscheme,
             factory_kwargs=factory_kwargs,
             eps=eps,
+            **kwargs,
         )
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
         self.bins = bins
