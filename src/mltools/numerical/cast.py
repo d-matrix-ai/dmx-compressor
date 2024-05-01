@@ -77,8 +77,7 @@ class CastTo(FakeQuantize):
             assert torch.ao.quantization.utils.is_per_tensor(
                 observer
             ), "group_size must be used with per tensor quantization scheme"
-            num_groups = math.ceil(self.weight.shape[self.weight.ch_axis] // group_size)
-            self.observer = [self.observer] * num_groups
+            num_groups = math.ceil(self.weight.shape[self.ch_axis] // group_size)
         self.num_groups = num_groups if group_size else None
         self.physical_dtype = None
         self.enable_fake_quant()
@@ -100,15 +99,24 @@ class CastTo(FakeQuantize):
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
         if self.num_groups:
-            xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+            xs = torch.split(
+                x,
+                math.ceil(x.shape[self.ch_axis] * 1.0 / self.num_groups),
+                dim=self.ch_axis,
+            )
             scale, zero_point = [], []
+            mins, maxs = [], []
             for i in range(self.num_groups):
-                self.activation_post_process[i](xs[i])
-                s, zp = self.activation_post_process[i].calculate_qparams()
+                self.activation_post_processes[i](xs[i])
+                s, zp = self.activation_post_processes[i].calculate_qparams()
                 scale.append(s)
                 zero_point.append(zp)
+                mins.append(self.activation_post_processes[i].min_val)
+                maxs.append(self.activation_post_processes[i].max_val)
             _scale = torch.tensor(scale)
             _zero_point = torch.tensor(zero_point)
+            self.activation_post_process.min_val = torch.tensor(mins)
+            self.activation_post_process.max_val = torch.tensor(maxs)
 
         else:
             self.activation_post_process(x.detach().float())
@@ -142,9 +150,16 @@ class CastTo(FakeQuantize):
             if isinstance(self.format, Format):  # d-Matrix custom format
                 if isinstance(self.format, FixedPoint):
                     sc, zp = self._get_affine_params(x)
-                    ## TODO: add support for group
                     if self.num_groups:
-                        xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+                        xs = list(
+                            torch.split(
+                                x,
+                                math.ceil(
+                                    x.shape[self.ch_axis] * 1.0 / self.num_groups
+                                ),
+                                dim=self.ch_axis,
+                            )
+                        )
                         for i in range(self.num_groups):
                             xs[i] = xs[i] / sc[i] + zp[i]
                         x = torch.cat(xs, dim=self.ch_axis)
@@ -153,30 +168,20 @@ class CastTo(FakeQuantize):
                 x = CastToFormat.apply(x, self.format)
                 if isinstance(self.format, FixedPoint):
                     if self.num_groups:
-                        xs = torch.split(x, self.num_groups, dim=self.ch_axis)
+                        xs = list(
+                            torch.split(
+                                x,
+                                math.ceil(
+                                    x.shape[self.ch_axis] * 1.0 / self.num_groups
+                                ),
+                                dim=self.ch_axis,
+                            )
+                        )
                         for i in range(self.num_groups):
                             xs[i] = (xs[i] - zp[i]) * sc[i]
                         x = torch.cat(xs, dim=self.ch_axis)
                     else:
                         x = (x - zp) * sc
-            else:  # torch.dtype
-                x = super().forward(x)
-        return x
-
-    def apply_quantizer(self, x, j):
-        """
-        apply quantizer to a slice of the tensor: x, scale is depended on which column x is at in the original complete tensor
-        """
-        if self.fake_quant_enabled[0] == 1:
-            if isinstance(self.format, Format):  # d-Matrix custom format
-                if isinstance(self.format, FixedPoint):
-                    sc, zp = self.scale, self.zero_point
-                    if self.is_per_channel:
-                        sc, zp = sc[j], zp[j]
-                    x = x / sc + zp
-                x = CastToFormat.apply(x, self.format)
-                if isinstance(self.format, FixedPoint):
-                    x = (x - zp) * sc
             else:  # torch.dtype
                 x = super().forward(x)
         return x
@@ -308,7 +313,11 @@ class NumericalCastMixin:
     ) -> None:
         self.smoothquant = (
             ActivationWeightSmoothQuant(
-                self.ch_axis, self.win_ch_axis, migration_strength, scale_format, dynamic
+                self.ch_axis,
+                self.win_ch_axis,
+                migration_strength,
+                scale_format,
+                dynamic,
             )
             if self.ch_axis is not None and self.win_ch_axis is not None
             else None

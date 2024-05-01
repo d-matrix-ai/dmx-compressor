@@ -29,6 +29,7 @@ class LayerReconstructionMixin:
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
     ):
+        ## TODO: support group quantization
         if self.input_cast is not None:
             if qscheme_to_overload is not None:
                 self.input_cast.qscheme = qscheme_to_overload
@@ -51,6 +52,7 @@ class LayerReconstructionMixin:
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
     ):
+        ## TODO: support group quantization
         if self.residual_cast is not None:
             if qscheme_to_overload is not None:
                 self.residual_cast.qscheme = qscheme_to_overload
@@ -80,23 +82,23 @@ class LayerReconstructionMixin:
                 self.weight_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
-                self.group_num = (
-                    math.ceil(self.weight.shape[self.weight.ch_axis] // group_size)
+                self.weight_cast.num_groups = (
+                    math.ceil(self.weight.shape[self.wout_ch_axis] * 1.0 / group_size)
                     if group_size
                     else None
                 )
-            ## TODO: add support for per group
-            if self.group_num:
+            if self.weight_cast.num_groups:
                 assert torch.ao.quantization.utils.is_per_tensor(
                     qscheme_to_overload
                 ), "group quantization is to be used with per tensor quantization"
-                self.weight_cast.activation_post_process = [
+                self.weight_cast.activation_post_processes = [
                     observer_cls(
                         dtype=self.weight_cast.format,
                         qscheme=self.weight_cast.qscheme,
-                        ch_axis=self.weight_cast.ch_axis,
+                        ch_axis=self.wout_ch_axis,
                     ).to(self.weight.device)
-                ] * self.group_num
+                    for i in range(self.weight_cast.num_groups)
+                ]
             self.weight_cast.activation_post_process = observer_cls(
                 dtype=self.weight_cast.format,
                 qscheme=self.weight_cast.qscheme,
