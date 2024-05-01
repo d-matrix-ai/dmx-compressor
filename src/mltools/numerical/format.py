@@ -49,6 +49,10 @@ class Format(ABC):
             return BlockFloatingPoint.from_shorthand(sh)
         elif sh.startswith("SBFP"):
             return ScaledBlockFloatingPoint.from_shorthand(sh)
+        elif sh.startswith("MXFP"):
+            return MXFP.from_shorthand(sh)
+        elif sh.startswith("MXINT"):
+            return MXINT.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized format shorthand: {sh}")
 
@@ -200,6 +204,10 @@ class FloatingPoint(Format):
         return x.abs() if self.unsigned else x
 
     @property
+    def largest_representable_power_of_two(self):
+        return 2 ** (2 ** (self.exponent - 1))
+
+    @property
     def bytes_per_elem(self) -> float:
         return (self.mantissa + self.exponent + 1) / 8.0
 
@@ -276,7 +284,7 @@ class BlockFloatingPoint(Format):
         if self.block_size == 1:  # borrowing float_quantize for block_size==1
             _x = float_quantize(
                 x.float(),
-                man=self.precision-2,  # 1 for sign and 1 for implicit bit
+                man=self.precision - 2,  # 1 for sign and 1 for implicit bit
                 exp=8,
                 bias=127,
                 flush_subnormal=False,
@@ -402,7 +410,10 @@ class ScaledBlockFloatingPoint(Format):
 
     @property
     def bytes_per_elem(self) -> float:
-        return self.block_format.bytes_per_elem + self.scaler_format / self.block_size
+        return (
+            self.block_format.bytes_per_elem
+            + self.scaler_format.bytes_per_elem / self.block_size
+        )
 
     @classmethod
     def from_shorthand(cls, sh: str):
@@ -429,3 +440,152 @@ class ScaledBlockFloatingPoint(Format):
 
     def __repr__(self) -> str:
         return f"SBFP<{repr(self.block_format)}><{repr(self.scaler_format)}>{{{self.block_size},{self.block_dim}}}"
+
+
+class MXFP(Format):
+    r"""
+    This is a MXFP tensor format.
+    """
+    blocked = True
+
+    def __init__(
+        self,
+        element_format: FloatingPoint,
+        block_size=32,
+        block_dim=-1,
+    ):
+        super().__init__()
+        # check validity of format configuration
+        assert isinstance(
+            element_format, FloatingPoint
+        ), "block format needs to be floating point"
+        assert block_size > 0, f"block size has to be positive, got {block_size}"
+        self.element_format = element_format
+        self.scaler_format = FloatingPoint(
+            mantissa=0,
+            exponent=8,
+            bias=127,
+            unsigned=True,
+        )
+        self.block_size = block_size
+        self.block_dim = block_dim
+
+        self.get_chunk_max = lambda chunk: torch.max(
+            torch.abs(chunk), dim=-1, keepdim=True
+        )[0]
+
+    def cast(self, x: torch.Tensor) -> torch.Tensor:
+        _x = x.float().transpose(self.block_dim, -1)  # dim swap
+        xshape = _x.shape  # remember shape
+        _xs = torch.split(
+            _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
+        )  # slice to chunks
+        _ss = [
+            2 ** torch.floor(torch.log2(self.get_chunk_max(chunk)))
+            / self.element_format.largest_representable_power_of_two
+            for chunk in _xs
+        ]
+        _x = torch.cat(
+            [
+                self.element_format.cast(chunk / scale) * scale
+                for chunk, scale in zip(_xs, _ss)
+            ],
+            dim=self.block_dim,
+        )  # quantize
+        _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
+        return _x
+
+    @property
+    def bytes_per_elem(self) -> float:
+        return (
+            self.element_format.bytes_per_elem
+            + self.scaler_format.bytes_per_elem / self.block_size
+        )
+
+    @property
+    def bit_precision(self) -> float:
+        return self.element_format.precision + 8.0 / self.block_size
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "MXFP{precision:d}[E{exponent:d}M{mantissa:d}]{{{block_size:d},{block_dim:d}}}",
+            sh,
+        )
+        assert conf["precision"] == conf["exponent"] + conf["mantissa"] + 1
+        return cls(
+            element_format=FloatingPoint(
+                mantissa=conf["mantissa"],
+                exponent=conf["exponent"],
+                bias=2 ** (conf["exponent"] - 1) - 1,
+                flush_subnormal=False,
+                unsigned=False,
+                rounding="nearest",
+            ),
+            block_size=conf["block_size"],
+            block_dim=conf["block_dim"],
+        )
+
+    def __str__(self) -> str:
+        return f"Simulated MXFP format: element format = {self.element_format}, scaler format = {self.scaler_format},\n block size = {self.block_size}, block dimension = {self.block_dim}"
+
+    def __repr__(self) -> str:
+        return f"MXFP{self.element_format.exponent+self.element_format.mantissa+1}[E{self.element_format.exponent}M{self.element_format.mantissa}]{{{self.block_size},{self.block_dim}}}"
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.element_format,
+                self.block_size,
+                self.block_dim,
+            ),
+        )
+
+
+class MXINT(BlockFloatingPoint):
+    r"""
+    This is a MXINT tensor format.
+    """
+
+    def __init__(
+        self,
+        precision=8,
+        block_size=32,
+        block_dim=-1,
+    ):
+        super().__init__(
+            precision=precision,
+            block_size=block_size,
+            block_dim=block_dim,
+            symmetric=True,
+            rounding="nearest",
+        )
+
+    @classmethod
+    def from_shorthand(cls, sh: str):
+        conf = parse(
+            "MXINT{precision:d}{{{block_size:d},{block_dim:d}}}",
+            sh,
+        )
+        return cls(
+            precision=conf["precision"],
+            block_size=conf["block_size"],
+            block_dim=conf["block_dim"],
+        )
+
+    def __str__(self) -> str:
+        return f"Simulated MXINT format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: symmetric = {self.symmetric}, rounding = {self.rounding}"
+
+    def __repr__(self) -> str:
+        return f"MXINT{self.precision}{{{self.block_size},{self.block_dim}}}"
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.precision,
+                self.block_size,
+                self.block_dim,
+            ),
+        )
