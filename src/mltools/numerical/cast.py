@@ -75,10 +75,9 @@ class CastTo(FakeQuantize):
         super().__init__(observer=observer, dtype=self.format, **fake_quantize_kwargs)
         if group_size:
             assert torch.ao.quantization.utils.is_per_tensor(
-                observer
+                self.qscheme
             ), "group_size must be used with per tensor quantization scheme"
-            num_groups = math.ceil(self.weight.shape[self.ch_axis] // group_size)
-        self.num_groups = num_groups if group_size else None
+        self.group_size = group_size if group_size else None
         self.physical_dtype = None
         self.enable_fake_quant()
         self.disable_observer()
@@ -98,15 +97,25 @@ class CastTo(FakeQuantize):
         Helper method for stepping observer in forward(),
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
-        if self.num_groups:
+        if self.group_size:
+            if not hasattr(self, "activation_post_processes"):
+                group_num = math.ceil(x.shape[self.ch_axis] * 1.0 / self.group_size)
+                self.activation_post_processes = [
+                    self.activation_post_process.__class__(
+                        dtype=self.format,
+                        qscheme=self.qscheme,
+                        ch_axis=self.ch_axis,
+                    ).to(x.device)
+                    for i in range(group_num)
+                ]
             xs = torch.split(
                 x,
-                math.ceil(x.shape[self.ch_axis] * 1.0 / self.num_groups),
+                self.group_size,
                 dim=self.ch_axis,
             )
             scale, zero_point = [], []
             mins, maxs = [], []
-            for i in range(self.num_groups):
+            for i in range(len(xs)):
                 self.activation_post_processes[i](xs[i])
                 s, zp = self.activation_post_processes[i].calculate_qparams()
                 scale.append(s)
@@ -150,38 +159,22 @@ class CastTo(FakeQuantize):
             if isinstance(self.format, Format):  # d-Matrix custom format
                 if isinstance(self.format, FixedPoint):
                     sc, zp = self._get_affine_params(x)
-                    if self.num_groups:
-                        xs = list(
-                            torch.split(
-                                x,
-                                math.ceil(
-                                    x.shape[self.ch_axis] * 1.0 / self.num_groups
-                                ),
-                                dim=self.ch_axis,
-                            )
-                        )
-                        for i in range(self.num_groups):
-                            xs[i] = xs[i] / sc[i] + zp[i]
-                        x = torch.cat(xs, dim=self.ch_axis)
-                    else:
-                        x = x / sc + zp
+                    if self.group_size:
+                        # duplicate each element in sc and zp for group_size number of times
+                        sc = torch.repeat_interleave(sc, self.group_size)[
+                            : x.shape[self.ch_axis]
+                        ]
+                        zp = torch.repeat_interleave(zp, self.group_size)[
+                            : x.shape[self.ch_axis]
+                        ]
+                        sc_shape = [1] * len(x.shape)
+                        sc_shape[self.ch_axis] = x.shape[self.ch_axis]
+                        sc = sc.view(sc_shape)
+                        zp = zp.view(sc_shape)
+                    x = x / sc + zp
                 x = CastToFormat.apply(x, self.format)
                 if isinstance(self.format, FixedPoint):
-                    if self.num_groups:
-                        xs = list(
-                            torch.split(
-                                x,
-                                math.ceil(
-                                    x.shape[self.ch_axis] * 1.0 / self.num_groups
-                                ),
-                                dim=self.ch_axis,
-                            )
-                        )
-                        for i in range(self.num_groups):
-                            xs[i] = (xs[i] - zp[i]) * sc[i]
-                        x = torch.cat(xs, dim=self.ch_axis)
-                    else:
-                        x = (x - zp) * sc
+                    x = (x - zp) * sc
             else:  # torch.dtype
                 x = super().forward(x)
         return x
@@ -198,7 +191,7 @@ class CastTo(FakeQuantize):
             return self.format.bit_precision
 
     def extra_repr(self):
-        return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}"
+        return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()},group_size = {self.group_size}"
 
 
 class Quantize(torch.nn.quantized.Quantize):

@@ -82,22 +82,21 @@ class LayerReconstructionMixin:
                 self.weight_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
-                self.weight_cast.num_groups = (
-                    math.ceil(self.weight.shape[self.wout_ch_axis] * 1.0 / group_size)
-                    if group_size
-                    else None
-                )
-            if self.weight_cast.num_groups:
+                self.weight_cast.group_size = group_size if group_size else None
+            if self.weight_cast.group_size:
                 assert torch.ao.quantization.utils.is_per_tensor(
                     qscheme_to_overload
                 ), "group quantization is to be used with per tensor quantization"
+                group_num = math.ceil(
+                    self.weight.shape[self.weight_cast.ch_axis] * 1.0 / group_size
+                )
                 self.weight_cast.activation_post_processes = [
                     observer_cls(
                         dtype=self.weight_cast.format,
                         qscheme=self.weight_cast.qscheme,
                         ch_axis=self.wout_ch_axis,
                     ).to(self.weight.device)
-                    for i in range(self.weight_cast.num_groups)
+                    for i in range(group_num)
                 ]
             self.weight_cast.activation_post_process = observer_cls(
                 dtype=self.weight_cast.format,
