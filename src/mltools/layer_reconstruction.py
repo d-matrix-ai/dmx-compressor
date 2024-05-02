@@ -82,7 +82,7 @@ class LayerReconstructionMixin:
                 self.weight_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
-                self.weight_cast.group_size = group_size if group_size else None
+            self.weight_cast.group_size = group_size if group_size else None
             if self.weight_cast.group_size:
                 assert torch.ao.quantization.utils.is_per_tensor(
                     qscheme_to_overload
