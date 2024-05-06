@@ -48,6 +48,7 @@ for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)
 dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
+dmx_aware_functional_mappings["<built-in function matmul>"] = dmx.nn.ActActMatMul
 
 
 def process_args(args):
@@ -150,13 +151,17 @@ def get_op_set_from(gm: Optional[torch.fx.GraphModule]):
     return set(t for _, t in _extract_ops(gm)) if gm is not None else set()
 
 
-def gap_analysis(source, target): 
+def gap_analysis(source, target):
     r"Print commonality and differences between new and existing op sets"
     known = target.intersection(source)
     unknown = target.difference(source)
-    print(f"""Known ops (n = {len(known)}):
+    print(
+        f"""Known ops (n = {len(known)}):
     {known}
-    """)
-    print(f"""Unknown ops (n = {len(unknown)}):
+    """
+    )
+    print(
+        f"""Unknown ops (n = {len(unknown)}):
     {unknown}
-    """)
+    """
+    )
