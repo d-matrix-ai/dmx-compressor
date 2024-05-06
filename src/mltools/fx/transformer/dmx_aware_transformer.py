@@ -122,19 +122,23 @@ class DMXAwareTransformer(fx.Transformer):
         # otherwise next call_function will use the same candidate. (create_name is also called in create_node)
         if new_name != candidate:
             self.new_graph._graph_namespace.create_name(candidate, None)
-        # find out what kwargs to pass in to new module
+        # find out what kwargs to pass in to new module init, which kwargs to pass into forward function of module
         empty_mod = dmx_aware_functional_mappings[node_key]()
         accepted_kwarg_keys = inspect.signature(empty_mod.__init__).parameters.keys()
+        initkwargs = {}
         newkwargs = {}
         for key, value in kwargs.items():
             if key in accepted_kwarg_keys:
+                initkwargs[key] = value
+            else:
                 newkwargs[key] = value
         self.module.add_submodule(
-            new_name, dmx_aware_functional_mappings[node_key](**newkwargs)
+            new_name, dmx_aware_functional_mappings[node_key](**initkwargs)
         )
         new_node = self.new_graph.create_node(
             "call_module",
             new_name,
         )
         new_node.args = process_args(args)
+        new_node.kwargs = process_kwargs(newkwargs)
         return Proxy(new_node, self.tracer)

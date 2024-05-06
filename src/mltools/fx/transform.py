@@ -35,7 +35,7 @@ def substitute_transform(
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     else:
         gm, tracer = symbolic_trace(root, concrete_args)
-    breakpoint()
+
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)

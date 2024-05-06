@@ -43,12 +43,14 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.softmax": dmx.nn.Softmax,
     "torch.nn.functional.dropout": dmx.nn.Dropout,
     "torch.matmul": dmx.nn.ActActMatMul,
+    "torch.nn.functional.scaled_dot_product_attention": dmx.nn.ScaledDoctProductAttention,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)
 dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
 dmx_aware_functional_mappings["<built-in function matmul>"] = dmx.nn.ActActMatMul
+dmx_aware_functional_mappings["<built-in function mul>"] = dmx.nn.ElementMul
 
 
 def process_args(args):

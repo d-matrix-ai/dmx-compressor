@@ -217,8 +217,8 @@ class DmxModule(
         """
         _dtype, _device = input.dtype, input.device
         if hasattr(self, "weight") and self.weight != None:
-            weight_device = self.weight.device
-            input = input.to(weight_device)
+            _device = self.weight.device
+            input = input.to(_device)
         if self.smoothquant is not None:
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
@@ -385,6 +385,37 @@ class InitMatMul(torch.nn.Module):
         return _output
 
 
+class ElementMul(DmxModule):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
+        return _input * multiplier.to(_input.device)
+
+
+class ScaledDoctProductAttention(DmxModule):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=None,
+        dropout_p=0,
+        is_causal=None,
+    ):
+        return torch.nn.functional.scaled_dot_product_attention(
+            query_states,
+            key_states.to(query_states.device),
+            value_states.to(query_states.device),
+            attn_mask=attn_mask.to(query_states.device) if attn_mask is not None else None,
+            dropout_p=dropout_p,
+            is_causal=is_causal,
+        )
+
+
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -398,7 +429,7 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         _multiplier = self.multiplier_cast(multiplier)
-        _output = torch.matmul(_input, _multiplier)
+        _output = torch.matmul(_input, _multiplier.to(_input.device))
         return _output
 
     def to_compiler_graph(self) -> Graph:
