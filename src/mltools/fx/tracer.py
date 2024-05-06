@@ -57,6 +57,7 @@ class DmxHFTracer(HFTracer):
                 sparse.Sparsify,
                 transformers.pytorch_utils.Conv1D,
                 transformers.models.bloom.modeling_bloom.BloomGelu,
+                transformers.models.llama.modeling_llama.LlamaRMSNorm,
             ),
         )
         is_leaf = is_leaf or (

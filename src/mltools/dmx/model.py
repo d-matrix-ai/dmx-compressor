@@ -10,6 +10,7 @@ from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import get_op_set_from
+import functools
 
 
 class DmxModelMixin:
@@ -209,6 +210,66 @@ class DmxModelMixin:
         )
 
 
+# class DmxModel(torch.nn.Module):
+#     @staticmethod
+#     def _jit_substitute_transform(_model, args, kwargs):
+#         if not _model.transformed:
+#             _mod_signature = signature(_model.old_forward)
+#             _output_cls = _mod_signature.return_annotation
+#             if get_origin(_output_cls) is Union:  # NOTE: this is error-prone
+#                 _output_cls = get_args(_output_cls)[1]
+#                 assert issubclass(
+#                     _output_cls, transformers.modeling_utils.ModelOutput
+#                 )  # NOTE: using this to guard against abuse
+#             elif _output_cls is _empty:
+#                 _output_cls = None
+#             _model.output_cls = _output_cls  # record the output class
+#             _model._gm = substitute_transform(
+#                 _model,
+#                 hf=_model.hf,
+#                 input_names=_mod_signature.bind(*args, **kwargs).arguments.keys(),
+#                 concrete_args=_model.concrete_args,
+#             )
+#             # _model.old_forward = _model.forward
+#             _model.forward = (
+#                 (
+#                     lambda *_args, **_kwargs: _model.output_cls(
+#                         _model._gm.forward(*_args, **_kwargs)
+#                     )
+#                 )
+#                 if _model.output_cls is not None
+#                 else _model._gm.forward
+#             )
+#             _model.transformed = True
+#             _model.baseline_config = _model.dmx_config  # BASELINE config recorded
+#             while len(_model._dmx_configurations_to_be_applied) != 0:
+#                 _config, _rules = _model._dmx_configurations_to_be_applied.popleft()
+#                 _model.configure(_config, *_rules)
+
+#     @classmethod
+#     def from_torch(
+#         cls,
+#         model: torch.nn.Module,
+#         concrete_args: Optional[Dict[str, Any]] = None,
+#     ) -> torch.nn.Module:
+#         if not DmxModelMixin in model.__class__.__bases__:
+#             model.__class__.__bases__ += (DmxModelMixin,)
+#             model._gm = None
+#             model.transformed = False
+#             model.hf = model.__class__.__module__.startswith("transformers")
+#             model.concrete_args = concrete_args
+#             model.old_forward = model.forward
+
+#             def _forward(_m, *_args, **_kwargs):
+#                 if not _m.transformed:
+#                     _m.forward = functools.partial(model.old_forward, model)
+#                     DmxModel._jit_substitute_transform(_m, _args, _kwargs)
+#                 return _m(*_args, **_kwargs)
+
+#             model.forward = functools.partial(_forward, model)
+
+
+#         return model
 class DmxModel(torch.nn.Module):
     @staticmethod
     def _get_transformed_forward(_model, args, kwargs):

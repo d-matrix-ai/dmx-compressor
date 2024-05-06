@@ -1373,6 +1373,21 @@ class RMSNorm(DmxModule, _RMSNorm):
         _output = self.approx_forward((_input,))
         return _output
 
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        r"""
+        Creates a new RMSNorm object (DmxModule) from a given PyTorch RMSNorm layer.
+
+        Args:
+            raw (torch.nn.Module): A PyTorch RMSNorm layer to be converted.
+
+        Returns:
+            DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
+        """
+        initial_dmx = RMSNorm(dim=raw.weight.shape[0], eps=raw.variance_epsilon)
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
 
 class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
     r"""
