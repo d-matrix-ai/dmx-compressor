@@ -5,6 +5,7 @@ from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
+from functools import partial
 from mltools import dmx
 from mltools.dmx.nn import *
 from mltools.fx.transform import substitute_transform
@@ -210,41 +211,36 @@ class DmxModelMixin:
 
 class DmxModel(torch.nn.Module):
     @staticmethod
-    def _jit_substitute_transform(_model, args, kwargs):
-        if not _model.transformed:
-            _mod_signature = signature(_model.forward)
-            _output_cls = _mod_signature.return_annotation
-            if get_origin(_output_cls) is Union:  # NOTE: this is error-prone
-                _output_cls = get_args(_output_cls)[1]
-                assert issubclass(
-                    _output_cls, transformers.modeling_utils.ModelOutput
-                )  # NOTE: using this to guard against abuse
-            elif _output_cls is _empty:
-                _output_cls = None
-            _model.output_cls = _output_cls  # record the output class
-            _model._gm = substitute_transform(
-                _model,
-                hf=_model.hf,
-                input_names=signature(_model.forward)
-                .bind(*args, **kwargs)
-                .arguments.keys(),
-                concrete_args=_model.concrete_args,
-            )
-            _model.old_forward = _model.forward
-            _model.forward = (
-                (
-                    lambda *_args, **_kwargs: _model.output_cls(
-                        _model._gm.forward(*_args, **_kwargs)
-                    )
+    def _get_transformed_forward(_model, args, kwargs):
+        _model.forward = _model.old_forward
+        _mod_signature = signature(_model.forward)
+        _output_cls = _mod_signature.return_annotation
+        if get_origin(_output_cls) is Union:  # NOTE: this is error-prone
+            _output_cls = get_args(_output_cls)[1]
+            assert issubclass(
+                _output_cls, transformers.modeling_utils.ModelOutput
+            )  # NOTE: using this to guard against abuse
+        elif _output_cls is _empty:
+            _output_cls = None
+        _model._gm = substitute_transform(
+            _model,
+            hf=_model.hf,
+            input_names=signature(_model.forward)
+            .bind(*args, **kwargs)
+            .arguments.keys(),
+            concrete_args=_model.concrete_args,
+        )
+        _model._output_cls = _output_cls
+        _forward = (
+            (
+                lambda *_args, **_kwargs: _output_cls(
+                    _model._gm.forward(*_args, **_kwargs)
                 )
-                if _model.output_cls is not None
-                else _model._gm.forward
             )
-            _model.transformed = True
-            _model.baseline_config = _model.dmx_config  # BASELINE config recorded
-            while len(_model._dmx_configurations_to_be_applied) != 0:
-                _config, _rules = _model._dmx_configurations_to_be_applied.popleft()
-                _model.configure(_config, *_rules)
+            if _model._output_cls is not None
+            else _model._gm.forward
+        )
+        return _forward
 
     @classmethod
     def from_torch(
@@ -258,12 +254,21 @@ class DmxModel(torch.nn.Module):
             model.transformed = False
             model.hf = model.__class__.__module__.startswith("transformers")
             model.concrete_args = concrete_args
-            model.register_forward_pre_hook(
-                cls._jit_substitute_transform,
-                prepend=True,
-                with_kwargs=True,
-            )
 
+            def temp_forward(_m, *_args, **_kwargs):
+                print("IN TEMP FORWARD")
+                if not _m.transformed:
+                    _forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
+                    _m.forward = _forward
+                    _m.transformed = True
+                    _m.baseline_config = _m.dmx_config  # BASELINE config recorded
+                    while len(_m._dmx_configurations_to_be_applied) != 0:
+                        _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
+                        _m.configure(_config, *_rules)
+                return _m.forward(*_args, **_kwargs)
+
+            model.old_forward = model.forward
+            model.forward = partial(temp_forward, model)
         return model
 
 
