@@ -92,7 +92,6 @@ class QdQTransformer(fx.Transformer):
             processed_args = process_args(args)
             subgraph_input_nodes = filter(lambda n: n.op == "placeholder", list(subgraph.nodes))
             val_map = {n: processed_args[i] for i, n in enumerate(subgraph_input_nodes)}
-            print(val_map)
             curr_node = self.substitute_compiler_graph(
                 self.new_graph, subgraph, val_map, target, curr_mod, self.module, False
             )
