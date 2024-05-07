@@ -3,7 +3,6 @@ from typing import Optional
 import torch
 import warnings
 from contextlib import contextmanager
-from mltools.numerical.smoothquant import SmoothQuant
 from mltools.numerical.observer import HistogramObserver
 
 

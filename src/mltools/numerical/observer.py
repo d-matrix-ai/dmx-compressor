@@ -626,4 +626,4 @@ class PercentileObserver(HistogramObserver):
 
     @torch.jit.export
     def extra_repr(self):
-        return "percentile = {}".format(self.min_val, self.max_val)
+        return "percentile = {}".format(self.min_val, )

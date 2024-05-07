@@ -1,6 +1,5 @@
 import warnings
 from typing import Union, Optional
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Function
@@ -10,9 +9,7 @@ from .format import (
     Format,
     Same,
     FixedPoint,
-    FloatingPoint,
     BlockFloatingPoint,
-    ScaledBlockFloatingPoint,
 )
 from .smoothquant import ActivationWeightSmoothQuant
 from .observer import DummyObserver

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import copy
 
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union, Set
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
 import torch.fx as fx
@@ -11,9 +11,7 @@ import torch.fx.traceback as fx_traceback
 
 import itertools
 
-from mltools import dmx
 from mltools.fx.transformer.utils import process_args
-from mltools.numerical import Quantize, DeQuantize
 
 from .utils import dmx_aware_mapping, dmx_aware_functional_mappings
 

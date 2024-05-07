@@ -6,7 +6,6 @@ import tempfile
 import shutil
 import yaml
 from typing import Type
-import mltools
 from mltools.dmx import nn
 from mltools.numerical import Format
 from mltools.sparse import Sparseness

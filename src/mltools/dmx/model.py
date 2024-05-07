@@ -1,6 +1,6 @@
 import torch
 import re
-from collections import deque
+from collections import deque, OrderedDict
 from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
@@ -248,7 +248,7 @@ class DmxModel(torch.nn.Module):
         model: torch.nn.Module,
         concrete_args: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
-        if not DmxModelMixin in model.__class__.__bases__:
+        if DmxModelMixin not in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
             model._gm = None
             model.transformed = False

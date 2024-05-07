@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import torch
 import torch.fx as fx
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any
 from graphviz import Digraph
 from mltools.fx import NodeDictTransformer, QuantTracer
 from mltools.utils.fx.interpreter import MetadataInterpreter

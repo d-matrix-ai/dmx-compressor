@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 
-import pytest
 import torch
 from torch import fx, nn
 import torch.nn.functional as F
 from mltools import dmx
 from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import dmx_aware_mapping
-import transformers.utils.fx as hf_fx
 
 RANDOM_SEED = 0
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

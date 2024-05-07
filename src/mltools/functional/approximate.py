@@ -2,7 +2,6 @@ from typing import Union, Optional
 from parse import parse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from . import functions, vsimd
 
 
@@ -66,10 +65,10 @@ class NoApproximation(ApproximationFunction):
         return cls()
 
     def __str__(self) -> str:
-        return f"Dummy approximation function: no approximation"
+        return "Dummy approximation function: no approximation"
 
     def __repr__(self) -> str:
-        return f"NONE"
+        return "NONE"
 
 
 class Identity(ApproximationFunction):
@@ -92,10 +91,10 @@ class Identity(ApproximationFunction):
         )
 
     def __str__(self) -> str:
-        return f"Identity: return itself"
+        return "Identity: return itself"
 
     def __repr__(self) -> str:
-        return f"Identity"
+        return "Identity"
 
 
 class SoftmaxApproximation(ApproximationFunction):

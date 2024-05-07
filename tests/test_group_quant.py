@@ -1,6 +1,5 @@
 import pytest
 import torch
-import torch.nn as nn
 from mltools import dmx
 from mltools.numerical.observer import MinMaxObserver, HistogramObserver
 from mltools.numerical import CastTo

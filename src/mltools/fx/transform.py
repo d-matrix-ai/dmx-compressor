@@ -6,8 +6,7 @@ from ..fx import QuantTracer, InputOutputTransformer, QdQTransformer
 from mltools.fx import ConfigurationTransformer, DMXAwareTransformer
 from mltools.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
-from torch import fx
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 
 def substitute_transform(

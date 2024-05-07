@@ -1,10 +1,6 @@
 import functools
 import torch
-import torch.nn.functional as F
 import numpy as np
-from mltools.numerical import CastTo
-from mltools.quant import block_quantize
-from typing import List
 
 
 def poly2softmax(x, dim=-1, nform="float16", **kwargs):

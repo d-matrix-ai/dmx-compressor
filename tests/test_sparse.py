@@ -1,7 +1,6 @@
 import pytest
 
 import torch
-from mltools import dmx
 from mltools.sparse import Sparsify, Sparseness
 
 RANDOM_SEED = 0

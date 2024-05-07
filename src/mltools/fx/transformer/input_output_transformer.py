@@ -1,7 +1,7 @@
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union, Set
+from typing import Any, Dict, Tuple
 
 import torch.fx as fx
-from torch.fx.node import Argument, Node, Target
+from torch.fx.node import Argument, Target
 from torch.fx.proxy import Proxy
 
 from mltools.numerical import CastTo

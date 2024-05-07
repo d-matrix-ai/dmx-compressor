@@ -86,10 +86,10 @@ class Same(Format):
         return None
 
     def __str__(self) -> str:
-        return f"Dummy numerical format: no casting"
+        return "Dummy numerical format: no casting"
 
     def __repr__(self) -> str:
-        return f"SAME"
+        return "SAME"
 
 
 class FixedPoint(Format):

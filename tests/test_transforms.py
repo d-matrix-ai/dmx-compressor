@@ -3,17 +3,12 @@
 import pytest
 import torch
 from torch import Tensor
-import torch.nn.functional as F
 import torch.nn as nn
 from mltools import dmx
 from mltools.fx.tracer import QuantTracer
 from mltools.fx.transform import cast_input_output_transform
-from mltools.sparse import Sparsify
-from mltools.functional import Approximate
 import torch.fx as fx
 from transformers.pytorch_utils import Conv1D
-from transformers.models.gpt2.modeling_gpt2 import GPT2Attention, GPT2MLP, GPT2Model
-from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
 RANDOM_SEED = 0
 
@@ -53,10 +48,10 @@ def checkTransform(gm: nn.Module) -> bool:
         nodeList.append(i)
     for i in nodeList:
         if i.op == "placeholder":
-            if not i.target + "_cast" in i.next.target:
+            if i.target + "_cast" not in i.next.target:
                 return False
         elif i.op == "output":
-            if not "output_cast" in i.prev.target:
+            if "output_cast" not in i.prev.target:
                 return False
         elif i.op == "get_attr" and "weight" in i.target:
             if not (
@@ -73,7 +68,7 @@ def checkTransform(gm: nn.Module) -> bool:
             ):
                 return False
         elif i.op == "get_attr" and "bias" in i.target:
-            if not "weight_cast" in i.next.target and not "bias_cast" in i.next.target:
+            if "weight_cast" not in i.next.target and "bias_cast" not in i.next.target:
                 return False
         elif i.op == "call_module":
             if not checkTransform(gm.get_submodule(i.target)):

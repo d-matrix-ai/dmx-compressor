@@ -1,10 +1,8 @@
 import numpy as np
 import torch
-import torch.nn.functional as F
 from functools import wraps
 from typing import List, Optional, Callable, Tuple
 from types import SimpleNamespace
-import math
 
 try:
     from dmsimd import SIMDKernels as _K

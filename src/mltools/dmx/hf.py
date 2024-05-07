@@ -2,12 +2,11 @@ from typing import Optional
 from transformers import pipeline as hfpipeline
 from mltools.fx.transform import substitute_transform
 import transformers
-from transformers import pipeline as hfpipeline
 from .model import DmxModelMixin, DmxConfig
 import evaluate
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
-from .model import DmxModel, DmxConfig
+from .model import DmxModel
 
 
 def get_config_file(repo_name, revision, config_name):
@@ -25,7 +24,6 @@ def dmx_transform(pipe, dmx_config_name):
         pipe.model.configure(config["model"])
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
-            from . import config_rules
             # NOTE: assuming pipe.model is in BASELINE mode
             pipe.model.configure(None, *eval(f"config_rules.{dmx_config_name}"))
         else:

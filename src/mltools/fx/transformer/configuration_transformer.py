@@ -1,9 +1,9 @@
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union, Set
+from typing import Any, Dict, Tuple, Union
 import torch.fx as fx
-from torch.fx.node import Argument, Node, Target, map_arg, map_aggregate
+from torch.fx.node import Argument, Target, map_aggregate
 from torch.fx.proxy import Proxy
 
-from mltools.sparse import Sparsify, Sparseness
+from mltools.sparse import Sparseness
 
 
 class ConfigurationTransformer(fx.Transformer):
