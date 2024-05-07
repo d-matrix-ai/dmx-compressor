@@ -113,6 +113,19 @@ class DMXAwareTransformer(fx.Transformer):
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)
+        elif node_key in "<built-in function mul>":
+            if (
+                isinstance(args[0], Proxy)
+                and isinstance(args[1], Proxy)
+                and args[0].node.op
+                in ["call_module", "call_function", "call_method", "placeholder"]
+                and args[1].node.op
+                in ["call_module", "call_function", "call_method", "placeholder"]
+            ):
+                cand_name = curr_target + ".elemul"
+                new_name = self.create_unique_name_in_scope(cand_name)
+            else:
+                return super().call_function(target, args, kwargs)
         elif node_key in [repr(eval("torch.matmul")), "<built-in function matmul>"]:
             cand_name = curr_target + ".matmul"
             new_name = self.create_unique_name_in_scope(cand_name)

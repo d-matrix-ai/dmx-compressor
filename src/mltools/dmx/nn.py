@@ -393,7 +393,7 @@ class ElementMul(DmxModule):
         return _input * multiplier.to(_input.device)
 
 
-class ScaledDoctProductAttention(DmxModule):
+class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
         super().__init__()
 
@@ -410,7 +410,9 @@ class ScaledDoctProductAttention(DmxModule):
             query_states,
             key_states.to(query_states.device),
             value_states.to(query_states.device),
-            attn_mask=attn_mask.to(query_states.device) if attn_mask is not None else None,
+            attn_mask=(
+                attn_mask.to(query_states.device) if attn_mask is not None else None
+            ),
             dropout_p=dropout_p,
             is_causal=is_causal,
         )
@@ -1415,7 +1417,10 @@ class RMSNorm(DmxModule, _RMSNorm):
         Returns:
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
-        initial_dmx = RMSNorm(dim=raw.weight.shape[0], eps=raw.variance_epsilon)
+        initial_dmx = RMSNorm(
+            dim=raw.weight.shape[0],
+            eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
+        )
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 

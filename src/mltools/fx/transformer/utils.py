@@ -32,6 +32,7 @@ dmx_aware_mapping = {
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,
     "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
+    "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmx.nn.RMSNorm,
 }
 
 dmx_aware_functional_mappings = {
@@ -43,7 +44,7 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.softmax": dmx.nn.Softmax,
     "torch.nn.functional.dropout": dmx.nn.Dropout,
     "torch.matmul": dmx.nn.ActActMatMul,
-    "torch.nn.functional.scaled_dot_product_attention": dmx.nn.ScaledDoctProductAttention,
+    "torch.nn.functional.scaled_dot_product_attention": dmx.nn.ScaledDotProductAttention,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))

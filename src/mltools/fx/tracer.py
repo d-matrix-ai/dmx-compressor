@@ -58,6 +58,7 @@ class DmxHFTracer(HFTracer):
                 transformers.pytorch_utils.Conv1D,
                 transformers.models.bloom.modeling_bloom.BloomGelu,
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
+                transformers.models.gemma.modeling_gemma.GemmaRMSNorm,
             ),
         )
         is_leaf = is_leaf or (
