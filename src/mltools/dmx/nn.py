@@ -1206,18 +1206,38 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         """
         Returns a compiler friendly graph
         """
-        dmx_graph = torch.fx.Graph()
-        with dmx_graph.inserting_after():
-            _input = dmx_graph.placeholder('_input')
-            normalized_shape = dmx_graph.get_attr('normalized_shape')
-            _weight = dmx_graph.get_attr('_weight')
-            _bias = dmx_graph.get_attr('_bias')
-            eps = dmx_graph.get_attr('eps')
-            ln_args = ((_input), normalized_shape, _weight, _bias, eps)
-            ln = dmx_graph.create_node('call_function', torch.nn.functional.layer_norm, ln_args, name="ln")
-            dmx_graph.output(ln)
-        graph = dmx_graph
-        return graph
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder('_input')
+
+            # Tensor Attributes
+
+            _weight = g.get_attr('_weight')
+            _weight_scale = g.get_attr("weight_scale")
+            _weight_zero_point = g.get_attr("weight_zero_point")
+            _weight_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)),
+            )
+            _weight_dq = g.call_function(torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point))
+
+            _bias = g.get_attr("_bias")
+            _bias_scale = g.get_attr("bias_cast.scale")
+            _bias_zero_point = g.get_attr("bias_cast.zero_point")
+            _bias_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
+            )
+            _bias_dq = g.call_function(torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point))
+
+            # Non Tensor Attributes (no need to quantize)
+            normalized_shape = g.get_attr('normalized_shape')
+            eps = g.get_attr('eps')
+
+            ln_args = ((_input), normalized_shape, _weight_q, _bias_dq, eps)
+            ln = g.create_node('call_function', torch.nn.functional.layer_norm, ln_args, name="ln")
+            g.output(ln)
+        return g
 
 class _RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
