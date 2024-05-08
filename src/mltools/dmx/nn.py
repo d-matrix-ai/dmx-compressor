@@ -7,8 +7,6 @@ import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
 
-from mltools.utils.fx.qdq_graph import qdq_attr
-
 from mltools.numerical import (
     NumericalCastMixin,
     Same,
@@ -537,28 +535,54 @@ class Linear(DmxModule, torch.nn.Linear):
             # ATTRIBUTES
 
             # _weight
-            _weight_dq = qdq_attr("_weight")
+            _weight = g.get_attr("_weight")
+            _weight_scale = g.get_attr("weight_scale")
+            _weight_zero_point = g.get_attr("weight_zero_point")
+            _weight_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)),
+            )
+            _weight_dq = g.call_function(torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point))
 
             # _bias
             if self.bias is not None:
-                _bias_dq = qdq_attr("_bias")
+                _bias = g.get_attr("_bias")
+                _bias_scale = g.get_attr("bias_cast.scale")
+                _bias_zero_point = g.get_attr("bias_cast.zero_point")
+                _bias_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
+                )
+                _bias_dq = g.call_function(torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point))
+                _output = g.create_node(
+                    "call_function",
+                    torch.nn.functional.linear,
+                    (_input_dq, _weight_dq, _bias_dq),
+                    name="_output",
+                )
+                _output_scale = g.get_attr("output_cast.scale")
+                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                )
+                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                g.output(_output_dq)
             else:
-                _bias_dq = None
-
-            _output = g.create_node(
-                "call_function",
-                torch.nn.functional.linear,
-                (_input_dq, _weight_dq, _bias_dq),
-                name="_output",
-            )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
-            _output_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
-            )
-            _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
-            g.output(_output_dq)
+                _output = g.create_node(
+                    "call_function",
+                    torch.nn.functional.linear,
+                    (_input_dq, _weight_dq, None),
+                    name="_output",
+                )
+                _output_scale = g.get_attr("output_cast.scale")
+                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_q = g.call_function(
+                    torch.ops.dmx.quantize,
+                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                )
+                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                g.output(_output_dq)
         return g
 
 
