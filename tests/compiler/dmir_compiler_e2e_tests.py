@@ -44,16 +44,19 @@ def test_distilgpt2():
     import dmir_compiler
     from dmir_compiler import DMIRCompilerConfigs
 
-    config = DMIRCompilerConfigs["stablehlo-refbackend"]
+    config = DMIRCompilerConfigs["stablehlo-dmir"]
     config.use_fx_importer = True
+    config.use_tracing = True
+    config.generate_artifacts = True
     config.decomposition_ops = [torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes, torch.ops.aten.t]
 
-    prog = dmir_compiler.compile(
+    module = dmir_compiler.compile(
         qdqm, x, "distilgpt2", config
     )
 
-    return prog
+    return module
 
 
 if __name__ == "__main__":
-    prog = test_distilgpt2()
+    module = test_distilgpt2()
+    print(module.operation.get_asm(large_elements_limit=10, enable_debug_info=False))
