@@ -222,7 +222,7 @@ class MetadataInterpreter(fx.Interpreter):
     def call_function(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
-        # Diamond with target inside
+        # Diamond with target inside, different color for dmx ops
         # args are used to put text above the in edges
         # output is out edge
         call_func_node = self.nodeDict["function"][self.functionNum]
@@ -235,6 +235,9 @@ class MetadataInterpreter(fx.Interpreter):
                 {"fillcolor": "#edc485", "shape": "diamond"},
             )
         )
+        if "dmx" in repr(call_func_node.target):
+            self.nodes[-1].kwargs["fillcolor"] = "#AAD8FF"
+            self.nodes[-1].args[-1] = str(call_func_node.target)
         self.add_edges(call_func_node)
         return super().call_function(target, args, kwargs)
 
@@ -267,8 +270,9 @@ class MetadataInterpreter(fx.Interpreter):
         color = "#D5D6EA"
         call_module_node = self.nodeDict["module"][self.moduleNum]
         self.moduleNum += 1
+        curr_mod = self.module.get_submodule(target)
         target_name = call_module_node.name
-        print_out = target_name
+        print_out = target + "\n" + f"{curr_mod.__class__}"
         self.nodes.append(
             InfoNode(
                 target_name,
@@ -276,23 +280,23 @@ class MetadataInterpreter(fx.Interpreter):
                 {"fillcolor": color, "shape": "circle"},
             )
         )
-        if isinstance(self.module.get_submodule(target), dmx.nn.DmxModule):
+        if isinstance(curr_mod, dmx.nn.DmxModule):
             for ops in FORMAT_DICT:
-                cast = getattr(self.module.get_submodule(target), ops)
+                cast = getattr(curr_mod, ops)
                 if cast:
                     format = cast.format
                     setattr(self.nodes[-1], ops, format)
                     if repr(format) != FORMAT_DICT[ops]:
                         print_out += "\n" + f"{ops}: {repr(format)}"
 
-            sparsifier = self.module.get_submodule(target).weight_sparsifier
+            sparsifier = curr_mod.weight_sparsifier
             if sparsifier:
                 sparseness = sparsifier.sparseness
                 setattr(self.nodes[-1], "weight_sparsifier", sparseness)
                 if repr(sparseness) != "DENSE":
                     print_out += "\n" + f"weight_sparsifier: {repr(sparseness)}"
 
-            approximator = self.module.get_submodule(target).approximator
+            approximator = curr_mod.approximator
             if approximator:
                 approx_func = approximator.function
                 setattr(self.nodes[-1], "approximator", approx_func)
