@@ -3,6 +3,7 @@ import torch
 from mltools import dmx
 from mltools.numerical.observer import MinMaxObserver, HistogramObserver
 from mltools.numerical import CastTo
+from torch import nn
 
 RANDOM_SEED = 0
 
@@ -28,6 +29,17 @@ def _create_module(cls):
         raise ValueError("unsupported module class {cls}")
 
 
+def _create_test_input(module: torch.nn.Module):
+    if isinstance(module, nn.Conv1d):
+        x_ref = torch.randn(BATCH_SIZE, IN_DIM, IMG_SIZE)
+    elif isinstance(module, nn.Conv2d):
+        x_ref = torch.randn(BATCH_SIZE, IN_DIM, IMG_SIZE, IMG_SIZE)
+    else:
+        x_ref = torch.randn(BATCH_SIZE, IN_DIM)
+
+    return x_ref
+
+
 def test_block_size_non_factor():
     """
     verify performance of group quant when group size is not a factor of ch_axis
@@ -45,7 +57,7 @@ def test_block_size_non_factor():
     assert torch.allclose(cast(x), y, rtol=0.0, atol=1e-6)
 
 
-def test_block_size_non_factor_linear():
+def test_block_size_non_factor_linear_weight():
     """
     verify performance of group quant when group size is not a factor of ch_axis called from a linear layer
     """
@@ -61,6 +73,25 @@ def test_block_size_non_factor_linear():
         layer._weight
     y = torch.Tensor([[0, 1], [3, 7], [6, 8], [10, 14], [0.1, 0.7]])
     assert torch.allclose(layer._weight, y, rtol=0.0, atol=1e-6)
+
+
+def test_block_size_non_factor_linear_activation():
+    """
+    verify performance of group quant when group size is not a factor of ch_axis called from a linear layer
+    """
+    in_dim = 2
+    out_dim = 5
+    layer = dmx.nn.Linear(in_dim, out_dim)
+    layer.input_cast.set_format(dmx.format.INT4)
+    x = torch.Tensor([[0, 1], [3, 7], [5.1, 8], [10, 14], [0.1, 0.7]])
+    layer.input_cast.ch_axis = 0
+    layer.set_activation_calibrator(
+        MinMaxObserver, torch.per_tensor_symmetric, group_size=2
+    )
+    with layer.calibrating_activation(), torch.no_grad():
+        layer(x)
+    y = torch.Tensor([[0, 1], [3, 7], [6, 8], [10, 14], [0.1, 0.7]])
+    assert torch.allclose(layer.input_cast(x), y, rtol=0.0, atol=1e-6)
 
 
 def test_hypernet_linear():
@@ -95,7 +126,7 @@ def test_hypernet_linear():
     "qscheme", (torch.per_tensor_affine, torch.per_tensor_symmetric)
 )
 @pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
-def test_per_tensor_equivalence(module_cls, observer, qscheme, format):
+def test_per_tensor_equivalence_weight(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per tensor when group size is set to size of ch_axis
     """
@@ -138,7 +169,7 @@ def test_per_tensor_equivalence(module_cls, observer, qscheme, format):
     ),
 )
 @pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
-def test_per_channel_equivalence(module_cls, observer, qscheme, format):
+def test_per_channel_equivalence_weight(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per channel when group size is set to 1
     """
@@ -162,3 +193,94 @@ def test_per_channel_equivalence(module_cls, observer, qscheme, format):
     with module_ref.calibrating_weight(), torch.no_grad():
         module_ref._weight
     assert torch.allclose(module._weight, module_ref._weight, rtol=0.0, atol=1e-8)
+
+
+@pytest.mark.parametrize(
+    "module_cls",
+    (
+        dmx.nn.Linear,
+        dmx.nn.Conv1d,
+        dmx.nn.Conv2d,
+    ),
+)
+@pytest.mark.parametrize("observer", (MinMaxObserver, HistogramObserver))
+@pytest.mark.parametrize(
+    "qscheme", (torch.per_tensor_affine, torch.per_tensor_symmetric)
+)
+@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format):
+    """
+    verify that per group is equivalent to per tensor when group size is set to size of ch_axis
+    """
+    module = _create_module(module_cls)
+    module_ref = _create_module(module_cls)
+    x = _create_test_input(
+        module,
+    )
+    module.input_cast.set_format(format)
+    module_ref.input_cast.set_format(format)
+    module.set_activation_calibrator(
+        observer_cls=observer,
+        qscheme_to_overload=qscheme,
+        group_size=x.shape[module.input_cast.ch_axis],
+    )
+    module_ref.set_activation_calibrator(
+        observer_cls=observer,
+        qscheme_to_overload=qscheme,
+    )
+
+    with module.calibrating_activation(), torch.no_grad():
+        module(x)
+    with module_ref.calibrating_activation(), torch.no_grad():
+        module_ref(x)
+    assert torch.allclose(
+        module.input_cast(x), module_ref.input_cast(x), rtol=0.0, atol=1e-8
+    )
+
+
+@pytest.mark.parametrize(
+    "module_cls",
+    (
+        dmx.nn.Linear,
+        dmx.nn.Conv1d,
+        dmx.nn.Conv2d,
+    ),
+)
+@pytest.mark.parametrize("observer", (MinMaxObserver,))
+@pytest.mark.parametrize(
+    "qscheme",
+    (
+        [torch.per_tensor_affine, torch.per_channel_affine],
+        [torch.per_tensor_symmetric, torch.per_channel_symmetric],
+    ),
+)
+@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+def test_per_channel_equivalence_activation(module_cls, observer, qscheme, format):
+    """
+    verify that per group is equivalent to per channel when group size is set to 1
+    """
+    module = _create_module(module_cls)
+    module_ref = _create_module(module_cls)
+
+    x = _create_test_input(
+        module,
+    )
+
+    module.input_cast.set_format(format)
+    module_ref.input_cast.set_format(format)
+    module.set_activation_calibrator(
+        observer_cls=observer,
+        qscheme_to_overload=qscheme[0],
+        group_size=1,
+    )
+    module_ref.set_activation_calibrator(
+        observer_cls=observer,
+        qscheme_to_overload=qscheme[1],
+    )
+    with module.calibrating_activation(), torch.no_grad():
+        module(x)
+    with module_ref.calibrating_activation(), torch.no_grad():
+        module_ref(x)
+    assert torch.allclose(
+        module.input_cast(x), module_ref.input_cast(x), rtol=0.0, atol=1e-8
+    )

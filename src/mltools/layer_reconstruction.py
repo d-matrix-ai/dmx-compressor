@@ -27,14 +27,15 @@ class LayerReconstructionMixin:
         self,
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
+        group_size=None,
     ):
-        ## TODO: support group quantization
         if self.input_cast is not None:
             if qscheme_to_overload is not None:
                 self.input_cast.qscheme = qscheme_to_overload
                 self.input_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
+            self.input_cast.group_size = group_size if group_size else None
             self.input_cast.activation_post_process = observer_cls(
                 dtype=self.input_cast.format,
                 qscheme=self.input_cast.qscheme,
@@ -50,14 +51,15 @@ class LayerReconstructionMixin:
         self,
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
+        group_size=None,
     ):
-        ## TODO: support group quantization
         if self.residual_cast is not None:
             if qscheme_to_overload is not None:
                 self.residual_cast.qscheme = qscheme_to_overload
                 self.residual_cast.is_per_channel = (
                     torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
                 )
+            self.residual_cast.group_size = group_size if group_size else None
             self.residual_cast.activation_post_process = observer_cls(
                 dtype=self.residual_cast.format,
                 qscheme=self.residual_cast.qscheme,
