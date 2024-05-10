@@ -414,7 +414,7 @@ class ScaledDotProductAttention(DmxModule):
                 attn_mask.to(query_states.device) if attn_mask is not None else None
             ),
             dropout_p=dropout_p,
-            is_causal=is_causal,
+            is_causal=attn_mask is None,
         )
 
 

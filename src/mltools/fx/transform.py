@@ -38,7 +38,6 @@ def substitute_transform(
 
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
-    breakpoint()
     # Copy over all object attributes (i.e. config files)
     for key, val in root.__dict__.items():
         if key not in transformed.__dict__ and key != "forward":
