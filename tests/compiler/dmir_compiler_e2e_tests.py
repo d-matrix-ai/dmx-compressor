@@ -47,6 +47,7 @@ def test_distilgpt2():
     config = DMIRCompilerConfigs["stablehlo-dmir"]
     config.use_fx_importer = True
     config.use_tracing = True
+    config.use_sharding = True
     config.generate_artifacts = True
     config.decomposition_ops = [torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes, torch.ops.aten.t]
 
