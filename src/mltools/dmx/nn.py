@@ -1425,6 +1425,50 @@ class RMSNorm(DmxModule, _RMSNorm):
         return initial_dmx
 
 
+class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSNorm):
+    r"""
+    An extension of RMSNorm layer to support DmxModule configurations.
+    This module performs RMS-based layer normalization on the input tensor.
+    The layer normalization is characterized by the `hidden_size` and an optional `eps` value for numerical stability.
+
+    Args:
+        dim (int): The size of the hidden layer (number of hidden units).
+        eps (float, optional): A small constant added to the denominator for numerical stability. Defaults to 1e-6.
+
+    Methods:
+        _forward (_input: Tensor) -> Tensor: Computes the forward pass of the RMS layer normalization.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        eps: float = 1e-6,
+    ) -> None:
+        super().__init__(dim, eps=eps)
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = self.approx_forward((_input,))
+        return _output
+
+    @staticmethod
+    def from_raw(raw: torch.nn.Module) -> DmxModule:
+        r"""
+        Creates a new RMSNorm object (DmxModule) from a given PyTorch RMSNorm layer.
+
+        Args:
+            raw (torch.nn.Module): A PyTorch RMSNorm layer to be converted.
+
+        Returns:
+            DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
+        """
+        initial_dmx = GemmaRMSNorm(
+            dim=raw.weight.shape[0],
+            eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
+        )
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
+
 class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
     r"""
     An extension of PyTorch's BatchNorm2d layer to support DmxModule configurations.

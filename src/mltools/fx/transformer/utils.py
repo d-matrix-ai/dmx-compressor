@@ -32,7 +32,7 @@ dmx_aware_mapping = {
     "transformers.activations.SiLUActivation": dmx.nn.SiLU,
     "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
-    "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmx.nn.RMSNorm,
+    "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmx.nn.GemmaRMSNorm,
 }
 
 dmx_aware_functional_mappings = {
