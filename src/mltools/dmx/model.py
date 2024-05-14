@@ -257,6 +257,7 @@ class DmxModel(torch.nn.Module):
             model.concrete_args = concrete_args
 
             def temp_forward(_m, *_args, **_kwargs):
+                _is_training = _m.training
                 if not _m.transformed:
                     _forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     _m.forward = _forward
@@ -265,10 +266,13 @@ class DmxModel(torch.nn.Module):
                     while len(_m._dmx_configurations_to_be_applied) != 0:
                         _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
                         _m.configure(_config, *_rules)
+                    _m.train(_is_training)
+
                 return _m.forward(*_args, **_kwargs)
 
             model.old_forward = model.forward
             model.forward = partial(temp_forward, model)
+
         return model
 
 
