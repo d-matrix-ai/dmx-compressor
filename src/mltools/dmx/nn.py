@@ -198,7 +198,6 @@ class DmxModule(
         """
         return self.weight_cast.zero_point.to(self.weight.device)
 
-
     @property
     def _bias(self):
         """
@@ -339,6 +338,12 @@ class ResAdd(DmxModule, torch.nn.Module):
         super().__init__()
         self.residual_cast = CastTo()
 
+    def forward(self, input, residual):
+        if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
+            return DmxModule.forward(self, input, residual)
+        else:
+            return torch.add(input, residual)
+
     def _forward(self, _input: Tensor, residual: Tensor) -> Tensor:
         """
         A forward pass of addition operation with quantization applied
@@ -354,15 +359,18 @@ class ResAdd(DmxModule, torch.nn.Module):
         _input = _input.to(_residual.device)
         _output = _input + _residual
         return _output
+
     def to_compiler_graph(self) -> Graph:
         """
         Returns a compiler friendly graph
         """
         dmx_graph = torch.fx.Graph()
         with dmx_graph.inserting_after():
-            _input = dmx_graph.placeholder('_input')
-            _residual = dmx_graph.placeholder('_residual')
-            resadd = dmx_graph.create_node('call_function', torch.add, (_input, _residual), name="resadd")
+            _input = dmx_graph.placeholder("_input")
+            _residual = dmx_graph.placeholder("_residual")
+            resadd = dmx_graph.create_node(
+                "call_function", torch.add, (_input, _residual), name="resadd"
+            )
             dmx_graph.output(resadd)
         graph = dmx_graph
         return graph
@@ -376,10 +384,17 @@ class InitMatMul(torch.nn.Module):
         _output = torch.matmul(_input, multiplier)
         return _output
 
+
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.multiplier_cast = CastTo()
+
+    def forward(self, input, multiplier):
+        if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
+            return DmxModule.forward(self, input, multiplier)
+        else:
+            return torch.matmul(input, multiplier)
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         _multiplier = self.multiplier_cast(multiplier)
@@ -425,7 +440,12 @@ class ActActMatMul(DmxModule, torch.nn.Module):
             _output_zero_point = g.get_attr("output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_output, _output_scale, _output_zero_point, repr(self.output_cast.format)),
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
             )
             _output_dq = g.call_function(
                 torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
@@ -530,7 +550,9 @@ class Linear(DmxModule, torch.nn.Linear):
                 torch.ops.dmx.quantize,
                 (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
             )
-            _input_dq = g.call_function(torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point))
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
 
             # ATTRIBUTES
 
@@ -540,9 +562,16 @@ class Linear(DmxModule, torch.nn.Linear):
             _weight_zero_point = g.get_attr("weight_zero_point")
             _weight_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)),
+                (
+                    _weight,
+                    _weight_scale,
+                    _weight_zero_point,
+                    repr(self.weight_cast.format),
+                ),
             )
-            _weight_dq = g.call_function(torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point))
+            _weight_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
+            )
 
             # _bias
             if self.bias is not None:
@@ -553,7 +582,9 @@ class Linear(DmxModule, torch.nn.Linear):
                     torch.ops.dmx.quantize,
                     (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
                 )
-                _bias_dq = g.call_function(torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point))
+                _bias_dq = g.call_function(
+                    torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point)
+                )
                 _output = g.create_node(
                     "call_function",
                     torch.nn.functional.linear,
@@ -564,9 +595,17 @@ class Linear(DmxModule, torch.nn.Linear):
                 _output_zero_point = g.get_attr("output_cast.zero_point")
                 _output_q = g.call_function(
                     torch.ops.dmx.quantize,
-                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                    (
+                        _output,
+                        _output_scale,
+                        _output_zero_point,
+                        repr(self.weight_cast.format),
+                    ),
                 )
-                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                _output_dq = g.call_function(
+                    torch.ops.dmx.dequantize,
+                    (_output_q, _output_scale, _output_zero_point),
+                )
                 g.output(_output_dq)
             else:
                 _output = g.create_node(
@@ -579,9 +618,17 @@ class Linear(DmxModule, torch.nn.Linear):
                 _output_zero_point = g.get_attr("output_cast.zero_point")
                 _output_q = g.call_function(
                     torch.ops.dmx.quantize,
-                    (_output, _output_scale, _output_zero_point, repr(self.weight_cast.format)),
+                    (
+                        _output,
+                        _output_scale,
+                        _output_zero_point,
+                        repr(self.weight_cast.format),
+                    ),
                 )
-                _output_dq = g.call_function(torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point))
+                _output_dq = g.call_function(
+                    torch.ops.dmx.dequantize,
+                    (_output_q, _output_scale, _output_zero_point),
+                )
                 g.output(_output_dq)
         return g
 
@@ -1143,11 +1190,14 @@ class Softmax(DmxModule, torch.nn.Softmax):
         """
         dmx_graph = torch.fx.Graph()
         with dmx_graph.inserting_after():
-            _input = dmx_graph.placeholder('_input')
-            softmax = dmx_graph.create_node('call_function', torch.nn.functional.softmax, (_input,), name="softmax")
+            _input = dmx_graph.placeholder("_input")
+            softmax = dmx_graph.create_node(
+                "call_function", torch.nn.functional.softmax, (_input,), name="softmax"
+            )
             dmx_graph.output(softmax)
         graph = dmx_graph
         return graph
+
 
 class LayerNorm(DmxModule, torch.nn.LayerNorm):
     r"""
@@ -1208,18 +1258,25 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         """
         g = torch.fx.Graph()
         with g.inserting_after():
-            _input = g.placeholder('_input')
+            _input = g.placeholder("_input")
 
             # Tensor Attributes
 
-            _weight = g.get_attr('_weight')
+            _weight = g.get_attr("_weight")
             _weight_scale = g.get_attr("weight_scale")
             _weight_zero_point = g.get_attr("weight_zero_point")
             _weight_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)),
+                (
+                    _weight,
+                    _weight_scale,
+                    _weight_zero_point,
+                    repr(self.weight_cast.format),
+                ),
             )
-            _weight_dq = g.call_function(torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point))
+            _weight_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
+            )
 
             _bias = g.get_attr("_bias")
             _bias_scale = g.get_attr("bias_cast.scale")
@@ -1228,16 +1285,21 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
                 torch.ops.dmx.quantize,
                 (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
             )
-            _bias_dq = g.call_function(torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point))
+            _bias_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point)
+            )
 
             # Non Tensor Attributes (no need to quantize)
-            normalized_shape = g.get_attr('normalized_shape')
-            eps = g.get_attr('eps')
+            normalized_shape = g.get_attr("normalized_shape")
+            eps = g.get_attr("eps")
 
             ln_args = ((_input), normalized_shape, _weight_q, _bias_dq, eps)
-            ln = g.create_node('call_function', torch.nn.functional.layer_norm, ln_args, name="ln")
+            ln = g.create_node(
+                "call_function", torch.nn.functional.layer_norm, ln_args, name="ln"
+            )
             g.output(ln)
         return g
+
 
 class _RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -1478,6 +1540,7 @@ class Dropout(DmxModule, torch.nn.Dropout):
         self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
         graph = self.initial_dmx_graph
         return graph
+
 
 class ReLU(DmxModule, torch.nn.ReLU):
     r"""

@@ -256,7 +256,6 @@ class DmxModel(torch.nn.Module):
             model.concrete_args = concrete_args
 
             def temp_forward(_m, *_args, **_kwargs):
-                print("IN TEMP FORWARD")
                 if not _m.transformed:
                     _forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     _m.forward = _forward
