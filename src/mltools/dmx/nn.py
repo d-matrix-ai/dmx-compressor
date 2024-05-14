@@ -385,12 +385,15 @@ class InitMatMul(torch.nn.Module):
         return _output
 
 
-class ElementMul(DmxModule):
+class Mul(DmxModule):
     def __init__(self) -> None:
         super().__init__()
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        return _input * multiplier.to(_input.device)
+        if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
+            return _input * multiplier.to(_input.device)
+        else:
+            return _input * multiplier
 
 
 class ScaledDotProductAttention(DmxModule):

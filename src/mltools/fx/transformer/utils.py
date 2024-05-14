@@ -51,7 +51,7 @@ for f_key in list(dmx_aware_functional_mappings.keys()):
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)
 dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
 dmx_aware_functional_mappings["<built-in function matmul>"] = dmx.nn.ActActMatMul
-dmx_aware_functional_mappings["<built-in function mul>"] = dmx.nn.ElementMul
+dmx_aware_functional_mappings["<built-in function mul>"] = dmx.nn.Mul
 
 
 def process_args(args):
