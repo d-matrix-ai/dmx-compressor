@@ -1266,11 +1266,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward(
-            (_input,),
-            self.normalized_shape,
-            self._weight.to(_input.dtype),
-            self._bias.to(_input.dtype),
-            self.eps,
+            (_input,), self.normalized_shape, self._weight, self._bias, self.eps
         )
         return _output
 

@@ -174,7 +174,7 @@ class CastTo(FakeQuantize):
                     x = (x - zp) * sc
             else:  # torch.dtype
                 x = super().forward(x)
-        return x
+        return x.to(self.physical_dtype)
 
     def get_precision(self) -> Optional[int]:
         if isinstance(self.format, (Same, torch.dtype)):
