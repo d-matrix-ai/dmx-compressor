@@ -226,7 +226,6 @@ class DmxModule(
         _input = self.input_cast(input)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
-        breakpoint()
         _output = self._forward(_input, *args, **kwags)
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
