@@ -338,6 +338,12 @@ class ResAdd(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.residual_cast = CastTo()
+    
+    def forward(self,input,residual):
+        if isinstance(input,torch.Tensor) and isinstance(residual,torch.Tensor):
+            return DmxModule.forward(self,input,residual)
+        else:
+            return input+residual
 
     def _forward(self, _input: Tensor, residual: Tensor) -> Tensor:
         """
@@ -380,6 +386,12 @@ class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.multiplier_cast = CastTo()
+    
+    def forward(self,input,multiplier):
+        if isinstance(input,torch.Tensor) and isinstance(multiplier,torch.Tensor):
+            return DmxModule.forward(self,input,multiplier)
+        else:
+            return torch.matmul(input,multiplier)
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         _multiplier = self.multiplier_cast(multiplier)
