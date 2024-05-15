@@ -61,6 +61,7 @@ class SmoothQuant(nn.Module):
         migration_strength: float = 0.5,
         scale_format: Union[str, Format] = "SAME",
         scale_min: float = 1e-5,
+        **kwargs,
     ) -> None:
         super().__init__()
         self.a_ch_axis = a_ch_axis
@@ -399,6 +400,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         scale_format: Union[str, Format] = "SAME",
         dynamic: bool = False,
         scale_min: float = 1e-5,
+        **kwargs,
     ) -> None:
         super().__init__(
             a_ch_axis=ch_axis,
@@ -408,6 +410,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
             a_dynamic=dynamic,
             b_dynamic=False,
             scale_min=scale_min,
+            **kwargs
         )
         self.ch_axis = ch_axis
         self.win_ch_axis = win_ch_axis
@@ -479,7 +482,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         Returns:
             scaled weight tensor
         """
-        return self.scale_b(wgt)
+        return self.scale_b(wgt).to(wgt.device)
 
     def scale_input(self, inp):
         """
@@ -491,7 +494,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         Returns:
             scaled input activation tensor
         """
-        return self.scale_a(inp)
+        return self.scale_a(inp).to(inp.device)
 
     def fuse_to_weight(self, wgt: torch.Tensor) -> None:
         """
