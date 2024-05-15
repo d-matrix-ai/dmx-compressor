@@ -146,9 +146,12 @@ class DmxModelMixin:
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
+        **hyperparams,
     ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
+        for _, _m in specific_layers:
+            _m.set_weight_calibrator(**hyperparams)
         with torch.no_grad(), ExitStack() as stack:
             yield [
                 stack.enter_context(m.calibrating_weight()) for _, m in specific_layers
@@ -162,9 +165,12 @@ class DmxModelMixin:
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
+        **hyperparams,
     ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
+        for _, _m in specific_layers:
+            _m.set_activation_calibrator(**hyperparams)
         with torch.no_grad(), ExitStack() as stack:
             yield [
                 stack.enter_context(m.calibrating_activation())
@@ -179,6 +185,7 @@ class DmxModelMixin:
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
         save_checkpoint_to: Optional[str] = None,
+        **hyperparams,
     ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
