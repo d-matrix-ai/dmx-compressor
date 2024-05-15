@@ -122,7 +122,7 @@ class DMXAwareTransformer(fx.Transformer):
                 and args[1].node.op
                 in ["call_module", "call_function", "call_method", "placeholder"]
             ):
-                cand_name = curr_target + ".elemul"
+                cand_name = curr_target + ".mul"
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)

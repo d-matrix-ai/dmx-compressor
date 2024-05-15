@@ -389,8 +389,14 @@ class Mul(DmxModule):
     def __init__(self) -> None:
         super().__init__()
 
+    def forward(self, input, residual):
+        if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
+            return DmxModule.forward(self, input, residual)
+        else:
+            return torch.mul(input, residual)
+
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
+        if isinstance(_input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
             return _input * multiplier.to(_input.device)
         else:
             return _input * multiplier
@@ -1201,7 +1207,7 @@ class Softmax(DmxModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
-    def _forward(self, _input: Tensor) -> Tensor:
+    def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward((_input,), dim=self.dim)
         return _output
 
@@ -1264,7 +1270,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
             normalized_shape, eps=eps, elementwise_affine=elementwise_affine
         )
 
-    def _forward(self, _input: Tensor) -> Tensor:
+    def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward(
             (_input,), self.normalized_shape, self._weight, self._bias, self.eps
         )
@@ -1611,7 +1617,7 @@ class Dropout(DmxModule, torch.nn.Dropout):
     def __init__(self, p: float = 0.5, inplace: bool = False) -> None:
         super().__init__(p=p, inplace=inplace)
 
-    def _forward(self, _input: Tensor) -> Tensor:
+    def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward((_input,))
         return _output
 
