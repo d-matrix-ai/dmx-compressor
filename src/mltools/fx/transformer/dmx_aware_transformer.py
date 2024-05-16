@@ -56,6 +56,34 @@ class DMXAwareTransformer(fx.Transformer):
         )
         return Proxy(new_node, self.tracer)
 
+    def call_method(
+        self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+    ) -> Any:
+        if target == "baddbmm":
+            candidate = target
+            curr_name = get_name_for_func_nodes(
+                target,
+                self.new_graph._graph_namespace._used_names,
+                self.new_graph._graph_namespace._base_count,
+            )
+            scope, _ = self.node_name_to_scope[curr_name]
+            new_name = scope + "." + candidate if scope != "" else candidate
+            # If new name is not candidate, need to add candidate to used names,
+            # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
+            if new_name != candidate:
+                self.new_graph._graph_namespace.create_name(candidate, None)
+
+            self.module.add_submodule(new_name, dmx.nn.BAddBMM())
+            new_node = self.new_graph.create_node(
+                "call_module",
+                new_name,
+            )
+            new_node.args = process_args(args)
+            new_node.kwargs = process_kwargs(kwargs)
+            return Proxy(new_node, self.tracer)
+        else:
+            return super().call_method(target, args, kwargs)
+
     def create_unique_name_in_scope(self, cand_name):
         curr_name = get_name_for_func_nodes(
             cand_name,
@@ -91,7 +119,7 @@ class DMXAwareTransformer(fx.Transformer):
         node_key = str(target)
         if node_key not in dmx_aware_functional_mappings:
             return super().call_function(target, args, kwargs)
-        # Skip tranformation for add that is not in a resnet
+
         candidate = self.new_graph._target_to_str(target)
         curr_name = get_name_for_func_nodes(
             candidate,
@@ -126,7 +154,11 @@ class DMXAwareTransformer(fx.Transformer):
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)
-        elif node_key in [repr(eval("torch.matmul")), "<built-in function matmul>"]:
+        elif node_key in [
+            repr(eval("torch.matmul")),
+            repr(eval("torch.bmm")),
+            "<built-in function matmul>",
+        ]:
             cand_name = curr_target + ".matmul"
             new_name = self.create_unique_name_in_scope(cand_name)
         else:

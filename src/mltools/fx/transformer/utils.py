@@ -44,6 +44,7 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.softmax": dmx.nn.Softmax,
     "torch.nn.functional.dropout": dmx.nn.Dropout,
     "torch.matmul": dmx.nn.ActActMatMul,
+    "torch.bmm": dmx.nn.ActActMatMul,
     "torch.nn.functional.scaled_dot_product_attention": dmx.nn.ScaledDotProductAttention,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):

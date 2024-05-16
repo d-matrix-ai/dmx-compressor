@@ -496,6 +496,13 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         return g
 
 
+class BAddBMM(DmxModule):
+    def _forward(self, _input, batch1, batch2, **kwargs):
+        return torch.baddbmm(
+            _input, batch1.to(_input.device), batch2.to(_input.device), **kwargs
+        )
+
+
 class Linear(DmxModule, torch.nn.Linear):
     r"""
     An extension of PyTorch's Linear layer to support DmxModule configurations.
