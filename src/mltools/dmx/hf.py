@@ -36,7 +36,9 @@ def dmx_transform(pipe, dmx_config_name):
             raise RuntimeError(f"illegal dmx_config: {dmx_config_name}")
 
 
-def prepare_dataset_and_column(dataset, column_name=None, dataset_version=None, dataset_split="test", seed=42):
+def prepare_dataset_and_column(
+    dataset, column_name=None, dataset_version=None, dataset_split="test", seed=42
+):
     dataset_column_mapping = {
         "wikitext": "text",
         "ptb_text_only": "sentence",
@@ -53,9 +55,11 @@ def prepare_dataset_and_column(dataset, column_name=None, dataset_version=None, 
         )
 
     dataset = load_dataset(dataset, dataset_version, split=dataset_split)
-    dataset = dataset.shuffle(seed=seed)
+    if dataset_split == "train":
+        dataset = dataset.shuffle(seed=seed)
 
     return dataset, column_name
+
 
 def do_forward_on(
     model,
@@ -67,17 +71,19 @@ def do_forward_on(
     num_samples=None,
     seed=42,
 ):
-    dataset, column_name = prepare_dataset_and_column(dataset, column_name, dataset_version, dataset_split, seed)
-    
+    dataset, column_name = prepare_dataset_and_column(
+        dataset, column_name, dataset_version, dataset_split, seed
+    )
+
     encodings = tokenizer("\n\n".join(dataset[column_name]), return_tensors="pt")
-    
+
     if hasattr(model.config, "max_position_embeddings"):
         max_seq_len = model.config.max_position_embeddings
     elif hasattr(model.config, "n_positions"):
         max_seq_len = model.config.n_positions
     else:
         max_seq_len = 2048
-    
+
     stride = max_seq_len
 
     seq_len = encodings.input_ids.size(1)
@@ -86,7 +92,7 @@ def do_forward_on(
         seq_len = min((num_samples - 1) * stride + max_seq_len, seq_len)
     else:
         seq_len = (seq_len // stride) * stride
-    
+
     nlls = []
     prev_end_loc = 0
     model.eval()
@@ -116,6 +122,7 @@ def do_forward_on(
         perplexity=ppl.item(),
     )
 
+
 def eval_text_generation(
     model,
     dataset,
@@ -125,14 +132,17 @@ def eval_text_generation(
     dataset_version=None,
     dataset_split="test",
 ):
-    dataset, column_name = prepare_dataset_and_column(dataset, column_name, dataset_version, dataset_split)
-    
+    dataset, column_name = prepare_dataset_and_column(
+        dataset, column_name, dataset_version, dataset_split
+    )
+
     metric = evaluate.load(metric, module_type="metric")
 
     results = metric.compute(
         model=model, revision=revision, references=dataset[column_name]
     )
     return results
+
 
 def pipe_eval(
     model,
@@ -156,6 +166,7 @@ def pipe_eval(
     return eval_function(
         model, dataset, metric, revision, column_name, dataset_version, dataset_split
     )
+
 
 def pipeline(
     *args,
