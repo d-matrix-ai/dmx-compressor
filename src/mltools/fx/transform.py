@@ -36,6 +36,18 @@ def substitute_transform(
     else:
         gm, tracer = symbolic_trace(root, concrete_args)
 
+    # inputs_names appearing in concrete args will be removed from input, we want to add it back to maintain original input signature
+    intersection = set(input_names) & set(concrete_args.keys())
+    if intersection:
+        # find first none placehoder node
+        node_list = gm.graph.nodes
+        for node in node_list:
+            if node.op != "placeholder":
+                break
+        for inp in intersection:
+            with gm.graph.inserting_before(node):
+                gm.graph.placeholder(inp)
+        gm.recompile()
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)

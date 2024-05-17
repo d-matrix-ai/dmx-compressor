@@ -232,6 +232,9 @@ class DmxModel(torch.nn.Module):
             )  # NOTE: using this to guard against abuse
         elif _output_cls is _empty:
             _output_cls = None
+        # boolean inputs will affect tracing and need to be set as concrete args
+        bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
+        _model.concrete_args.update(bool_inputs)
         _model._gm = substitute_transform(
             _model,
             hf=_model.hf,

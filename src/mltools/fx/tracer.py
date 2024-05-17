@@ -115,7 +115,6 @@ def hf_symbolic_trace(
         concrete_args.update()
     else:
         concrete_args = get_concrete_args(model, input_names)
-
     # Tracing.
     tracer = tracer_cls()
     traced_graph = tracer.trace(model, concrete_args=concrete_args)
