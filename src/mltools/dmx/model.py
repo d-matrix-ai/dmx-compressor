@@ -222,6 +222,7 @@ class DmxModelMixin:
 class DmxModel(torch.nn.Module):
     @staticmethod
     def _get_transformed_forward(_model, args, kwargs):
+        print("Model transformation triggered")
         _model.forward = _model.old_forward
         _mod_signature = signature(_model.forward)
         _output_cls = _mod_signature.return_annotation
@@ -234,6 +235,7 @@ class DmxModel(torch.nn.Module):
             _output_cls = None
         # boolean inputs will affect tracing and need to be set as concrete args
         bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
+
         _model.concrete_args.update(bool_inputs)
         _model._gm = substitute_transform(
             _model,
@@ -255,6 +257,24 @@ class DmxModel(torch.nn.Module):
         )
         return _forward
 
+    @staticmethod
+    def is_same_signature(_model, kwargs):
+        tracing_kwargs = _model.tracing_kwargs
+        # if kwargs has different keys, need to retrace
+        if tracing_kwargs.keys() != kwargs.keys():
+            return False
+        # comparing kwargs values between tracing kwarg and new kwargs
+        for k in kwargs.keys():
+            # if bool argument has different values, need to retrace
+            if isinstance(kwargs[k], bool) and kwargs[k] != tracing_kwargs[k]:
+                return False
+            # if one in None and other is not none, need to retrace
+            if not isinstance(kwargs[k], bool) and (kwargs[k] is None) != (
+                tracing_kwargs[k] is None
+            ):
+                return False
+        return True
+
     @classmethod
     def from_torch(
         cls,
@@ -270,15 +290,21 @@ class DmxModel(torch.nn.Module):
 
             def temp_forward(_m, *_args, **_kwargs):
                 _is_training = _m.training
-                if not _m.transformed:
+
+                if not _m.transformed or not DmxModel.is_same_signature(model, _kwargs):
+                    # remove kwargs with value None
+                    _kwargs = {k: v for k, v in _kwargs.items() if v is not None}
                     _forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
-                    _m.forward = _forward
+
                     _m.transformed = True
                     _m.baseline_config = _m.dmx_config  # BASELINE config recorded
                     while len(_m._dmx_configurations_to_be_applied) != 0:
                         _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
                         _m.configure(_config, *_rules)
                     _m.train(_is_training)
+                    _m.tracing_kwargs = _kwargs
+                    _m.forward = partial(temp_forward, _m)
+                    return _forward(*_args, **_kwargs)
 
                 return _m.forward(*_args, **_kwargs)
 
