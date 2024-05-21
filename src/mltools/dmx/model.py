@@ -236,16 +236,16 @@ class DmxModel(torch.nn.Module):
         # boolean inputs will affect tracing and need to be set as concrete args
         bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
 
-        _model.concrete_args.update(bool_inputs)
         _model._gm = substitute_transform(
             _model,
             hf=_model.hf,
             input_names=signature(_model.forward)
             .bind(*args, **kwargs)
             .arguments.keys(),
-            concrete_args=_model.concrete_args,
+            concrete_args=bool_inputs,
         )
         _model._output_cls = _output_cls
+
         _forward = (
             (
                 lambda *_args, **_kwargs: _output_cls(
@@ -279,22 +279,20 @@ class DmxModel(torch.nn.Module):
     def from_torch(
         cls,
         model: torch.nn.Module,
-        concrete_args: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
         if DmxModelMixin not in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
             model._gm = None
             model.transformed = False
             model.hf = model.__class__.__module__.startswith("transformers")
-            model.concrete_args = concrete_args
 
             def temp_forward(_m, *_args, **_kwargs):
                 _is_training = _m.training
-
-                if not _m.transformed or not DmxModel.is_same_signature(model, _kwargs):
+                if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+                    print("triggering transform")
                     # remove kwargs with value None
                     _kwargs = {k: v for k, v in _kwargs.items() if v is not None}
-                    _forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
+                    _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
 
                     _m.transformed = True
                     _m.baseline_config = _m.dmx_config  # BASELINE config recorded
@@ -304,9 +302,9 @@ class DmxModel(torch.nn.Module):
                     _m.train(_is_training)
                     _m.tracing_kwargs = _kwargs
                     _m.forward = partial(temp_forward, _m)
-                    return _forward(*_args, **_kwargs)
+                    return _m._forward(*_args, **_kwargs)
 
-                return _m.forward(*_args, **_kwargs)
+                return _m._forward(*_args, **_kwargs)
 
             model.old_forward = model.forward
             model.forward = partial(temp_forward, model)

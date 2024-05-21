@@ -187,7 +187,6 @@ def pipeline(
     pipe.revision = kwargs.get("revision", "main")
     pipe.model = DmxModel.from_torch(
         pipe.model,
-        concrete_args={},
     )
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
