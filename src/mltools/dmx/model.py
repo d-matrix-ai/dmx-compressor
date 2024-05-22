@@ -233,19 +233,33 @@ class DmxModel(torch.nn.Module):
             )  # NOTE: using this to guard against abuse
         elif _output_cls is _empty:
             _output_cls = None
+
+        # remove kwargs with value None
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
         # boolean inputs will affect tracing and need to be set as concrete args
         bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
+        kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
 
+        input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
         _model._gm = substitute_transform(
             _model,
             hf=_model.hf,
-            input_names=signature(_model.forward)
-            .bind(*args, **kwargs)
-            .arguments.keys(),
+            input_names=input_names,
             concrete_args=bool_inputs,
         )
+        # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
+        intersection = set(_model.tracing_kwargs.keys()) - set(kwargs.keys())
+        if intersection:
+            # find first none placehoder node
+            node_list = _model._gm.graph.nodes
+            for node in node_list:
+                if node.op != "placeholder":
+                    break
+            for inp in intersection:
+                with _model._gm.graph.inserting_before(node):
+                    _model._gm.graph.placeholder(inp)
+            _model._gm.recompile()
         _model._output_cls = _output_cls
-
         _forward = (
             (
                 lambda *_args, **_kwargs: _output_cls(
@@ -292,8 +306,8 @@ class DmxModel(torch.nn.Module):
                     if _m.transformed:
                         curr_cfg = _m.dmx_config
                     print("triggering transform")
-                    # remove kwargs with value None
-                    _kwargs = {k: v for k, v in _kwargs.items() if v is not None}
+                    _m.tracing_kwargs = _kwargs
+
                     _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     if _m.transformed:
                         _m.configure(curr_cfg)
@@ -306,7 +320,6 @@ class DmxModel(torch.nn.Module):
                             )
                             _m.configure(_config, *_rules)
                     _m.train(_is_training)
-                    _m.tracing_kwargs = _kwargs
                     _m.forward = partial(temp_forward, _m)
                     return _m._forward(*_args, **_kwargs)
 

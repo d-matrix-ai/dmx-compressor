@@ -218,7 +218,6 @@ class DmxModule(
         _dtype, _device = input.dtype, input.device
         if hasattr(self, "weight") and self.weight != None:
             _device = self.weight.device
-            input = input.to(_device)
         if self.smoothquant is not None:
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
@@ -226,15 +225,24 @@ class DmxModule(
         _input = self.input_cast(input)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
+        # _input, args, kwags = self.align_device(_input, args, kwags, _device)
         _output = self._forward(_input, *args, **kwags)
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
         if self.align_boundary_dtype:
             output = output.to(_dtype)
-        if self.align_boundary_device:
-            output = output.to(_device)
         return output
+
+    def align_device(self, _input, args, kwags, _device):
+        _input = _input.to(_device)
+        for arg in args:
+            if isinstance(arg, Tensor):
+                arg = arg.to(_device)
+        for v in kwags.values():
+            if isinstance(v, Tensor):
+                v = v.to(_device)
+        return _input, args, kwags
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
         """
@@ -245,7 +253,7 @@ class DmxModule(
         """
         state_dic = self.state_dict()
         for key, val in raw.state_dict().items():
-            state_dic[key] = val.to(val.device)
+            state_dic[key] = val
         self.load_state_dict(state_dic, assign=True)
         # Inherit device from raw module
         for n, m in raw.named_parameters():
@@ -356,7 +364,6 @@ class ResAdd(DmxModule, torch.nn.Module):
             Sum of _input tensor and quantized residual tensor.
         """
         _residual = self.residual_cast(residual)
-        _input = _input.to(_residual.device)
         _output = _input + _residual
         return _output
 
@@ -433,10 +440,7 @@ class Mul(DmxModule):
             return torch.mul(input, residual)
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        if isinstance(_input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
-            return _input * multiplier.to(_input.device)
-        else:
-            return _input * multiplier
+        return _input * multiplier
 
 
 class ScaledDotProductAttention(DmxModule):
@@ -454,11 +458,9 @@ class ScaledDotProductAttention(DmxModule):
     ):
         return torch.nn.functional.scaled_dot_product_attention(
             query_states,
-            key_states.to(query_states.device),
-            value_states.to(query_states.device),
-            attn_mask=(
-                attn_mask.to(query_states.device) if attn_mask is not None else None
-            ),
+            key_states,
+            value_states,
+            attn_mask=(attn_mask if attn_mask is not None else None),
             dropout_p=dropout_p,
             is_causal=attn_mask is None,
         )
@@ -477,7 +479,7 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         _multiplier = self.multiplier_cast(multiplier)
-        _output = torch.matmul(_input, _multiplier.to(_input.device))
+        _output = torch.matmul(_input, _multiplier)
         return _output
 
     def to_compiler_graph(self) -> Graph:
@@ -535,9 +537,7 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 
 class BAddBMM(DmxModule):
     def _forward(self, _input, batch1, batch2, **kwargs):
-        return torch.baddbmm(
-            _input, batch1.to(_input.device), batch2.to(_input.device), **kwargs
-        )
+        return torch.baddbmm(_input, batch1, batch2, **kwargs)
 
 
 class Linear(DmxModule, torch.nn.Linear):
