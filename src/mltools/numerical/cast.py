@@ -132,8 +132,8 @@ class CastTo(FakeQuantize):
             self.zero_point.device
         )
         if self.scale.shape != _scale.shape:
-            self.scale.resize_(_scale.shape)
-            self.zero_point.resize_(_zero_point.shape)
+            self.scale = torch.zeros_like(_scale)
+            self.zero_point = torch.zeros_like(_zero_point)
         self.scale.copy_(_scale)
         self.zero_point.copy_(_zero_point)
 
