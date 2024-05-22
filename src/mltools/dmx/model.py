@@ -289,16 +289,22 @@ class DmxModel(torch.nn.Module):
             def temp_forward(_m, *_args, **_kwargs):
                 _is_training = _m.training
                 if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+                    if _m.transformed:
+                        curr_cfg = _m.dmx_config
                     print("triggering transform")
                     # remove kwargs with value None
                     _kwargs = {k: v for k, v in _kwargs.items() if v is not None}
                     _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
-
-                    _m.transformed = True
-                    _m.baseline_config = _m.dmx_config  # BASELINE config recorded
-                    while len(_m._dmx_configurations_to_be_applied) != 0:
-                        _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
-                        _m.configure(_config, *_rules)
+                    if _m.transformed:
+                        _m.configure(curr_cfg)
+                    else:
+                        _m.transformed = True
+                        _m.baseline_config = _m.dmx_config  # BASELINE config recorded
+                        while len(_m._dmx_configurations_to_be_applied) != 0:
+                            _config, _rules = (
+                                _m._dmx_configurations_to_be_applied.popleft()
+                            )
+                            _m.configure(_config, *_rules)
                     _m.train(_is_training)
                     _m.tracing_kwargs = _kwargs
                     _m.forward = partial(temp_forward, _m)

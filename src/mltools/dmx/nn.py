@@ -745,7 +745,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
         self.align_boundary_dtype = False  # special treatment for sparse layers
 
     def _forward(self, _input: Tensor) -> Tensor:
-        print("using dmx")
+        print("using dmx:", self.input_cast.format)
         _output = F.embedding(
             _input,
             self._weight,
