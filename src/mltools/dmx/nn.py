@@ -225,7 +225,7 @@ class DmxModule(
         _input = self.input_cast(input)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
-        # _input, args, kwags = self.align_device(_input, args, kwags, _device)
+        _input, args, kwags = self.align_device(_input, args, kwags, _device)
         _output = self._forward(_input, *args, **kwags)
         output = self.output_cast(_output)
         if self.flop_counter_enabled:
@@ -236,12 +236,10 @@ class DmxModule(
 
     def align_device(self, _input, args, kwags, _device):
         _input = _input.to(_device)
-        for arg in args:
-            if isinstance(arg, Tensor):
-                arg = arg.to(_device)
-        for v in kwags.values():
-            if isinstance(v, Tensor):
-                v = v.to(_device)
+        args = tuple(x.to(_device) if isinstance(x, torch.Tensor) else x for x in args)
+        for k in kwags.keys():
+            if isinstance(kwags[k], Tensor):
+                kwags[k] = kwags[k].to(_device)
         return _input, args, kwags
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
@@ -745,7 +743,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
         self.align_boundary_dtype = False  # special treatment for sparse layers
 
     def _forward(self, _input: Tensor) -> Tensor:
-        print("using dmx:", self.input_cast.format)
+        print("using dmx:", self.output_cast.format)
         _output = F.embedding(
             _input,
             self._weight,
