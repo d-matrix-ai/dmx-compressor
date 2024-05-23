@@ -235,10 +235,10 @@ class DmxModule(
         return output
 
     def align_device(self, _input, args, kwags, _device):
-        _input = _input.to(_device)
-        args = tuple(x.to(_device) if isinstance(x, torch.Tensor) else x for x in args)
+        _input = _input.to(_device) if _input.device!=_device else _input
+        args = tuple(x.to(_device) if isinstance(x, torch.Tensor) and x.device!=_device else x for x in args)
         for k in kwags.keys():
-            if isinstance(kwags[k], Tensor):
+            if isinstance(kwags[k], Tensor) and kwags[k].device!=_device:
                 kwags[k] = kwags[k].to(_device)
         return _input, args, kwags
 
