@@ -3,7 +3,14 @@ from . import nn
 from ..numerical import CastTo, Format
 from ..sparse import Sparsify, Sparseness
 from ..functional import Approximate, ApproximationFunction
-from .model import DmxModel, DmxConfig, DmxConfigRule, DmxPipelineMixin, DmxSimplePipeline, Model
+from .model import (
+    DmxModel,
+    DmxConfig,
+    DmxConfigRule,
+    DmxPipelineMixin,
+    DmxSimplePipeline,
+    Model,
+)
 from .hf import pipeline, dmx_transform
 from .nn import *
 
@@ -120,6 +127,11 @@ format = SimpleNamespace(
         "SBFP<XP[4,0](CSN)><FP[0|4|4,18](FN)>{16,-1}"
     ),
     SBFP12_16_18_FD=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[0|4|4,18](FN)>{16,1}"),
+    # K block dim should be -1, and its block size should be 128
+    SBFP12_K=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[1|5|10,15](_N)>{128,-1}"),
+    # K block dim should be -1, and its block size could be 64 or 128
+    SBFP12_V_64=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[1|5|10,15](_N)>{64,-1}"),
+    SBFP12_V_128=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[1|5|10,15](_N)>{128,-1}"),
     MXFP8_E4M3K128_LD=Format.from_shorthand("MXFP8[E4M3]{128,-1}"),
     MXFP8_E4M3K128_FD=Format.from_shorthand("MXFP8[E4M3]{128,1}"),
     MXFP8_E4M3K64_LD=Format.from_shorthand("MXFP8[E4M3]{64,-1}"),
