@@ -234,40 +234,19 @@ class DmxModel(torch.nn.Module):
         elif _output_cls is _empty:
             _output_cls = None
 
-        if "cache_position" in kwargs:
-            kwargs["cache_position"] = None
-        # remove kwargs with value None
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        # boolean inputs will affect tracing and need to be set as concrete args
-        bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
-        kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
-
-        input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
-        dummy_inputs = {}
-        for k in input_names:
-            if k not in kwargs:
-                dummy_inputs[k] = args[0]
-            else:
-                dummy_inputs[k] = kwargs[k]
+        input_names, concrete_args, dummy_inputs, kwargs = (
+            DmxModel().prepare_tracing_inputs(_model, args, kwargs)
+        )
         _model._gm = substitute_transform(
             _model,
             hf=_model.hf,
             input_names=input_names,
-            concrete_args=bool_inputs,
+            concrete_args=concrete_args,
             dummy_inputs=dummy_inputs,
         )
-        # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
-        intersection = set(_model.tracing_kwargs.keys()) - set(kwargs.keys())
-        if intersection:
-            # find first none placehoder node
-            node_list = _model._gm.graph.nodes
-            for node in node_list:
-                if node.op != "placeholder":
-                    break
-            for inp in intersection:
-                with _model._gm.graph.inserting_before(node):
-                    _model._gm.graph.placeholder(inp)
-            _model._gm.recompile()
+
+        DmxModel().post_process_gm(_model, kwargs)
+
         _model._output_cls = _output_cls
         _forward = (
             (
@@ -297,6 +276,41 @@ class DmxModel(torch.nn.Module):
             ):
                 return False
         return True
+
+    @staticmethod
+    def prepare_tracing_inputs(_model, args, kwargs):
+        # special treatment for cache_position as it cannot be traced properly, specifying cache_position=None uses default cache_position pattern that produces functionaly correct results
+        if "cache_position" in kwargs:
+            kwargs["cache_position"] = None
+        # remove kwargs with value None
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        # boolean inputs will affect tracing and need to be set as concrete args
+        bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
+        kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
+
+        input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
+        dummy_inputs = {}
+        for k in input_names:
+            if k not in kwargs:
+                dummy_inputs[k] = args[0]
+            else:
+                dummy_inputs[k] = kwargs[k]
+        return input_names, bool_inputs, dummy_inputs, kwargs
+
+    @staticmethod
+    def post_process_gm(_model, kwargs):
+        # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
+        intersection = set(_model.tracing_kwargs.keys()) - set(kwargs.keys())
+        if intersection:
+            # find first none placehoder node
+            node_list = _model._gm.graph.nodes
+            for node in node_list:
+                if node.op != "placeholder":
+                    break
+            for inp in intersection:
+                with _model._gm.graph.inserting_before(node):
+                    _model._gm.graph.placeholder(inp)
+            _model._gm.recompile()
 
     @classmethod
     def from_torch(
