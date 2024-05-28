@@ -364,16 +364,53 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        dmx_graph = torch.fx.Graph()
-        with dmx_graph.inserting_after():
-            _input = dmx_graph.placeholder("_input")
-            _residual = dmx_graph.placeholder("_residual")
-            resadd = dmx_graph.create_node(
-                "call_function", torch.add, (_input, _residual), name="resadd"
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_cast.scale")
+            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
             )
-            dmx_graph.output(resadd)
-        graph = dmx_graph
-        return graph
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+            residual = g.placeholder("residual")
+            residual_scale = g.get_attr("residual_cast.scale")
+            residual_zero_point = g.get_attr("residual_cast.zero_point")
+            residual_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    residual,
+                    residual_scale,
+                    residual_zero_point,
+                    repr(self.residual_cast.format),
+                ),
+            )
+            residual_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (residual_q, residual_scale, residual_zero_point),
+            )
+            _output = g.create_node(
+                "call_function", torch.matmul, (_input_dq, residual_dq), name="output"
+            )
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_output_dq)
+        return g
 
 
 class InitMatMul(torch.nn.Module):
