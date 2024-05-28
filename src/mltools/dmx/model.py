@@ -234,6 +234,8 @@ class DmxModel(torch.nn.Module):
         elif _output_cls is _empty:
             _output_cls = None
 
+        if "cache_position" in kwargs:
+            kwargs["cache_position"] = None
         # remove kwargs with value None
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         # boolean inputs will affect tracing and need to be set as concrete args
@@ -241,11 +243,18 @@ class DmxModel(torch.nn.Module):
         kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
 
         input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
+        dummy_inputs = {}
+        for k in input_names:
+            if k not in kwargs:
+                dummy_inputs[k] = args[0]
+            else:
+                dummy_inputs[k] = kwargs[k]
         _model._gm = substitute_transform(
             _model,
             hf=_model.hf,
             input_names=input_names,
             concrete_args=bool_inputs,
+            dummy_inputs=dummy_inputs,
         )
         # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
         intersection = set(_model.tracing_kwargs.keys()) - set(kwargs.keys())
@@ -263,7 +272,7 @@ class DmxModel(torch.nn.Module):
         _forward = (
             (
                 lambda *_args, **_kwargs: _output_cls(
-                    _model._gm.forward(*_args, **_kwargs)
+                    **(_model._gm.forward(*_args, **_kwargs))
                 )
             )
             if _model._output_cls is not None
@@ -303,11 +312,12 @@ class DmxModel(torch.nn.Module):
             def temp_forward(_m, *_args, **_kwargs):
                 _is_training = _m.training
                 if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+
                     if _m.transformed:
                         curr_cfg = _m.dmx_config
                     print("triggering transform")
-                    _m.tracing_kwargs = _kwargs
-
+                    _m.tracing_kwargs = _kwargs.copy()
+                    # _kwargs["cache_position"] = None
                     _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     if _m.transformed:
                         _m.configure(curr_cfg)

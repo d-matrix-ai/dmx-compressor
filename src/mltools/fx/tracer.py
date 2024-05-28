@@ -77,6 +77,7 @@ def hf_symbolic_trace(
     input_names: Optional[List[str]] = None,
     concrete_args: Optional[Dict[str, Any]] = None,
     tracer_cls: Type[DmxHFTracer] = DmxHFTracer,
+    dummy_inputs: Optional[Dict[str, Any]] = None,
 ) -> GraphModule:
     """
     Performs symbolic tracing on a huggingface model.
@@ -115,11 +116,13 @@ def hf_symbolic_trace(
         concrete_args.update()
     else:
         concrete_args = get_concrete_args(model, input_names)
+
     # Tracing.
     tracer = tracer_cls()
-    traced_graph = tracer.trace(model, concrete_args=concrete_args)
+    traced_graph = tracer.trace(
+        model, concrete_args=concrete_args, dummy_inputs=dummy_inputs
+    )
     traced = GraphModule(model, traced_graph)
-
     traced.config = model.config
     # The model class must be stored as an attribute to allow model deserialization, which uses trace, and thus
     # _generate_dummy_input, where the model class is needed.
