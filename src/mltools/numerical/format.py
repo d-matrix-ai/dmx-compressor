@@ -21,6 +21,7 @@ class Format(ABC):
     This is an abstract class of tensor numerical format.
     Child classes to implement `cast()` and `from_shorthand()` method.
     """
+
     blocked: bool
     bfp_id: Optional[int] = None
 
@@ -65,6 +66,7 @@ class Same(Format):
     r"""
     This is a dummy numerical format whose `cast()` does not do anything but passing same input through.
     """
+
     blocked = False
 
     def __init__(self):
@@ -96,6 +98,7 @@ class FixedPoint(Format):
     r"""
     This is a fixed point format simulated in FP32, using QPyTorch.
     """
+
     blocked = False
 
     def __init__(
@@ -156,6 +159,7 @@ class FloatingPoint(Format):
     r"""
     This is a floating point format simulated in FP32, using QPyTorch.
     """
+
     blocked = False
 
     def __init__(
@@ -245,6 +249,7 @@ class BlockFloatingPoint(Format):
     r"""
     This is a block floating point format simulated in FP32, using QPyTorch.
     """
+
     blocked = True
 
     def __init__(
@@ -345,6 +350,7 @@ class ScaledBlockFloatingPoint(Format):
     r"""
     This is a scaled block floating point tensor format.
     """
+
     blocked = True
 
     def __init__(
@@ -364,7 +370,6 @@ class ScaledBlockFloatingPoint(Format):
         ), "scaler format needs to be floating point"
         assert block_format.fraction == 0, "block format needs to have zero fraction"
         assert block_format.symmetric, "block format needs to have symmetric range"
-        assert scaler_format.unsigned, "scaler format needs to be unsigned"
         assert block_size > 0, f"block size has to be positive, got {block_size}"
 
         self.block_format = block_format
@@ -387,24 +392,25 @@ class ScaledBlockFloatingPoint(Format):
     def cast(self, x: torch.Tensor) -> torch.Tensor:
         _x = x.float().transpose(self.block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
-        _x /= self.man_scaling
         _xs = torch.split(
             _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
         )  # slice to chunks
         _xms = [
-            self.scaler_format.cast(self.get_chunk_max(chunk)) for chunk in _xs
+            self.get_chunk_max(chunk) / self.man_scaling for chunk in _xs
         ]  # max of blocks in each chunk
         _x = torch.cat(
             [
                 torch.where(
                     chunk_max > 0.0,
-                    self.block_format.cast(chunk / chunk_max) * chunk_max,
+                    self.block_format.cast(chunk / chunk_max)
+                    * self.scaler_format.cast(chunk_max),
                     chunk,
                 )
                 for chunk, chunk_max in zip(_xs, _xms)
             ],
-            dim=self.block_dim,
+            dim=-1,
         )  # quantize
+
         _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
         return _x
 
@@ -446,6 +452,7 @@ class MXFP(Format):
     r"""
     This is a MXFP tensor format.
     """
+
     blocked = True
 
     def __init__(
