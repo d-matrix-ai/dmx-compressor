@@ -402,13 +402,7 @@ class ScaledBlockFloatingPoint(Format):
             [
                 torch.where(
                     chunk_max > 0.0,
-                    block_quantize(
-                        (chunk / chunk_max),
-                        wl=self.block_format.precision,
-                        dim=0,
-                        symmetric=self.block_format.symmetric,
-                        rounding=self.block_format.rounding,
-                    )
+                    self.block_format.cast(chunk / chunk_max)
                     * self.scaler_format.cast(chunk_max),
                     chunk,
                 )
