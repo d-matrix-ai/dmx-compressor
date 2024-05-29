@@ -189,6 +189,8 @@ class DmxModelMixin:
     ):
         if specific_layers is None:
             specific_layers = self.named_dmx_modules()
+        for _, _m in specific_layers:
+            _m.set_smoothquant_params(**hyperparams)
         with torch.no_grad(), ExitStack() as stack:
             yield [
                 stack.enter_context(m.calibrating_smoothquant())

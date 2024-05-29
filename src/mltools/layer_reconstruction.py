@@ -134,11 +134,9 @@ class LayerReconstructionMixin:
     def set_smoothquant_params(
         self,
         migration_strength: float = 0.5,
-        pow2: bool = False,
     ) -> None:
         if self.smoothquant is not None:
             self.smoothquant.set_migration_strength(migration_strength)
-            self.smoothquant.set_pow2(pow2)
 
     def enable_smoothquant_calib(self, state: bool = True) -> None:
         if self.smoothquant is not None:
