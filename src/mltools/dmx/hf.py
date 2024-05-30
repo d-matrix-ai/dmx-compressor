@@ -4,6 +4,7 @@ from mltools.fx.transform import substitute_transform
 import transformers
 from .model import DmxModelMixin, DmxConfig
 import evaluate
+from evaluate import evaluator
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 from .model import DmxModel, DmxConfig
@@ -47,9 +48,11 @@ def prepare_dataset_and_column(
         # Add more datasets and their respective column names here
     }
 
-    if not column_name and dataset in dataset_column_mapping:
+    if dataset == "squad":
+        column_name = None
+    elif not column_name and dataset in dataset_column_mapping:
         column_name = dataset_column_mapping[dataset]
-    if not column_name:
+    elif not column_name:
         raise ValueError(
             f"Column name not found for dataset '{dataset}'. Please provide the column_name."
         )
@@ -122,15 +125,31 @@ def do_forward_on(
         perplexity=ppl.item(),
     )
 
+def eval_question_answering(
+    model,
+    tokenizer,
+    dataset,
+    metric,
+    dataset_split,
+    column_name=None,
+    dataset_version=None,
+):
+    dataset, column_name = prepare_dataset_and_column(
+        dataset, column_name, dataset_version, dataset_split
+    )
+    task_evaluator = evaluator("question-answering")
+    results = task_evaluator.compute(model_or_pipeline=model, tokenizer=tokenizer, data=dataset)
+    return results
 
 def eval_text_generation(
     model,
+    tokenizer,
     dataset,
     metric,
     revision,
+    dataset_split,
     column_name=None,
     dataset_version=None,
-    dataset_split="test",
 ):
     dataset, column_name = prepare_dataset_and_column(
         dataset, column_name, dataset_version, dataset_split
@@ -139,13 +158,14 @@ def eval_text_generation(
     metric = evaluate.load(metric, module_type="metric")
 
     results = metric.compute(
-        model=model, revision=revision, references=dataset[column_name]
+        model=model, tokenizer=tokenizer, revision=revision, references=dataset[column_name]
     )
     return results
 
 
 def pipe_eval(
     model,
+    tokenizer,
     dataset,
     metric,
     revision,
@@ -156,7 +176,7 @@ def pipe_eval(
 ):
     task_eval_mapping = {
         "text-generation": eval_text_generation,
-        # Add more tasks here
+        "question-answering": eval_question_answering,
     }
 
     if task not in task_eval_mapping:
@@ -164,7 +184,7 @@ def pipe_eval(
 
     eval_function = task_eval_mapping[task]
     return eval_function(
-        model, dataset, metric, revision, column_name, dataset_version, dataset_split
+        model, tokenizer, dataset, metric, dataset_split, column_name, dataset_version
     )
 
 
@@ -196,6 +216,7 @@ def pipeline(
     pipe.model = DmxModel.from_torch(pipe.model, get_input_filter_rules(pipe.model_name))
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
+        pipe.tokenizer,
         dataset,
         metric,
         pipe.revision,
