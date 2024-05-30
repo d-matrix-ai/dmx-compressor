@@ -278,10 +278,19 @@ class DmxModel(torch.nn.Module):
         return True
 
     @staticmethod
+    def apply_input_filter_rules(kwargs, _model):
+        """
+        Special treatment for kwargs that cannot be traced properly, this is model specific.
+        """
+        if _model.input_filter_rules:
+            for k, v in _model.input_filter_rules.items():
+                if k in kwargs:
+                    kwargs[k] = v
+        return kwargs
+
+    @staticmethod
     def prepare_tracing_inputs(_model, args, kwargs):
-        # special treatment for cache_position as it cannot be traced properly, specifying cache_position=None uses default cache_position pattern that produces functionaly correct results
-        if "cache_position" in kwargs:
-            kwargs["cache_position"] = None
+        kwargs = DmxModel.apply_input_filter_rules(kwargs, _model)
         # remove kwargs with value None
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         # boolean inputs will affect tracing and need to be set as concrete args
@@ -314,14 +323,14 @@ class DmxModel(torch.nn.Module):
 
     @classmethod
     def from_torch(
-        cls,
-        model: torch.nn.Module,
+        cls, model: torch.nn.Module, input_filter_rules: Optional[Dict] = None
     ) -> torch.nn.Module:
         if DmxModelMixin not in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
             model._gm = None
             model.transformed = False
             model.hf = model.__class__.__module__.startswith("transformers")
+            model.input_filter_rules = input_filter_rules
 
             def temp_forward(_m, *_args, **_kwargs):
                 _is_training = _m.training
@@ -331,7 +340,6 @@ class DmxModel(torch.nn.Module):
                         curr_cfg = _m.dmx_config
                     print("triggering transform")
                     _m.tracing_kwargs = _kwargs.copy()
-                    # _kwargs["cache_position"] = None
                     _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     if _m.transformed:
                         _m.configure(curr_cfg)

@@ -168,6 +168,13 @@ def pipe_eval(
     )
 
 
+def get_input_filter_rules(task):
+    rule_mapping = {"text-generation": {"cache_positions": None}}
+    if task in rule_mapping:
+        return rule_mapping[task]
+    return None
+
+
 def pipeline(
     *args,
     dmx_config: Optional[str] = None,
@@ -185,9 +192,7 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-    pipe.model = DmxModel.from_torch(
-        pipe.model,
-    )
+    pipe.model = DmxModel.from_torch(pipe.model, get_input_filter_rules(pipe.task))
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
         dataset,
