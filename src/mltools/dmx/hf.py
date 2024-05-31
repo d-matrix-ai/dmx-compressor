@@ -131,6 +131,7 @@ def eval_question_answering(
     dataset,
     metric,
     dataset_split,
+    revision,
     column_name=None,
     dataset_version=None,
 ):
@@ -146,8 +147,8 @@ def eval_text_generation(
     tokenizer,
     dataset,
     metric,
-    revision,
     dataset_split,
+    revision,
     column_name=None,
     dataset_version=None,
 ):
@@ -162,17 +163,16 @@ def eval_text_generation(
     )
     return results
 
-
 def pipe_eval(
     model,
     tokenizer,
     dataset,
     metric,
-    revision,
     task,
+    revision,
+    dataset_split="test",
     column_name=None,
     dataset_version=None,
-    dataset_split="test",
 ):
     task_eval_mapping = {
         "text-generation": eval_text_generation,
@@ -184,9 +184,10 @@ def pipe_eval(
 
     eval_function = task_eval_mapping[task]
     return eval_function(
-        model, tokenizer, dataset, metric, dataset_split, column_name, dataset_version
+        model, tokenizer, dataset, metric, dataset_split, revision, column_name, dataset_version
     )
 
+<<<<<<< HEAD
 
 def get_input_filter_rules(model):
     rule_mapping = {"d-matrix/Llama-2": {"cache_positions": None},
@@ -196,6 +197,8 @@ def get_input_filter_rules(model):
     return None
 
 
+=======
+>>>>>>> 56f29a5 (update changes)
 def pipeline(
     *args,
     dmx_config: Optional[str] = None,
@@ -219,11 +222,11 @@ def pipeline(
         pipe.tokenizer,
         dataset,
         metric,
-        pipe.revision,
         pipe.task,
+        pipe.revision,
+        dataset_split,
         column_name,
         dataset_version,
-        dataset_split,
     )
 
     pipe.do_forward_on = lambda dataset, column_name=None, dataset_version=None, dataset_split="test", num_samples=None, seed=42: do_forward_on(
