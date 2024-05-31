@@ -401,7 +401,7 @@ class ResAdd(DmxModule, torch.nn.Module):
                 (residual_q, residual_scale, residual_zero_point),
             )
             _output = g.create_node(
-                "call_function", torch.matmul, (_input_dq, residual_dq), name="output"
+                "call_function", torch.add, (_input_dq, residual_dq), name="output"
             )
             _output_scale = g.get_attr("output_cast.scale")
             _output_zero_point = g.get_attr("output_cast.zero_point")
