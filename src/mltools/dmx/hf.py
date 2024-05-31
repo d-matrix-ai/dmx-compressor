@@ -129,9 +129,9 @@ def eval_question_answering(
     model,
     tokenizer,
     dataset,
-    metric,
-    dataset_split,
-    revision,
+    metric=None,
+    dataset_split="test",
+    revision="main",
     column_name=None,
     dataset_version=None,
 ):
@@ -147,8 +147,8 @@ def eval_text_generation(
     tokenizer,
     dataset,
     metric,
-    dataset_split,
-    revision,
+    dataset_split="test",
+    revision="main",
     column_name=None,
     dataset_version=None,
 ):
@@ -187,8 +187,6 @@ def pipe_eval(
         model, tokenizer, dataset, metric, dataset_split, revision, column_name, dataset_version
     )
 
-<<<<<<< HEAD
-
 def get_input_filter_rules(model):
     rule_mapping = {"d-matrix/Llama-2": {"cache_positions": None},
                     "d-matrix/Llama-3": {"cache_positions": None}}
@@ -196,9 +194,6 @@ def get_input_filter_rules(model):
         return rule_mapping[model]
     return None
 
-
-=======
->>>>>>> 56f29a5 (update changes)
 def pipeline(
     *args,
     dmx_config: Optional[str] = None,
