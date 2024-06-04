@@ -308,17 +308,18 @@ class DmxModel(torch.nn.Module):
     @staticmethod
     def post_process_gm(_model, kwargs):
         # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
-        intersection = set(_model.tracing_kwargs.keys()) - set(kwargs.keys())
-        if intersection:
-            # find first none placehoder node
-            node_list = _model._gm.graph.nodes
-            for node in node_list:
-                if node.op != "placeholder":
-                    break
-            for inp in intersection:
+        placeholders_needed = list(signature(_model.forward).parameters.keys())
+        node_list = _model._gm.graph.nodes
+        i = 0
+        for node in node_list:
+            if i >= len(placeholders_needed):
+                break
+            while i < len(placeholders_needed) and node.name != placeholders_needed[i]:
                 with _model._gm.graph.inserting_before(node):
-                    _model._gm.graph.placeholder(inp)
-            _model._gm.recompile()
+                    _model._gm.graph.placeholder(placeholders_needed[i])
+                    i += 1
+            i += 1
+        _model._gm.recompile()
 
     @classmethod
     def from_torch(
