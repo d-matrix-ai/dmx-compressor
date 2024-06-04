@@ -7,6 +7,7 @@ from mltools.fx import ConfigurationTransformer, DMXAwareTransformer
 from mltools.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
+from transformers.modeling_utils import get_parameter_device
 
 
 def substitute_transform(
@@ -31,10 +32,12 @@ def substitute_transform(
         transformed = dmx_aware_mapping[mod_type].from_raw(root)
         return transformed
     root = remove_new_forward(root)
-    if hf:
-        gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
-    else:
-        gm, tracer = symbolic_trace(root, concrete_args)
+    if not hf:
+        root.config = None
+        root.device = get_parameter_device(root)
+    gm, tracer = hf_symbolic_trace(
+        root, input_names, concrete_args=concrete_args, dummy_inputs=dummy_inputs
+    )
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)
@@ -58,7 +61,7 @@ def qDq_transform(
     Returns:
         transformed model
     """
-    #import compiler so q/dq ops are registered
+    # import compiler so q/dq ops are registered
     import dmir_compiler.custom_ops
 
     transformer = QdQTransformer(root)

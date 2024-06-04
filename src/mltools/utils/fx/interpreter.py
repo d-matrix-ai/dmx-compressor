@@ -267,7 +267,7 @@ class MetadataInterpreter(fx.Interpreter):
         # args are used to put text above the in edges
         # output is out edge
 
-        color = "#D5D6EA"
+        color = "#f0f8ff"
         call_module_node = self.nodeDict["module"][self.moduleNum]
         self.moduleNum += 1
         curr_mod = self.module.get_submodule(target)
@@ -281,6 +281,7 @@ class MetadataInterpreter(fx.Interpreter):
             )
         )
         if isinstance(curr_mod, dmx.nn.DmxModule):
+            self.nodes[-1].kwargs["fillcolor"] = "#D5D6EA"
             for ops in FORMAT_DICT:
                 cast = getattr(curr_mod, ops)
                 if cast:
