@@ -234,8 +234,8 @@ class DmxModel(torch.nn.Module):
         elif _output_cls is _empty:
             _output_cls = None
 
-        input_names, concrete_args, dummy_inputs, kwargs = (
-            DmxModel().prepare_tracing_inputs(_model, args, kwargs)
+        input_names, concrete_args, dummy_inputs = DmxModel().prepare_tracing_inputs(
+            _model, args, kwargs
         )
         _model._gm = substitute_transform(
             _model,
@@ -244,7 +244,7 @@ class DmxModel(torch.nn.Module):
             concrete_args=concrete_args,
         )
 
-        DmxModel().post_process_gm(_model, kwargs)
+        DmxModel().post_process_gm(_model, args, kwargs)
 
         _model._output_cls = _output_cls
         _forward = (
@@ -303,12 +303,14 @@ class DmxModel(torch.nn.Module):
                 dummy_inputs[k] = args[0]
             else:
                 dummy_inputs[k] = kwargs[k]
-        return input_names, bool_inputs, dummy_inputs, kwargs
+        return input_names, bool_inputs, dummy_inputs
 
     @staticmethod
-    def post_process_gm(_model, kwargs):
+    def post_process_gm(_model, args, kwargs):
         # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
-        placeholders_needed = list(signature(_model.forward).parameters.keys())
+        placeholders_needed = list(
+            signature(_model.forward).bind(*args, **kwargs).arguments.keys()
+        )
         node_list = _model._gm.graph.nodes
         i = 0
         for node in node_list:
