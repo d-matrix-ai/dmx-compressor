@@ -32,7 +32,7 @@ mltools.dmx.nn.Linear
    get_attr       output_cast_zero_point  output_cast.zero_point      ()                                                            {}
    call_function  quantize_3              dmx.quantize                (_output, output_cast_scale, output_cast_zero_point, 'SAME')  {}
    call_function  dequantize_3            dmx.dequantize              (quantize_3, output_cast_scale, output_cast_zero_point)       {}
-   output         output                  output                      (dequantize_3,)  
+   output         output                  output                      (dequantize_3,)                                               {}
 
 
 mltools.dmx.nn.ResAdd
@@ -159,5 +159,4 @@ mltools.dmx.nn.GELU
    call_function  gelu     <built-in function gelu>  (input_1,)  {'approximate': 'none'}
    output         output   output                    (gelu,)     {}
 
-                                             {}
 
