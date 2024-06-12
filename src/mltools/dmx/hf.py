@@ -125,6 +125,7 @@ def do_forward_on(
         perplexity=ppl.item(),
     )
 
+
 def eval_question_answering(
     model,
     tokenizer,
@@ -139,8 +140,11 @@ def eval_question_answering(
         dataset, column_name, dataset_version, dataset_split
     )
     task_evaluator = evaluator("question-answering")
-    results = task_evaluator.compute(model_or_pipeline=model, tokenizer=tokenizer, data=dataset)
+    results = task_evaluator.compute(
+        model_or_pipeline=model, tokenizer=tokenizer, data=dataset
+    )
     return results
+
 
 def eval_text_generation(
     model,
@@ -159,9 +163,13 @@ def eval_text_generation(
     metric = evaluate.load(metric, module_type="metric")
 
     results = metric.compute(
-        model=model, tokenizer=tokenizer, revision=revision, references=dataset[column_name]
+        model=model,
+        tokenizer=tokenizer,
+        revision=revision,
+        references=dataset[column_name],
     )
     return results
+
 
 def pipe_eval(
     model,
@@ -184,15 +192,26 @@ def pipe_eval(
 
     eval_function = task_eval_mapping[task]
     return eval_function(
-        model, tokenizer, dataset, metric, dataset_split, revision, column_name, dataset_version
+        model,
+        tokenizer,
+        dataset,
+        metric,
+        dataset_split,
+        revision,
+        column_name,
+        dataset_version,
     )
 
+
 def get_input_filter_rules(model):
-    rule_mapping = {"d-matrix/Llama-2": {"cache_positions": None},
-                    "d-matrix/Llama-3": {"cache_positions": None}}
+    rule_mapping = {
+        "d-matrix/Llama-2": {"cache_position": None},
+        "d-matrix/Llama-3": {"cache_position": None},
+    }
     if model in rule_mapping:
         return rule_mapping[model]
     return None
+
 
 def pipeline(
     *args,
@@ -211,7 +230,9 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-    pipe.model = DmxModel.from_torch(pipe.model, get_input_filter_rules(pipe.model_name))
+    pipe.model = DmxModel.from_torch(
+        pipe.model, get_input_filter_rules(pipe.model_name)
+    )
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
         pipe.tokenizer,
