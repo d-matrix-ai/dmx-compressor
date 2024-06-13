@@ -57,7 +57,7 @@ def prepare_dataset_and_column(
             f"Column name not found for dataset '{dataset}'. Please provide the column_name."
         )
 
-    dataset = load_dataset(dataset, dataset_version, split=dataset_split)
+    dataset = load_dataset(dataset, dataset_version, split=dataset_split, trust_remote_code=trust_remote_code)
     if dataset_split == "train":
         dataset = dataset.shuffle(seed=seed)
 
