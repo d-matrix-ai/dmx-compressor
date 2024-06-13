@@ -38,7 +38,7 @@ def dmx_transform(pipe, dmx_config_name):
 
 
 def prepare_dataset_and_column(
-    dataset, column_name=None, dataset_version=None, dataset_split="test", seed=42
+    dataset, column_name=None, dataset_version=None, dataset_split="test", seed=42, trust_remote_code=True
 ):
     dataset_column_mapping = {
         "wikitext": "text",
