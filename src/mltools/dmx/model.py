@@ -242,7 +242,6 @@ class DmxModel(torch.nn.Module):
             hf=_model.hf,
             input_names=input_names,
             concrete_args=concrete_args,
-            dummy_inputs=dummy_inputs,
         )
 
         DmxModel().post_process_gm(_model, kwargs)
