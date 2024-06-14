@@ -13,6 +13,8 @@ import torch
 
 
 def get_config_file(repo_name, revision, config_name):
+    if config_name in ["BASELINE", "BASIC"]:
+        return None
     try:
         return hf_hub_download(
             repo_id=repo_name, filename=f"configs/{config_name}.yaml", revision=revision
