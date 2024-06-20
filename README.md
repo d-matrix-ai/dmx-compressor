@@ -54,7 +54,7 @@ In addition, the project provides a set of optimization tools for co-design usin
 
 ## Getting started
 
-`pip install dmx-mltools`
+`pip install dmx-compressor`
 
 
 ## Usage
@@ -64,7 +64,7 @@ In addition, the project provides a set of optimization tools for co-design usin
 Given a PyTorch model, _e.g._ `Net()`, wrap it in a `dmx.Model` container: 
 
 ```python
-from mltools import dmx
+from dmx-compressor import dmx
 
 model = dmx.Model(Net())
 ```
@@ -90,7 +90,7 @@ model = model.transform(
 To leverage the popularity of [Hugging Face's pipeline API for inference](https://huggingface.co/docs/transformers/en/pipeline_tutorial), we extend `transformers.pipeline()` to `dmx.pipeline()`, which retains all existing functionality of pipelines while enabling model transformation and configuration for deployment on d-Matrix hardware.  
 
 ```python
-from mltools.dmx import pipeline
+from dmx-compressor.dmx import pipeline
 
 pipe = pipeline(
     task="text-generation",

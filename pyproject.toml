@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "mltools"
+name = "dmx-compressor"
 version = "0.1.2"
-description = "d-MATRiX ML tools"
+description = "d-Matrix Compressor"
 authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>","Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>", "Zifei Xu <xuzifei@d-matrix.ai>"]
 include = [{ path = "tests", format = "sdist" }]
 
