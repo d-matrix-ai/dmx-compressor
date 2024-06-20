@@ -1826,6 +1826,15 @@ class Tanh(DmxModule, torch.nn.Tanh):
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        initial_dmx = torch.nn.Tanh()
+        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
+        graph = self.initial_dmx_graph
+        return graph
+
 
 class GELU(DmxModule, torch.nn.GELU):
     r"""
