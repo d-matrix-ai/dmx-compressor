@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'mltools'
+project = 'dmx-mltools'
 copyright = '2023, d-Matrix'
 author = '"Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>", "Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>"'
 release = '0.1.x'
