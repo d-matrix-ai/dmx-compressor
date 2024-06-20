@@ -44,7 +44,7 @@ def test_distilgpt2():
     import dmir_compiler
     from dmir_compiler import DMIRCompilerConfigs
 
-    config = DMIRCompilerConfigs["stablehlo-dmir"]
+    config = DMIRCompilerConfigs["stablehlo-dmir"]()
     config.use_fx_importer = True
     config.use_tracing = True
     config.use_sharding = True
