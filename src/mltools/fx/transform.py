@@ -58,6 +58,9 @@ def qDq_transform(
     Returns:
         transformed model
     """
+    #import compiler so q/dq ops are registered
+    import dmir_compiler.custom_ops
+
     transformer = QdQTransformer(root)
     transformed = transformer.transform()
     transformed.recompile()

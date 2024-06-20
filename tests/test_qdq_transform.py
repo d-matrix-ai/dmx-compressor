@@ -8,6 +8,8 @@ from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import dmx_aware_mapping
 from mltools.utils.fx.qdq_graph import qdq_attr
 
+import dmir_compiler.custom_ops
+
 RANDOM_SEED = 0
 torch.manual_seed(RANDOM_SEED)
 
