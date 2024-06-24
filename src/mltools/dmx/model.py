@@ -325,6 +325,39 @@ class DmxModel(torch.nn.Module):
         _model._gm.recompile()
 
     @classmethod
+    def create_transform_forward(
+        cls, model: torch.nn.Module, submod: torch.nn.Module
+    ) -> None:
+        if DmxModelMixin not in submod.__class__.__bases__:
+            submod.__class__.__bases__ += (DmxModelMixin,)
+            submod._gm = None
+            submod.transformed = False
+            submod.hf = model.__class__.__module__.startswith("transformers")
+
+            def temp_forward(_m, *_args, **_kwargs):
+                _is_training = _m.training
+                if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+                    if not model.transformed:
+                        raise Exception(
+                            "model forward needs to be called before submodule forward."
+                        )
+                    print("triggering transform of submodule")
+                    _m.tracing_kwargs = _kwargs.copy()
+                    _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
+                    _m.transformed = True
+                    ### TODO: get dmxmodule from model._gm
+                    for n, m in model._gm.named_dmx_modules():
+                        pass
+
+                    _m.train(_is_training)
+                    _m.transformed_forward = partial(temp_forward, _m)
+                    return _m._forward(*_args, **_kwargs)
+
+                return _m._forward(*_args, **_kwargs)
+
+            submod.transformed_forward = partial(temp_forward, submod)
+
+    @classmethod
     def from_torch(
         cls, model: torch.nn.Module, input_filter_rules: Optional[Dict] = None
     ) -> torch.nn.Module:
