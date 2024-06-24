@@ -15,6 +15,7 @@ def substitute_transform(
     concrete_args: Optional[Dict[str, Any]] = None,
     hf: bool = False,
     input_names: Optional[List[str]] = None,
+    dummy_inputs: Optional[Dict[str, Any]] = None,
 ):
     """
     A function that transforms the model by substituting torch.nn.modules and activation functions to dmx.nn.modules.
@@ -35,7 +36,11 @@ def substitute_transform(
     if not hf:
         root.config = None
         root.device = get_parameter_device(root)
-    gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
+        gm, tracer = hf_symbolic_trace(
+            root, input_names, concrete_args=concrete_args, dummy_inputs=dummy_inputs
+        )
+    else:
+        gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)

@@ -77,6 +77,7 @@ def hf_symbolic_trace(
     input_names: Optional[List[str]] = None,
     concrete_args: Optional[Dict[str, Any]] = None,
     tracer_cls: Type[DmxHFTracer] = DmxHFTracer,
+    dummy_inputs: Optional[Dict[str, Any]] = None,
 ) -> GraphModule:
     """
     Performs symbolic tracing on a huggingface model.
@@ -121,6 +122,7 @@ def hf_symbolic_trace(
     traced_graph = tracer.trace(
         model,
         concrete_args=concrete_args,
+        dummy_inputs=dummy_inputs,
     )
     traced = GraphModule(model, traced_graph)
     traced.config = model.config
