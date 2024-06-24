@@ -35,9 +35,7 @@ def substitute_transform(
     if not hf:
         root.config = None
         root.device = get_parameter_device(root)
-    gm, tracer = hf_symbolic_trace(
-        root, input_names, concrete_args=concrete_args, dummy_inputs=dummy_inputs
-    )
+    gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
     transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)
