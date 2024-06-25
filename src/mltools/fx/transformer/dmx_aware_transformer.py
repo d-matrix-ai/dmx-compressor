@@ -68,6 +68,7 @@ class DMXAwareTransformer(fx.Transformer):
             )
             scope, _ = self.node_name_to_scope[curr_name]
             new_name = scope + "." + candidate if scope != "" else candidate
+
             # If new name is not candidate, need to add candidate to used names,
             # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
             if new_name != candidate:
@@ -137,7 +138,7 @@ class DMXAwareTransformer(fx.Transformer):
                 and args[1].node.op
                 in ["call_module", "call_function", "call_method", "placeholder"]
             ):
-                cand_name = curr_target + ".resadd"
+                cand_name = curr_target + ".resadd" if curr_target != "" else "resadd"
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)
@@ -150,7 +151,7 @@ class DMXAwareTransformer(fx.Transformer):
                 and args[1].node.op
                 in ["call_module", "call_function", "call_method", "placeholder"]
             ):
-                cand_name = curr_target + ".mul"
+                cand_name = curr_target + ".mul" if curr_target != "" else "mul"
                 new_name = self.create_unique_name_in_scope(cand_name)
             else:
                 return super().call_function(target, args, kwargs)
@@ -159,7 +160,7 @@ class DMXAwareTransformer(fx.Transformer):
             repr(eval("torch.bmm")),
             "<built-in function matmul>",
         ]:
-            cand_name = curr_target + ".matmul"
+            cand_name = curr_target + ".matmul" if curr_target != "" else "matmul"
             new_name = self.create_unique_name_in_scope(cand_name)
         else:
             new_name = curr_target + "." + candidate if curr_target != "" else candidate

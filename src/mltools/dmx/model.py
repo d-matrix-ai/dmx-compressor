@@ -222,7 +222,6 @@ class DmxModelMixin:
 class DmxModel(torch.nn.Module):
     @staticmethod
     def _get_transformed_forward(_model, args, kwargs):
-        print("Model transformation triggered")
         _model.forward = _model.old_forward
         _mod_signature = signature(_model.forward)
         _output_cls = _mod_signature.return_annotation
@@ -325,37 +324,47 @@ class DmxModel(torch.nn.Module):
         _model._gm.recompile()
 
     @classmethod
-    def create_transform_forward(
-        cls, model: torch.nn.Module, submod: torch.nn.Module
-    ) -> None:
+    def create_submod_transform_forward(cls, model: torch.nn.Module, submod_name: str):
+        submod = model.get_submodule(submod_name)
         if DmxModelMixin not in submod.__class__.__bases__:
             submod.__class__.__bases__ += (DmxModelMixin,)
-            submod._gm = None
-            submod.transformed = False
-            submod.hf = model.__class__.__module__.startswith("transformers")
+        submod._gm = None
+        submod.transformed = False
+        submod.hf = model.__class__.__module__.startswith("transformers")
+        submod.input_filter_rules = model.input_filter_rules
 
-            def temp_forward(_m, *_args, **_kwargs):
-                _is_training = _m.training
-                if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
-                    if not model.transformed:
-                        raise Exception(
-                            "model forward needs to be called before submodule forward."
-                        )
-                    print("triggering transform of submodule")
-                    _m.tracing_kwargs = _kwargs.copy()
-                    _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
-                    _m.transformed = True
-                    ### TODO: get dmxmodule from model._gm
-                    for n, m in model._gm.named_dmx_modules():
-                        pass
+        def temp_forward(_m, *_args, **_kwargs):
+            _is_training = _m.training
+            if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+                if not model.transformed:
+                    raise Exception(
+                        "model forward needs to be called before submodule forward."
+                    )
+                print("Submodule transformation triggered")
+                _m.tracing_kwargs = _kwargs.copy()
+                _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
+                _m.transformed = True
 
-                    _m.train(_is_training)
-                    _m.transformed_forward = partial(temp_forward, _m)
-                    return _m._forward(*_args, **_kwargs)
+                for n, _ in _m.named_dmx_modules():
+                    dmx_mod_name = n[4:]  # first 4 chars are _gm.
+                    dmx_mod_name = "_gm." + submod_name + "." + dmx_mod_name
 
+                    # handling nested attr for setattr
+                    pre, _, post = n.rpartition(".")
+                    if pre:
+                        parent = submod.get_submodule(pre)
+                    else:
+                        parent = submod
+                    setattr(parent, post, model.get_submodule(dmx_mod_name))
+
+                _m.train(_is_training)
+                _m.transformed_forward = partial(temp_forward, _m)
                 return _m._forward(*_args, **_kwargs)
 
-            submod.transformed_forward = partial(temp_forward, submod)
+            return _m._forward(*_args, **_kwargs)
+
+        submod.old_forward = submod.forward
+        submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod
     def from_torch(
@@ -374,7 +383,7 @@ class DmxModel(torch.nn.Module):
 
                     if _m.transformed:
                         curr_cfg = _m.dmx_config
-                    print("triggering transform")
+                    print("Model transformation triggered")
                     _m.tracing_kwargs = _kwargs.copy()
                     _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                     if _m.transformed:
