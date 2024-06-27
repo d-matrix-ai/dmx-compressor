@@ -255,7 +255,7 @@ class DmxModule(
         state_dic = self.state_dict()
         for key, val in raw.state_dict().items():
             state_dic[key] = val
-        self.load_state_dict(state_dic, assign=True)
+        self.load_state_dict(state_dic, assign=False)
         # Inherit device from raw module
         for n, m in raw.named_parameters():
             device = "cuda" if torch.cuda.is_available() else "cpu"
