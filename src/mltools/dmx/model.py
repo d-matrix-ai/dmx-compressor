@@ -222,17 +222,23 @@ class DmxModelMixin:
 class DmxModel(torch.nn.Module):
     @staticmethod
     def _get_transformed_forward(_model, args, kwargs):
-        _model.forward = _model.old_forward
+        if hasattr(_model, "old_forward"):
+            _model.forward = _model.old_forward
         _mod_signature = signature(_model.forward)
         _output_cls = _mod_signature.return_annotation
         if get_origin(_output_cls) is Union:  # NOTE: this is error-prone
-            _output_cls = get_args(_output_cls)[1]
-            assert issubclass(
-                _output_cls, transformers.modeling_utils.ModelOutput
-            )  # NOTE: using this to guard against abuse
-        elif _output_cls is _empty:
+            transformer_output_cls = None
+            for output_type in get_args(_output_cls):
+                if output_type.__module__.startswith("transformers") and issubclass(
+                    output_type, transformers.modeling_utils.ModelOutput
+                ):
+                    transformer_output_cls = output_type
+                    break
+            _output_cls = transformer_output_cls
+        elif _output_cls is _empty or not _output_cls.__module__.startswith(
+            "transformers"
+        ):
             _output_cls = None
-
         input_names, concrete_args, dummy_inputs = DmxModel().prepare_tracing_inputs(
             _model, args, kwargs
         )
@@ -330,8 +336,9 @@ class DmxModel(torch.nn.Module):
             submod.__class__.__bases__ += (DmxModelMixin,)
         submod._gm = None
         submod.transformed = False
-        submod.hf = model.__class__.__module__.startswith("transformers")
+        submod.hf = isinstance(submod, transformers.PreTrainedModel)
         submod.input_filter_rules = model.input_filter_rules
+        submod.config = model.config
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
@@ -363,7 +370,6 @@ class DmxModel(torch.nn.Module):
 
             return _m._forward(*_args, **_kwargs)
 
-        submod.old_forward = submod.forward
         submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod
