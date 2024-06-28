@@ -466,6 +466,94 @@ class ScaledDotProductAttention(DmxModule):
             is_causal=attn_mask is None,
         )
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_cast.scale")
+            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+
+            value_states = g.placeholder("value_states")
+            value_states_scale = g.get_attr("value_states_cast.scale")
+            value_states_zero_point = g.get_attr("value_states_cast.zero_point")
+            value_states_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    value_states,
+                    value_states_scale,
+                    value_states_zero_point,
+                    repr(self.value_states_cast.format),
+                ),
+            )
+            value_states_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (value_states_q, value_states_scale, value_states_zero_point),
+            )
+
+            query_states = g.placeholder("query_states")
+            query_states_scale = g.get_attr("query_states_cast.scale")
+            query_states_zero_point = g.get_attr("query_states_cast.zero_point")
+            query_states_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    query_states,
+                    query_states_scale,
+                    query_states_zero_point,
+                    repr(self.query_states_cast.format),
+                ),
+            )
+            query_states_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (query_states_q, query_states_scale, query_states_zero_point),
+            )
+
+            key_states = g.placeholder("key_states")
+            key_states_scale = g.get_attr("key_states_cast.scale")
+            key_states_zero_point = g.get_attr("key_states_cast.zero_point")
+            key_states_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    key_states,
+                    key_states_scale,
+                    key_states_zero_point,
+                    repr(self.key_states_cast.format),
+                ),
+            )
+            key_states_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (key_states_q, key_states_scale, key_states_zero_point),
+            )
+
+            _output = g.create_node(
+                "call_function", torch.matmul, (_input_dq, multiplier_dq), name="output"
+            )
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_output_dq)
+        return g
+
 
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
