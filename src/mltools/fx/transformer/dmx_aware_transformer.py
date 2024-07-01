@@ -68,6 +68,7 @@ class DMXAwareTransformer(fx.Transformer):
             )
             scope, _ = self.node_name_to_scope[curr_name]
             new_name = scope + "." + candidate if scope != "" else candidate
+
             # If new name is not candidate, need to add candidate to used names,
             # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
             if new_name != candidate:
@@ -85,17 +86,16 @@ class DMXAwareTransformer(fx.Transformer):
             return super().call_method(target, args, kwargs)
 
     def create_unique_name_in_scope(self, cand_name):
+        # output of get_name_for_func_nodes will replace all . with _
         curr_name = get_name_for_func_nodes(
             cand_name,
             self.new_graph._graph_namespace._used_names,
             self.new_graph._graph_namespace._base_count,
         )
-        # replace "_" with "." exit for last "_" if new_name ends with digit
-        new_name = curr_name.replace("_", ".")
         new_name = (
-            new_name[: new_name.rfind(".")] + "_" + new_name[new_name.rfind(".") + 1 :]
-            if new_name[-1].isdigit()
-            else new_name
+            cand_name + "_" + curr_name[curr_name.rfind("_") + 1 :]
+            if curr_name[-1].isdigit()
+            else cand_name
         )
         return new_name
 
@@ -126,7 +126,6 @@ class DMXAwareTransformer(fx.Transformer):
             self.new_graph._graph_namespace._used_names,
             self.new_graph._graph_namespace._base_count,
         )
-
         curr_target, curr_type = self.node_name_to_scope[curr_name]
         if node_key == "<built-in function add>":
             if (
@@ -137,8 +136,7 @@ class DMXAwareTransformer(fx.Transformer):
                 and args[1].node.op
                 in ["call_module", "call_function", "call_method", "placeholder"]
             ):
-                cand_name = curr_target + ".resadd"
-                new_name = self.create_unique_name_in_scope(cand_name)
+                cand_name = curr_target + ".resadd" if curr_target != "" else "resadd"
             else:
                 return super().call_function(target, args, kwargs)
         elif node_key in "<built-in function mul>":
@@ -150,8 +148,7 @@ class DMXAwareTransformer(fx.Transformer):
                 and args[1].node.op
                 in ["call_module", "call_function", "call_method", "placeholder"]
             ):
-                cand_name = curr_target + ".mul"
-                new_name = self.create_unique_name_in_scope(cand_name)
+                cand_name = curr_target + ".mul" if curr_target != "" else curr_name
             else:
                 return super().call_function(target, args, kwargs)
         elif node_key in [
@@ -159,14 +156,18 @@ class DMXAwareTransformer(fx.Transformer):
             repr(eval("torch.bmm")),
             "<built-in function matmul>",
         ]:
-            cand_name = curr_target + ".matmul"
-            new_name = self.create_unique_name_in_scope(cand_name)
+            cand_name = curr_target + ".actmatmul" if curr_target != "" else "actmatmul"
         else:
-            new_name = curr_target + "." + candidate if curr_target != "" else candidate
-        # If new name is not candidate, need to add candidate to used names,
-        # otherwise next call_function will use the same candidate. (create_name is also called in create_node)
-        if new_name != candidate:
-            self.new_graph._graph_namespace.create_name(candidate, None)
+            cand_name = (
+                curr_target + "." + candidate if curr_target != "" else curr_name
+            )
+        # when cand_name is not the same as curr_name, it did not go through the create_unique_name_in_scope process, so we need to do it here.
+        # We also need to add curr_name to used names, otherwise next call_function will use the same curr_name, which will map to the wrong node in the old graph. (create_name is also called in create_node
+        if cand_name != curr_name:
+            new_name = self.create_unique_name_in_scope(cand_name)
+            self.new_graph._graph_namespace.create_name(curr_name, None)
+        else:
+            new_name = curr_name
         # find out what kwargs to pass in to new module init, which kwargs to pass into forward function of module
         empty_mod = dmx_aware_functional_mappings[node_key]()
         accepted_kwarg_keys = inspect.signature(empty_mod.__init__).parameters.keys()

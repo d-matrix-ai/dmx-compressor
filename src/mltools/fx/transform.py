@@ -8,6 +8,7 @@ from mltools.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
 from transformers.modeling_utils import get_parameter_device
+import inspect
 
 
 def substitute_transform(
@@ -33,9 +34,19 @@ def substitute_transform(
         transformed = dmx_aware_mapping[mod_type].from_raw(root)
         return transformed
     root = remove_new_forward(root)
-    if not hf:
+    if not hasattr(root, "config"):
         root.config = None
+    if not hf:
         root.device = get_parameter_device(root)
+        # set dummy_input for params without default
+        sig = inspect.signature(
+            root.forward if isinstance(root, torch.nn.Module) else root
+        )
+        for param in sig.parameters.values():
+            if param.name in dummy_inputs:
+                continue
+            if param.default is inspect.Parameter.empty:
+                dummy_inputs[param.name] = None
         gm, tracer = hf_symbolic_trace(
             root, input_names, concrete_args=concrete_args, dummy_inputs=dummy_inputs
         )
