@@ -3,10 +3,10 @@
 import torch
 from torch import fx, nn
 import torch.nn.functional as F
-from mltools import dmx
-from mltools.fx.transform import substitute_transform
-from mltools.fx.transformer import dmx_aware_mapping
-from mltools.utils.fx.qdq_graph import qdq_attr
+from compressor import dmx
+from compressor.fx.transform import substitute_transform
+from compressor.fx.transformer import dmx_aware_mapping
+from compressor.utils.fx.qdq_graph import qdq_attr
 
 import dmir_compiler.custom_ops
 

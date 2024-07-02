@@ -4,9 +4,9 @@ import pytest
 import torch
 from torch import Tensor
 import torch.nn as nn
-from mltools import dmx
-from mltools.fx.tracer import QuantTracer
-from mltools.fx.transform import cast_input_output_transform
+from compressor import dmx
+from compressor.fx.tracer import QuantTracer
+from compressor.fx.transform import cast_input_output_transform
 import torch.fx as fx
 from transformers.pytorch_utils import Conv1D
 

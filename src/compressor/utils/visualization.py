@@ -1,7 +1,7 @@
 import math
 import torch
 import pptree
-import mltools
+import compressor
 
 
 def mask2braille(m, dims=(0, 1), max_elems=None):
@@ -70,7 +70,7 @@ def _box_wrap(
 
 def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
     node_str = lambda _n, _m: f"{_n}:{type(_m).__name__}" if include_type else _n
-    is_leaf_node = mltools.dmx.nn.is_configurable
+    is_leaf_node = compressor.dmx.nn.is_configurable
     m_root = pptree.Node(node_str("model", model))
 
     def get_tree(mod, root):

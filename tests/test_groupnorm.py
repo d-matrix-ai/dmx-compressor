@@ -1,6 +1,6 @@
 import pytest
 import torch
-from mltools import dmx
+from compressor import dmx
 
 RANDOM_SEED = 0
 

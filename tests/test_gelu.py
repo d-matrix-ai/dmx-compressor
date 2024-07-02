@@ -1,9 +1,9 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from mltools import dmx
-from mltools.numerical import Format
-from mltools.functional import ApproximationFunction
+from compressor import dmx
+from compressor.numerical import Format
+from compressor.functional import ApproximationFunction
 
 
 @pytest.mark.parametrize(

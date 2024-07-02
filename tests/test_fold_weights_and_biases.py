@@ -2,9 +2,9 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mltools import dmx
-from mltools.numerical.format import Same
-from mltools.sparse import Dense, Sparseness
+from compressor import dmx
+from compressor.numerical.format import Same
+from compressor.sparse import Dense, Sparseness
 
 RANDOM_SEED = 0
 

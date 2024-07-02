@@ -1,5 +1,5 @@
 import torch
-from mltools import numerical
+from compressor import numerical
 
 
 RANDOM_SEED = 0

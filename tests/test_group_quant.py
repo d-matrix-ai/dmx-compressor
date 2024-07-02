@@ -1,8 +1,8 @@
 import pytest
 import torch
-from mltools import dmx
-from mltools.numerical.observer import MinMaxObserver, HistogramObserver
-from mltools.numerical import CastTo
+from compressor import dmx
+from compressor.numerical.observer import MinMaxObserver, HistogramObserver
+from compressor.numerical import CastTo
 from torch import nn
 
 RANDOM_SEED = 0
