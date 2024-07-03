@@ -1847,10 +1847,10 @@ class GELUBase(DmxModule):
     """
 
     def __init__(self, activation_cls, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.activation_cls = activation_cls
         if activation_cls not in self.__class__.__bases__:
             self.__class__.__bases__ += (activation_cls,)
+        super().__init__(*args, **kwargs)
+        self.activation_cls = activation_cls
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
