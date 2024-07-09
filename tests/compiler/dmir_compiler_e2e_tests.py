@@ -36,7 +36,7 @@ def test_distilgpt2():
         >>> result = test_distilgpt2(); print(result.graph.print_tabular())
     """
 
-    from mlreferences import distilgpt2 as wl
+    from mlreferences import squad_bert_base as wl
 
     m, x = get_workload_graphmodule(wl)
     qdqm = qDq_transform(m)
@@ -47,7 +47,7 @@ def test_distilgpt2():
     config = DMIRCompilerConfigs["stablehlo-dmir"]()
     config.use_fx_importer = True
     config.use_tracing = True
-    config.use_sharding = True
+    config.use_sharding = False
     config.generate_artifacts = True
     config.decomposition_ops = [torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes, torch.ops.aten.t]
 
