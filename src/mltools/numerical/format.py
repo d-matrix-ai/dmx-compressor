@@ -256,8 +256,8 @@ class BlockFloatingPoint(Format):
         self,
         precision=8,
         block_size=64,
-        block_dim=-1,
         symmetric=True,
+        block_dim=None,
         rounding="nearest",
     ):
         super().__init__()
@@ -269,7 +269,6 @@ class BlockFloatingPoint(Format):
 
         self.precision = precision
         self.block_size = block_size
-        self.block_dim = block_dim
         self.symmetric = symmetric
         self.rounding = rounding
 
@@ -278,7 +277,7 @@ class BlockFloatingPoint(Format):
         name = f"DMX_BFP_{self.precision+8}{'' if self.symmetric else 'A'}_{self.block_size}"
         return BFPTypeEnum[name].value
 
-    def cast(self, x: torch.Tensor):
+    def cast(self, x: torch.Tensor, block_dim):
         # input of Linear: [B, ..., Cin], dim=-1
         # weight of Linear: [Cout, Cin], dim=-1
         # input of Conv1D: [B, Cin, L], dim=1
@@ -296,7 +295,7 @@ class BlockFloatingPoint(Format):
                 rounding=self.rounding,
             )
         else:
-            _x = x.float().transpose(self.block_dim, -1)  # dim swap
+            _x = x.float().transpose(block_dim, -1)  # dim swap
             xshape = _x.shape  # remember shape
             _xs = torch.split(
                 _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
@@ -314,7 +313,7 @@ class BlockFloatingPoint(Format):
                 ],
                 dim=-1,
             )  # quantize
-            _x = _x.reshape(xshape).transpose_(self.block_dim, -1)  # recover shape
+            _x = _x.reshape(xshape).transpose_(block_dim, -1)  # recover shape
         return _x
 
     @property
@@ -324,13 +323,13 @@ class BlockFloatingPoint(Format):
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
-            "BFP[{precision:d}|8]{{{block_size:d},{block_dim:d}}}({symmetric:w}{rounding:l})",
+            "BFP[{precision:d}|8]{{{block_size:d}}}({symmetric:w}{rounding:l})",
             sh,
         )
+
         return cls(
             precision=conf["precision"],
             block_size=conf["block_size"],
-            block_dim=conf["block_dim"],
             symmetric=conf["symmetric"] == "S",
             rounding=ROUNDING_MODE[conf["rounding"]],
         )
@@ -340,10 +339,10 @@ class BlockFloatingPoint(Format):
         return self.precision + 8.0 / self.block_size
 
     def __str__(self) -> str:
-        return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}, block dimension = {self.block_dim}\ncasting behavior: symmetric = {self.symmetric}, rounding = {self.rounding}"
+        return f"Simulated block floating point format: precision bits = {self.precision}, block size = {self.block_size}\ncasting behavior: symmetric = {self.symmetric}, rounding = {self.rounding}"
 
     def __repr__(self) -> str:
-        return f"BFP[{self.precision}|8]{{{self.block_size},{self.block_dim}}}({'S' if self.symmetric else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
+        return f"BFP[{self.precision}|8]{{{self.block_size}}}({'S' if self.symmetric else '_'}{ROUNDING_MODE.inverse[self.rounding]})"
 
 
 class ScaledBlockFloatingPoint(Format):

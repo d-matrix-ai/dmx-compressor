@@ -10,6 +10,8 @@ from .format import (
     Same,
     FixedPoint,
     BlockFloatingPoint,
+    MXFP,
+    MXINT,
 )
 from .smoothquant import ActivationWeightSmoothQuant
 from .observer import DummyObserver
@@ -22,9 +24,12 @@ class CastToFormat(Function):
     """
 
     @staticmethod
-    def forward(ctx, x, fmt):
+    def forward(ctx, x, fmt, block_dim=None):
         ctx.set_materialize_grads(False)
-        return fmt.cast(x)
+        if block_dim is None:
+            return fmt.cast(x)
+        else:
+            return fmt.cast(x, block_dim)
 
     @staticmethod
     def backward(ctx, g):
@@ -66,6 +71,7 @@ class CastTo(FakeQuantize):
         format="SAME",
         observer=DummyObserver,
         group_size=None,
+        block_dim=None,
         **fake_quantize_kwargs,
     ):
         self.set_format(format)
@@ -76,6 +82,7 @@ class CastTo(FakeQuantize):
             ), "group_size must be used with per tensor quantization scheme"
         self.group_size = group_size if group_size else None
         self.physical_dtype = None
+        self.block_dim = block_dim
         self.enable_fake_quant()
         self.disable_observer()
 
@@ -87,7 +94,7 @@ class CastTo(FakeQuantize):
             self.dtype = format
             self.activation_post_process.dtype = format
             if hasattr(format, "block_dim"):
-                self.activation_post_process.ch_axis = self.ch_axis = format.block_dim
+                self.activation_post_process.ch_axis = self.ch_axis = self.block_dim
 
     def _observer_step(self, x):
         r"""
@@ -169,7 +176,10 @@ class CastTo(FakeQuantize):
                         sc = sc.view(sc_shape)
                         zp = zp.view(sc_shape)
                     x = x / sc + zp
-                x = CastToFormat.apply(x, self.format)
+                if isinstance(self.format, (BlockFloatingPoint, MXFP, MXINT)):
+                    x = CastToFormat.apply(x, self.format, self.block_dim)
+                else:
+                    x = CastToFormat.apply(x, self.format, None)
                 if isinstance(self.format, FixedPoint):
                     x = (x - zp) * sc
             else:  # torch.dtype
@@ -188,7 +198,10 @@ class CastTo(FakeQuantize):
             return self.format.bit_precision
 
     def extra_repr(self):
-        return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()},group_size = {self.group_size}"
+        if self.block_dim is None:
+            return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}, group_size = {self.group_size}"
+        else:
+            return f"format = dtype = {repr(self.format)}, block_dim = {self.block_dim} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}"
 
 
 class Quantize(torch.nn.quantized.Quantize):
@@ -290,7 +303,7 @@ class NumericalCastMixin:
         self.weight_cast = (
             CastTo(ch_axis=self.wout_ch_axis) if "weight" in pnames else None
         )
-        self.bias_cast = CastTo() if "bias" in pnames else None
+        self.bias_cast = CastTo(block_dim=-1) if "bias" in pnames else None
         self.residual_cast = None
         self.multiplier_cast = None
 
