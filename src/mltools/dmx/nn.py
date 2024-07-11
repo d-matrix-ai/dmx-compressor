@@ -23,6 +23,7 @@ from mltools.functional import (
 )
 from mltools.perf_proxy import PerformanceProxyMixin
 from mltools.layer_reconstruction import LayerReconstructionMixin
+import transformers.activations
 
 
 class DmxModuleType(type):
@@ -1924,35 +1925,37 @@ class Tanh(DmxModule, torch.nn.Tanh):
         return graph
 
 
-class GELU(DmxModule, torch.nn.GELU):
+class GELUBase(DmxModule):
     r"""
-    An extension of PyTorch's GELU (Gaussian Error Linear Unit) layer to support DmxModule configurations.
-    This module applies the GELU function element-wise on the input tensor.
-    The function is defined as:
+    A generalized base class to support various GELUActivation configurations.
+    This module applies the specified GELUActivation function element-wise on the input tensor.
 
     Methods:
         _forward (_input: Tensor) -> Tensor: Computes the forward pass of the GELU layer.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, activation_cls, *args, **kwargs) -> None:
+        if activation_cls not in self.__class__.__bases__:
+            self.__class__.__bases__ += (activation_cls,)
         super().__init__(*args, **kwargs)
+        self.activation_cls = activation_cls
 
     def _forward(self, _input: Tensor) -> Tensor:
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
-        Creates a new GELU object (DmxModule) from a given PyTorch GELU layer.
+        Creates a new GELU object (DmxModule) from a given Transformers layer.
 
         Args:
-            raw (torch.nn.Module): A PyTorch GELU layer to be converted.
+            raw (torch.nn.Module): A Transformers GELUActivation layer to be converted.
 
         Returns:
-            DmxModule: A GELU object that has the same configuration as the input PyTorch GELU layer.
+            DmxModule: A GELU object that has the same configuration as the input Transformers GELUActivation layer.
         """
-        initial_dmx = GELU()
+        initial_dmx = cls()
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1960,7 +1963,41 @@ class GELU(DmxModule, torch.nn.GELU):
         """
         Returns a compiler friendly graph
         """
-        initial_dmx = torch.nn.GELU()
+        initial_dmx = self.activation_cls()
         self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
         graph = self.initial_dmx_graph
         return graph
+
+
+class GELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(torch.nn.GELU, *args, **kwargs)
+
+
+class NewGELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(transformers.activations.NewGELUActivation, *args, **kwargs)
+
+
+class FastGELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(transformers.activations.FastGELUActivation, *args, **kwargs)
+
+
+class QuickGELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(transformers.activations.QuickGELUActivation, *args, **kwargs)
+
+
+class ClippedGELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(
+            transformers.activations.ClippedGELUActivation, *args, **kwargs
+        )
+
+
+class BloomGELU(GELUBase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(
+            transformers.models.bloom.modeling_bloom.BloomGelu, *args, **kwargs
+        )

@@ -516,7 +516,11 @@ class DmxConfigRule(SimpleNamespace):
         return [
             n
             for n in config.module_names
-            if config[n]["instance"] in self.module_types and self.name_rule.match(n)
+            if any(
+                issubclass(config[n]["instance"], mod_type)
+                for mod_type in self.module_types
+            )
+            and self.name_rule.match(n)
         ]
 
     def apply_to(self, model_or_config: Union[torch.nn.Module, DmxConfig]):
@@ -530,13 +534,13 @@ class DmxConfigRule(SimpleNamespace):
         target_module_names = self.names_in(model_or_config)
         if isinstance(model_or_config, torch.nn.Module):
             for n, m in model_or_config.named_dmx_modules():
-                if n in target_module_names and type(m) in self.module_types:
+                if n in target_module_names and isinstance(m, self.module_types):
                     m.configure(self.module_config)
         else:
             config = model_or_config
-            for n in (
-                target_module_names
-                and getattr(dmx.nn, config[n]["instance"]) in self.module_types
+            for n in target_module_names and any(
+                issubclass(config[n]["instance"], mod_type)
+                for mod_type in self.module_types
             ):
                 config[n].update(self.module_config)
 

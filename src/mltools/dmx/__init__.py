@@ -277,7 +277,7 @@ config_rules = SimpleNamespace(
             ),
         ),
         DmxConfigRule(
-            module_types=(nn.GELU,),
+            module_types=(nn.GELUBase,),
             module_config=dict(
                 input_format=format.FLOAT16,
                 output_format=format.FLOAT16,
