@@ -24,16 +24,13 @@ class CastToFormat(Function):
     """
 
     @staticmethod
-    def forward(ctx, x, fmt, block_dim=None):
+    def forward(ctx, x, fmt, block_dim):
         ctx.set_materialize_grads(False)
-        if block_dim is None:
-            return fmt.cast(x)
-        else:
-            return fmt.cast(x, block_dim)
+        return fmt.cast(x, block_dim)
 
     @staticmethod
     def backward(ctx, g):
-        return g, None
+        return g, None, None
 
     @staticmethod
     def symbolic(
@@ -176,10 +173,7 @@ class CastTo(FakeQuantize):
                         sc = sc.view(sc_shape)
                         zp = zp.view(sc_shape)
                     x = x / sc + zp
-                if isinstance(self.format, (BlockFloatingPoint, MXFP, MXINT)):
-                    x = CastToFormat.apply(x, self.format, self.block_dim)
-                else:
-                    x = CastToFormat.apply(x, self.format, None)
+                x = CastToFormat.apply(x, self.format, self.block_dim)
                 if isinstance(self.format, FixedPoint):
                     x = (x - zp) * sc
             else:  # torch.dtype
