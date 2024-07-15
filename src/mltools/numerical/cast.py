@@ -248,21 +248,21 @@ class NumericalCastMixin:
             self,
             (nn.Linear,),
         ):
-            self.ch_axis = -2
+            self.ch_axis = -1
             self.win_ch_axis = -1
-            self.wout_ch_axis = -2
+            self.wout_ch_axis = 0
         elif isinstance(
             self,
             (transformers.pytorch_utils.Conv1D,),
         ):
-            self.ch_axis = -2
-            self.win_ch_axis = -2
+            self.ch_axis = -1
+            self.win_ch_axis = 0
             self.wout_ch_axis = -1
         elif isinstance(
             self,
             (nn.modules.conv._ConvNd,),
         ):
-            self.ch_axis = 0
+            self.ch_axis = 1
             self.win_ch_axis = 1
             self.wout_ch_axis = 0
         else:
