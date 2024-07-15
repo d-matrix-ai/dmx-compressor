@@ -90,8 +90,6 @@ class CastTo(FakeQuantize):
         if hasattr(self, "dtype"):
             self.dtype = format
             self.activation_post_process.dtype = format
-            if hasattr(format, "block_dim"):
-                self.activation_post_process.ch_axis = self.ch_axis = self.block_dim
 
     def _observer_step(self, x):
         r"""
@@ -297,7 +295,7 @@ class NumericalCastMixin:
         self.weight_cast = (
             CastTo(ch_axis=self.wout_ch_axis) if "weight" in pnames else None
         )
-        self.bias_cast = CastTo(block_dim=-1) if "bias" in pnames else None
+        self.bias_cast = CastTo() if "bias" in pnames else None
         self.residual_cast = None
         self.multiplier_cast = None
 

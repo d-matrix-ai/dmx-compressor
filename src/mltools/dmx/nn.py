@@ -571,6 +571,8 @@ class Linear(DmxModule, torch.nn.Linear):
         super().__init__(in_features, out_features, bias=bias, **kwargs)
         self.input_cast.block_dim = -1
         self.weight_cast.block_dim = -1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.accum_format, Same):
@@ -862,6 +864,8 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
         )
         self.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         _weight = self._weight
@@ -952,6 +956,8 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
         )
         self.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         _weight = self._weight
@@ -1042,6 +1048,8 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
         )
         self.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(
         self, _input: Tensor, output_size: Optional[List[int]] = None

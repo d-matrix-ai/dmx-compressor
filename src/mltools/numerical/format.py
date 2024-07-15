@@ -276,7 +276,7 @@ class BlockFloatingPoint(Format):
         name = f"DMX_BFP_{self.precision+8}{'' if self.symmetric else 'A'}_{self.block_size}"
         return BFPTypeEnum[name].value
 
-    def cast(self, x: torch.Tensor, block_dim):
+    def cast(self, x: torch.Tensor, block_dim: int):
         # input of Linear: [B, ..., Cin], dim=-1
         # weight of Linear: [Cout, Cin], dim=-1
         # input of Conv1D: [B, Cin, L], dim=1
@@ -385,7 +385,7 @@ class ScaledBlockFloatingPoint(Format):
         name = f"DMX_SBFP_{self.block_format.precision+8}_{self.block_size}_{self.scaler_format.bias}"
         return BFPTypeEnum[name].value
 
-    def cast(self, x: torch.Tensor, block_dim) -> torch.Tensor:
+    def cast(self, x: torch.Tensor, block_dim: int) -> torch.Tensor:
         _x = x.float().transpose(block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
         _xs = torch.split(
@@ -474,7 +474,7 @@ class MXFP(Format):
             torch.abs(chunk), dim=-1, keepdim=True
         )[0]
 
-    def cast(self, x: torch.Tensor, block_dim) -> torch.Tensor:
+    def cast(self, x: torch.Tensor, block_dim: int) -> torch.Tensor:
         _x = x.float().transpose(block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
         _xs = torch.split(
