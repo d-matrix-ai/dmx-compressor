@@ -68,7 +68,7 @@ class CastTo(FakeQuantize):
         format="SAME",
         observer=DummyObserver,
         group_size=None,
-        block_dim=None,
+        block_dim=-1,
         **fake_quantize_kwargs,
     ):
         self.set_format(format)
@@ -190,10 +190,10 @@ class CastTo(FakeQuantize):
             return self.format.bit_precision
 
     def extra_repr(self):
-        if self.block_dim is None:
-            return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}, group_size = {self.group_size}"
-        else:
+        if self.format.blocked:
             return f"format = dtype = {repr(self.format)}, block_dim = {self.block_dim} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}"
+        else:
+            return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}, group_size = {self.group_size}"
 
 
 class Quantize(torch.nn.quantized.Quantize):

@@ -44,11 +44,11 @@ class Lenet5(nn.Module):
 
 conv_quantize_input = dmx.DmxConfigRule(
     module_types=(dmx.nn.Conv2d,),
-    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128_FD),
+    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128),
 )
 conv_quantize_weight = dmx.DmxConfigRule(
     module_types=(dmx.nn.Conv2d,),
-    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128_FD),
+    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128),
 )
 conv_sparsify_weight = dmx.DmxConfigRule(
     module_types=(dmx.nn.Conv2d,),
@@ -58,11 +58,11 @@ conv_sparsify_weight = dmx.DmxConfigRule(
 )
 fc_quantize_input = dmx.DmxConfigRule(
     module_types=(dmx.nn.Linear,),
-    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128_LD),
+    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128),
 )
 fc_quantize_weight = dmx.DmxConfigRule(
     module_types=(dmx.nn.Linear,),
-    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128_LD),
+    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128),
 )
 fc_sparsify_weight = dmx.DmxConfigRule(
     module_types=(dmx.nn.Linear,),

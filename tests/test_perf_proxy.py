@@ -48,8 +48,8 @@ test_cases = [
         layer_dims=(8, 24, None, None, None, None),
         input_dims=(8, None),
         weight_sparseness=dmx.sparseness.BTK8_4_LD,
-        input_format=dmx.format.BFP16_128_LD,
-        weight_format=dmx.format.BFP12_128_LD,
+        input_format=dmx.format.BFP16_128,
+        weight_format=dmx.format.BFP12_128,
         # --------------------------------
         _weight_elem_count=96.0,
         _weight_size_in_bytes=48.75,
@@ -152,8 +152,8 @@ test_cases = [
         layer_dims=(32, 32, (3, 3), 2, 4, "valid"),
         input_dims=(8, (10, 10)),
         weight_sparseness=dmx.sparseness.BTK8_4_FD,
-        input_format=dmx.format.BFP14_128_FD,
-        weight_format=dmx.format.BFP12_128_FD,
+        input_format=dmx.format.BFP14_128,
+        weight_format=dmx.format.BFP12_128,
         # --------------------------------
         _weight_elem_count=1152.0,
         _weight_size_in_bytes=585.0,
