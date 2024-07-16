@@ -277,10 +277,8 @@ def pipeline(
     device_map: Optional[str] = "auto",
     **kwargs,
 ):
-    breakpoint()
     if device_map == "dmx":
         device_map = dmx_device_map(kwargs.get("model"), kwargs.get("revision", "main"))
-        print("Device map:", device_map)
     kwargs.update(
         {
             "trust_remote_code": trust_remote_code,
