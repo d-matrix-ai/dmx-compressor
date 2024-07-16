@@ -219,12 +219,29 @@ def get_input_filter_rules(model):
 
 
 def contains_number(string):
+    """
+    This function checks whether a string contains a number or not.
+    This is used to identify hidden layers in the model.
+    """
     return bool(re.search(r'\d', string))
 
 
-def get_modules(model, prefix):
+def get_modules(root: torch.nn.Module, prefix: str) -> Dict[str, torch.nn.Module]:
+    """
+    A function that recursively traverses the model from the given root module and
+    returns a dictionary of submodules for device mapping. In accordance with the format
+    of device_map = "auto", only submodules that are leaf nodes or hidden layers are 
+    included in the dictionary; submodules of hidden layers are ignored.
+
+    Args:
+        root (torch.nn.Module): model/module to traverse
+        prefix (str): prefix for the submodule names
+    
+    Returns:
+        Dict[str, torch.nn.Module]: dictionary of submodules
+    """
     modules = {}
-    for name, module in model.named_children():
+    for name, module in root.named_children():
         if len(list(module.children())) == 0 or contains_number(name):
             modules[prefix + name] = module
         else:
@@ -232,11 +249,18 @@ def get_modules(model, prefix):
             modules.update(submodules)
     return modules
 
+def dmx_device_map(model: str, revision: Optional[str]= "main") -> Dict[str, int]: 
+    """
+    A function that computes a custom device map for the given model that distributes model weights
+    evenly across all devices. Enable with device_map = "dmx" when calling pipeline.
 
-def dmx_device_map(
-    model,
-    revision,
-):
+    Args:
+        model (str): model name on huggingface
+        revision (str): revision of the model on huggingface
+    
+    Returns:
+        Dict[str, int]: dictionary of the device map
+    """
     model = AutoModelForCausalLM.from_pretrained(model, revision=revision, device_map="meta")
     module_sizes = compute_module_sizes(model)
     tied_parameters = find_tied_parameters(model)
