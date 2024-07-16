@@ -53,7 +53,7 @@ def test_unquantized():
 
 
 def test_quantized():
-    bfp16 = "BFP[8|8]{64,-1}(SN)"
+    bfp16 = "BFP[8|8]{64}(SN)"
     rules = (
         dmx.DmxConfigRule(
             module_types=(dmx.nn.Linear,),
