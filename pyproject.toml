@@ -20,6 +20,7 @@ transformers = "^4.35.0"
 torch = ">=1.12.0, <2.3"
 torchvision = ">=0.13.0, <0.21.0"
 diffusers = "^0.25"
+accelerate = "^0.31"
 
 [[tool.poetry.source]]
 name = "dmatrix"
