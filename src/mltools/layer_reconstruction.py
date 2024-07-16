@@ -27,9 +27,14 @@ class LayerReconstructionMixin:
         self,
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size=None,
+        group_size: int = None,
+        ch_axis: int = None,
     ):
         if self.input_cast is not None:
+            if ch_axis is not None:
+                self.input_cast.ch_axis = (
+                    self.input_cast.activation_post_process.ch_axis
+                ) = ch_axis
             if qscheme_to_overload is not None:
                 self.input_cast.qscheme = qscheme_to_overload
                 self.input_cast.is_per_channel = (
@@ -51,9 +56,14 @@ class LayerReconstructionMixin:
         self,
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size=None,
+        group_size: int = None,
+        ch_axis: int = None,
     ):
         if self.residual_cast is not None:
+            if ch_axis is not None:
+                self.residual_cast.ch_axis = (
+                    self.residual_cast.activation_post_process.ch_axis
+                ) = ch_axis
             if qscheme_to_overload is not None:
                 self.residual_cast.qscheme = qscheme_to_overload
                 self.residual_cast.is_per_channel = (
@@ -76,8 +86,13 @@ class LayerReconstructionMixin:
         observer_cls=HistogramObserver,
         qscheme_to_overload: Optional[torch.qscheme] = None,
         group_size: int = None,
+        ch_axis: int = None,
     ):
         if self.weight_cast is not None:
+            if ch_axis is not None:
+                self.weight_cast.ch_axis = (
+                    self.weight_cast.activation_post_process.ch_axis
+                ) = ch_axis
             if qscheme_to_overload is not None:
                 self.weight_cast.qscheme = qscheme_to_overload
                 self.weight_cast.is_per_channel = (
@@ -95,14 +110,14 @@ class LayerReconstructionMixin:
                     observer_cls(
                         dtype=self.weight_cast.format,
                         qscheme=self.weight_cast.qscheme,
-                        ch_axis=self.wout_ch_axis,
+                        ch_axis=self.weight_cast.ch_axis,
                     ).to(self.weight.device)
                     for i in range(group_num)
                 ]
             self.weight_cast.activation_post_process = observer_cls(
                 dtype=self.weight_cast.format,
                 qscheme=self.weight_cast.qscheme,
-                ch_axis=self.wout_ch_axis,
+                ch_axis=self.weight_cast.ch_axis,
             ).to(self.weight.device)
         else:
             warnings.warn(

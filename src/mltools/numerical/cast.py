@@ -269,13 +269,13 @@ class NumericalCastMixin:
         ):
             self.ch_axis = 1
             self.win_ch_axis = 1
-            self.wout_ch_axis = 2
+            self.wout_ch_axis = 0
         else:
             self.ch_axis = self.win_ch_axis = self.wout_ch_axis = None
 
     def init_casts(self) -> None:
         # dynamic i/o casts
-        self.input_cast = CastTo()
+        self.input_cast = CastTo(ch_axis=self.ch_axis)
         self.output_cast = CastTo()
         # dynamic intermediate casts
         if isinstance(
