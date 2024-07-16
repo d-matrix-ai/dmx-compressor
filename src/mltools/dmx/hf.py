@@ -10,6 +10,9 @@ from huggingface_hub import hf_hub_download
 from .model import DmxModel, DmxConfig
 from tqdm import tqdm
 import torch
+from transformers import AutoModelForCausalLM
+from accelerate.utils import compute_module_sizes, find_tied_parameters
+import re
 
 
 def get_config_file(repo_name, revision, config_name):
@@ -215,6 +218,58 @@ def get_input_filter_rules(model):
     return None
 
 
+def contains_number(string):
+    return bool(re.search(r'\d', string))
+
+
+def get_modules(model, prefix):
+    modules = {}
+    for name, module in model.named_children():
+        if len(list(module.children())) == 0 or contains_number(name):
+            modules[prefix + name] = module
+        else:
+            submodules = get_modules(module, prefix + name + ".")
+            modules.update(submodules)
+    return modules
+
+
+def dmx_device_map(
+    model,
+    revision,
+):
+    model = AutoModelForCausalLM.from_pretrained(model, revision=revision, device_map="meta")
+    module_sizes = compute_module_sizes(model)
+    tied_parameters = find_tied_parameters(model)
+    modules = get_modules(model, "")
+
+    params = {}
+    for k, v in modules.items():
+        params[k] = module_sizes[k]
+
+    device_map = {}
+    total_params = sum(params.values())
+    num_devices = torch.cuda.device_count()
+    
+    cur_device = 0
+    params_on_cur_device = 0
+    accumulated_params = 0
+    average_params = total_params // num_devices
+    
+    for k, v in params.items():
+        if params_on_cur_device > average_params or (params_on_cur_device != 0 and params_on_cur_device + v > average_params * 1.2):
+            cur_device = min(cur_device + 1, num_devices - 1)
+            accumulated_params += params_on_cur_device
+            params_on_cur_device = 0
+            average_params = (total_params - accumulated_params) // (num_devices - cur_device)
+        device_map[k] = cur_device
+        params_on_cur_device += v
+
+    for pair in tied_parameters:
+        device_map[pair[0][:-len(".weight")]] = device_map[pair[1][:-len(".weight")]]
+    
+    return device_map
+
+
 def pipeline(
     *args,
     dmx_config: Optional[str] = None,
@@ -222,6 +277,10 @@ def pipeline(
     device_map: Optional[str] = "auto",
     **kwargs,
 ):
+    breakpoint()
+    if device_map == "dmx":
+        device_map = dmx_device_map(kwargs.get("model"), kwargs.get("revision", "main"))
+        print("Device map:", device_map)
     kwargs.update(
         {
             "trust_remote_code": trust_remote_code,
