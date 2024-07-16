@@ -559,7 +559,8 @@ class ScaledDotProductAttention(DmxModule):
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.multiplier_cast = CastTo()
+        self.multiplier_cast = CastTo(block_dim=-2)
+        self.input_cast.block_dim = -1
 
     def forward(self, input, multiplier):
         if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
@@ -657,6 +658,10 @@ class Linear(DmxModule, torch.nn.Linear):
         **kwargs,
     ) -> None:
         super().__init__(in_features, out_features, bias=bias, **kwargs)
+        self.input_cast.block_dim = -1
+        self.weight_cast.block_dim = -1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         if isinstance(self.accum_format, Same):
@@ -946,6 +951,10 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             padding_mode=padding_mode,
             **kwargs,
         )
+        self.input_cast.block_dim = 1
+        self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         _weight = self._weight
@@ -1034,6 +1043,10 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
             padding_mode=padding_mode,
             **kwargs,
         )
+        self.input_cast.block_dim = 1
+        self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(self, _input: Tensor) -> Tensor:
         _weight = self._weight
@@ -1122,6 +1135,10 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             padding_mode=padding_mode,
             **kwargs,
         )
+        self.input_cast.block_dim = 1
+        self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
 
     def _forward(
         self, _input: Tensor, output_size: Optional[List[int]] = None
