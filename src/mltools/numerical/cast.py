@@ -275,7 +275,7 @@ class NumericalCastMixin:
 
     def init_casts(self) -> None:
         # dynamic i/o casts
-        self.input_cast = CastTo(ch_axis=self.ch_axis)
+        self.input_cast = nn.ModuleList([CastTo(ch_axis=self.ch_axis)])
         self.output_cast = CastTo()
         # dynamic intermediate casts
         if isinstance(
@@ -363,7 +363,7 @@ class NumericalCastMixin:
 
     @property
     def input_format(self):
-        return self.input_cast.format
+        return [cast.format for cast in self.input_cast]
 
     @property
     def input_precision(self):

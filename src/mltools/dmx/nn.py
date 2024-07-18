@@ -67,13 +67,10 @@ class DmxModule(
         """
         # numerics transformation
         if "input_format" in config:
-            self.input_cast.set_format(format=config["input_format"])
+            for i, f in enumerate(config["input_format"]):
+                self.input_cast[i].set_format(format=f)
         if "output_format" in config:
             self.output_cast.set_format(format=config["output_format"])
-        if self.residual_cast is not None and "residual_format" in config:
-            self.residual_cast.set_format(format=config["residual_format"])
-        if self.multiplier_cast is not None and "multiplier_format" in config:
-            self.multiplier_cast.set_format(format=config["multiplier_format"])
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_cast is not None and "weight_format" in config:
@@ -223,7 +220,7 @@ class DmxModule(
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
             input = self.smoothquant.scale_input(input)
-        _input = self.input_cast(input)
+        _input, args, kwags = self.cast_input(input, args, kwags)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
         _input, args, kwags = self.align_device(_input, args, kwags, _device)
@@ -274,6 +271,17 @@ class DmxModule(
         """
         pass
 
+    def cast_input(self, x, args, kwargs):
+        i = 0
+        new_args = []
+        for a in args:
+            if isinstance(a, torch.Tensor):
+                new_args.append(self.input_cast[i](a))
+                i += 1
+            else:
+                new_args.append(a)
+        return self.input_cast[0](x), new_args, kwargs
+
 
 class DmxModuleConfig(dict):
     @classmethod
@@ -291,7 +299,7 @@ class DmxModuleConfig(dict):
         cc.instance = module.__class__
         if isinstance(module, DmxModule):
             if module.input_format is not None and (
-                freeze or not isinstance(module.input_format, Same)
+                freeze or not all(isinstance(f, Same) for f in module.input_format)
             ):
                 cc.input_format = module.input_format
             if module.residual_format is not None and (
@@ -340,13 +348,12 @@ class ResAdd(DmxModule, torch.nn.Module):
     """
     A module for handling residual connections.
 
-    Attributes:
-        residual_cast (CastTo): CastTo module for residual component
+
     """
 
     def __init__(self) -> None:
         super().__init__()
-        self.residual_cast = CastTo()
+        self.input_cast = torch.nn.ModuleList([CastTo(), CastTo()])
 
     def forward(self, input, residual):
         if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
@@ -354,7 +361,7 @@ class ResAdd(DmxModule, torch.nn.Module):
         else:
             return torch.add(input, residual)
 
-    def _forward(self, _input: Tensor, residual: Tensor) -> Tensor:
+    def _forward(self, _input: Tensor, _residual: Tensor) -> Tensor:
         """
         A forward pass of addition operation with quantization applied
 
@@ -365,7 +372,6 @@ class ResAdd(DmxModule, torch.nn.Module):
         Returns:
             Sum of _input tensor and quantized residual tensor.
         """
-        _residual = self.residual_cast(residual)
         _output = _input + _residual
         return _output
 
@@ -422,18 +428,12 @@ class ResAdd(DmxModule, torch.nn.Module):
         return g
 
 
-class InitMatMul(torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        _output = torch.matmul(_input, multiplier)
-        return _output
-
-
 class Mul(DmxModule):
     def __init__(self) -> None:
         super().__init__()
+        self.input_cast = torch.nn.ModuleList(
+            [CastTo(block_dim=-1), CastTo(block_dim=-2)]
+        )
 
     def forward(self, input, residual):
         if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
@@ -448,6 +448,9 @@ class Mul(DmxModule):
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
         super().__init__()
+        self.input_cast = torch.nn.ModuleList(
+            [CastTo(block_dim=-1), CastTo(block_dim=-1), CastTo(block_dim=-1)]
+        )
 
     def _forward(
         self,
@@ -559,8 +562,9 @@ class ScaledDotProductAttention(DmxModule):
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.multiplier_cast = CastTo(block_dim=-2)
-        self.input_cast.block_dim = -1
+        self.input_cast = torch.nn.ModuleList(
+            [CastTo(block_dim=-1), CastTo(block_dim=-2)]
+        )
 
     def forward(self, input, multiplier):
         if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
@@ -568,8 +572,7 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         else:
             return torch.matmul(input, multiplier)
 
-    def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
-        _multiplier = self.multiplier_cast(multiplier)
+    def _forward(self, _input: Tensor, _multiplier: Tensor) -> Tensor:
         _output = torch.matmul(_input, _multiplier)
         return _output
 
@@ -627,6 +630,12 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 
 
 class BAddBMM(DmxModule):
+    def __init__(self) -> None:
+        super().__init__()
+        self.input_cast = torch.nn.ModuleList(
+            [CastTo(block_dim=-1), CastTo(block_dim=-1), CastTo(block_dim=-2)]
+        )
+
     def _forward(self, _input, batch1, batch2, **kwargs):
         return torch.baddbmm(_input, batch1, batch2, **kwargs)
 
@@ -658,7 +667,7 @@ class Linear(DmxModule, torch.nn.Linear):
         **kwargs,
     ) -> None:
         super().__init__(in_features, out_features, bias=bias, **kwargs)
-        self.input_cast.block_dim = -1
+        self.input_cast[0].block_dim = -1
         self.weight_cast.block_dim = -1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -951,7 +960,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast.block_dim = 1
+        self.input_cast[0].block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -1043,7 +1052,7 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast.block_dim = 1
+        self.input_cast[0].block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -1135,7 +1144,7 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast.block_dim = 1
+        self.input_cast[0].block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
