@@ -153,7 +153,11 @@ class CastTo(FakeQuantize):
 
     def forward(self, x):
         self.physical_dtype = x.dtype
-        if self.observer_enabled[0] == 1 and x is not None:
+        if (
+            self.observer_enabled[0] == 1
+            and x is not None
+            and not isinstance(self.format, Same)
+        ):
             self._observer_step(x)
         if self.fake_quant_enabled[0] == 1:
             if isinstance(self.format, Format):  # d-Matrix custom format
