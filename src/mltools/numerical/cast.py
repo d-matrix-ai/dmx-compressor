@@ -96,6 +96,7 @@ class CastTo(FakeQuantize):
         Helper method for stepping observer in forward(),
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
+        self.activation_post_process.to(x.device)
         if self.group_size:
             if not hasattr(self, "activation_post_processes"):
                 group_num = math.ceil(x.shape[self.ch_axis] * 1.0 / self.group_size)
