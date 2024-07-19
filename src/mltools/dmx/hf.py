@@ -278,15 +278,24 @@ def dmx_device_map(model: str, revision: Optional[str]= "main") -> Dict[str, int
     params_on_cur_device = 0
     accumulated_params = 0
     average_params = total_params // num_devices
-    
-    for k, v in params.items():
-        if params_on_cur_device > average_params or (params_on_cur_device != 0 and params_on_cur_device + v > average_params * 1.2):
+
+    # place all embedding modules together on the first device
+    for name, module in modules.items():
+        if isinstance(module, torch.nn.Embedding):
+            device_map[name] = cur_device
+            params_on_cur_device += params[name]
+            continue
+
+    # distribute remaining modules across all devices
+    for name, module in modules.items():
+        if isinstance(module, torch.nn.Embedding): continue
+        if params_on_cur_device > average_params or (params_on_cur_device != 0 and params_on_cur_device + params[name] > average_params * 1.2):
             cur_device = min(cur_device + 1, num_devices - 1)
             accumulated_params += params_on_cur_device
             params_on_cur_device = 0
             average_params = (total_params - accumulated_params) // (num_devices - cur_device)
-        device_map[k] = cur_device
-        params_on_cur_device += v
+        device_map[name] = cur_device
+        params_on_cur_device += params[name]
 
     for pair in tied_parameters:
         device_map[pair[0][:-len(".weight")]] = device_map[pair[1][:-len(".weight")]]
