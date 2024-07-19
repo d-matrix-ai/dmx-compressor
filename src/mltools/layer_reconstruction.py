@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, List, Union, Iterable
 import torch
 import warnings
 from contextlib import contextmanager
@@ -26,26 +26,54 @@ class LayerReconstructionMixin:
     def set_activation_calibrator(
         self,
         observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size: int = None,
-        ch_axis: int = None,
+        qscheme_to_overload: Optional[Union[torch.qscheme, List[torch.qscheme]]] = None,
+        group_size: Union[int, List[int]] = None,
+        ch_axis: Union[int, List[int]] = None,
     ):
         if self.input_cast is not None:
+            num_input_casts = len(self.input_cast)
             if ch_axis is not None:
-                self.input_cast.ch_axis = (
-                    self.input_cast.activation_post_process.ch_axis
-                ) = ch_axis
+                if not isinstance(ch_axis, Iterable):
+                    ch_axis = [ch_axis for i in range(num_input_casts)]
+                if len(ch_axis) != num_input_casts:
+                    raise RuntimeError(
+                        "length of ch_axis mismatched with length of input_cast"
+                    )
+                for i in range(num_input_casts):
+                    self.input_cast[i].ch_axis = self.input_cast[
+                        i
+                    ].activation_post_process.ch_axis = ch_axis[i]
             if qscheme_to_overload is not None:
-                self.input_cast.qscheme = qscheme_to_overload
-                self.input_cast.is_per_channel = (
-                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
+                if not isinstance(qscheme_to_overload, Iterable):
+                    qscheme_to_overload = [
+                        qscheme_to_overload for i in range(num_input_casts)
+                    ]
+                if len(qscheme_to_overload) != num_input_casts:
+                    raise RuntimeError(
+                        "length of qscheme_to_overload mismatched with length of input_cast"
+                    )
+                for i in range(num_input_casts):
+                    self.input_cast[i].qscheme = qscheme_to_overload[i]
+                    self.input_cast[i].is_per_channel = (
+                        torch.ao.quantization.utils.is_per_channel(
+                            qscheme_to_overload[i]
+                        )
+                    )
+            if group_size is not None:
+                if not isinstance(group_size, Iterable):
+                    group_size = [group_size for i in range(num_input_casts)]
+                if len(group_size) != num_input_casts:
+                    raise RuntimeError(
+                        "length of group_size mismatched with length of input_cast"
+                    )
+                for i in range(num_input_casts):
+                    self.input_cast[i].group_size = group_size[i]
+            for i in range(num_input_casts):
+                self.input_cast[i].activation_post_process = observer_cls(
+                    dtype=self.input_cast[i].format,
+                    qscheme=self.input_cast[i].qscheme,
+                    ch_axis=self.input_cast[i].ch_axis,
                 )
-            self.input_cast.group_size = group_size if group_size else None
-            self.input_cast.activation_post_process = observer_cls(
-                dtype=self.input_cast.format,
-                qscheme=self.input_cast.qscheme,
-                ch_axis=self.input_cast.ch_axis,
-            ).to(self.weight.device)
         else:
             warnings.warn(
                 "cannot set up activation calibration because of a lack of input_cast",
@@ -127,11 +155,13 @@ class LayerReconstructionMixin:
 
     def enable_activation_calib(self, state: bool = True) -> None:
         if state:
-            self.input_cast.disable_fake_quant()
-            self.input_cast.enable_observer()
+            for i in range(len(self.input_cast)):
+                self.input_cast[i].disable_fake_quant()
+                self.input_cast[i].enable_observer()
         else:
-            self.input_cast.enable_fake_quant()
-            self.input_cast.disable_observer()
+            for i in range(len(self.input_cast)):
+                self.input_cast[i].enable_fake_quant()
+                self.input_cast[i].disable_observer()
 
     def enable_weight_calib(self, state: bool = True) -> None:
         if self._has_weight():
