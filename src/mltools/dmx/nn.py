@@ -272,7 +272,7 @@ class DmxModule(
         pass
 
     def cast_input(self, x, args, kwargs):
-        i = 0
+        i = 1
         new_args = []
         for a in args:
             if isinstance(a, torch.Tensor):
