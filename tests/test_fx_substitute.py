@@ -53,11 +53,11 @@ class Lenet5(nn.Module):
 def test_lenet5():
     net = Lenet5()
     gm_before = fx.symbolic_trace(net)
-    gm = substitute_transform(net)
+    gm = dmx.DmxModel.from_torch(net)
     inp = torch.rand(1, 95, 95)
     output_before = gm_before(inp)
     output = gm(inp)
-    assert check_all_dmx(gm), True
+    assert check_all_dmx(gm._gm), True
     assert (output_before - output).abs().sum() <= 1e-5, True
 
 
@@ -75,13 +75,13 @@ class MultiInputNet(nn.Module):
 def test_multiple_inputs():
     net = MultiInputNet()
     gm_before = fx.symbolic_trace(net)
-    gm = substitute_transform(net)
+    gm = dmx.DmxModel.from_torch(net)
     x = torch.rand(8, 32)
     y = torch.rand(8, 64)
     z = torch.rand(8, 16)
     output_before = gm_before(x, y, z)
     output = gm(x, y, z)
-    assert check_all_dmx(gm), True
+    assert check_all_dmx(gm._gm), True
     assert (output_before - output).abs().sum() <= 1e-5, True
 
 
@@ -109,9 +109,9 @@ class ResConnection(nn.Module):
 def test_res_connection():
     net = ResConnection()
     gm_before = fx.symbolic_trace(net)
-    gm = substitute_transform(net)
+    gm = dmx.DmxModel.from_torch(net)
     x = torch.rand(8, 32)
     output_before = gm_before(x)
     output = gm(x)
-    assert check_all_dmx(gm), True
+    assert check_all_dmx(gm._gm), True
     assert (output_before - output).abs().sum() <= 1e-5, True

@@ -7,11 +7,7 @@ import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
 
-from mltools.numerical import (
-    NumericalCastMixin,
-    Same,
-    CastTo,
-)
+from mltools.numerical import NumericalCastMixin, Same, CastTo, CastToList
 from mltools.sparse import (
     WeightSparseMixin,
     Dense,
@@ -67,8 +63,7 @@ class DmxModule(
         """
         # numerics transformation
         if "input_format" in config:
-            for i, f in enumerate(config["input_format"]):
-                self.input_cast[i].set_format(format=f)
+            self.input_cast.set_format(format=config["input_format"])
         if "output_format" in config:
             self.output_cast.set_format(format=config["output_format"])
         if self.accum_cast is not None and "accum_format" in config:
@@ -220,7 +215,7 @@ class DmxModule(
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
             input = self.smoothquant.scale_input(input)
-        _input, args, kwags = self.cast_input(input, args, kwags)
+        _input, args, kwags = self.input_cast(input, *args, **kwags)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
         _input, args, kwags = self.align_device(_input, args, kwags, _device)
@@ -270,17 +265,6 @@ class DmxModule(
         Returns a compiler friendly graph
         """
         pass
-
-    def cast_input(self, x, args, kwargs):
-        i = 1
-        new_args = []
-        for a in args:
-            if isinstance(a, torch.Tensor):
-                new_args.append(self.input_cast[i](a))
-                i += 1
-            else:
-                new_args.append(a)
-        return self.input_cast[0](x), new_args, kwargs
 
 
 class DmxModuleConfig(dict):
@@ -353,7 +337,7 @@ class ResAdd(DmxModule, torch.nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = torch.nn.ModuleList([CastTo(), CastTo()])
+        self.input_cast = CastToList([CastTo(), CastTo()])
 
     def forward(self, input, residual):
         if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
@@ -431,9 +415,7 @@ class ResAdd(DmxModule, torch.nn.Module):
 class Mul(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = torch.nn.ModuleList(
-            [CastTo(block_dim=-1), CastTo(block_dim=-2)]
-        )
+        self.input_cast = CastToList([CastTo(block_dim=-1), CastTo(block_dim=-2)])
 
     def forward(self, input, residual):
         if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
@@ -448,7 +430,7 @@ class Mul(DmxModule):
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = torch.nn.ModuleList(
+        self.input_cast = CastToList(
             [CastTo(block_dim=-1), CastTo(block_dim=-1), CastTo(block_dim=-1)]
         )
 
@@ -562,9 +544,7 @@ class ScaledDotProductAttention(DmxModule):
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = torch.nn.ModuleList(
-            [CastTo(block_dim=-1), CastTo(block_dim=-2)]
-        )
+        self.input_cast = CastToList([CastTo(block_dim=-1), CastTo(block_dim=-2)])
 
     def forward(self, input, multiplier):
         if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
@@ -632,7 +612,7 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 class BAddBMM(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = torch.nn.ModuleList(
+        self.input_cast = CastToList(
             [CastTo(block_dim=-1), CastTo(block_dim=-1), CastTo(block_dim=-2)]
         )
 

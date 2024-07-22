@@ -1,5 +1,5 @@
 import warnings
-from typing import Union, Optional
+from typing import Union, Optional, List, Iterable
 import torch
 import torch.nn as nn
 from torch.autograd import Function
@@ -54,6 +54,38 @@ class CastToFormat(Function):
             )
         else:
             return None
+
+
+class CastToList(torch.nn.ModuleList):
+    def forward(self, x, *args, **kwargs):
+        i = 1
+        new_args = []
+        new_kwargs = {}
+        for a in args:
+            if isinstance(a, torch.Tensor):
+                new_args.append(self[i](a))
+                i += 1
+            else:
+                new_args.append(a)
+        for k, v in kwargs.items():
+            if isinstance(v, torch.Tensor):
+                new_kwargs[k] = self[k](v)
+            else:
+                new_kwargs[k] = v
+        return self[0](x), new_args, new_kwargs
+
+    def set_format(self, format: Union[List, str, torch.dtype, Format]):
+        if not isinstance(format, Iterable):
+            format = [format for i in len(self)]
+        if len(format) != len(self):
+            raise RuntimeError("length of format mismatched with length of input_cast")
+        for i, f in enumerate(format):
+            if isinstance(f, str):
+                f = Format.from_shorthand(f)
+            self[i].format = f
+            if hasattr(self[i], "dtype"):
+                self[i].dtype = f
+                self[i].activation_post_process.dtype = f
 
 
 class CastTo(FakeQuantize):
@@ -280,7 +312,7 @@ class NumericalCastMixin:
 
     def init_casts(self) -> None:
         # dynamic i/o casts
-        self.input_cast = nn.ModuleList([CastTo(ch_axis=self.ch_axis)])
+        self.input_cast = CastToList([CastTo(ch_axis=self.ch_axis)])
         self.output_cast = CastTo()
         # dynamic intermediate casts
         if isinstance(
