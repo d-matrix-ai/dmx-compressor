@@ -1,9 +1,9 @@
 import math
-from typing import Optional, List, Union, Iterable
+from typing import Optional, List, Union, Dict, Iterable
 import torch
 import warnings
 from contextlib import contextmanager
-from mltools.numerical.observer import HistogramObserver
+from mltools.numerical.observer import HistogramObserver, ObserverBase
 
 
 class LayerReconstructionMixin:
@@ -25,87 +25,53 @@ class LayerReconstructionMixin:
 
     def set_activation_calibrator(
         self,
-        observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[Union[torch.qscheme, List[torch.qscheme]]] = None,
-        group_size: Union[int, List[int]] = None,
-        ch_axis: Union[int, List[int]] = None,
+        observer_cls: Union[ObserverBase, Dict, List] = HistogramObserver,
+        qscheme_to_overload: Optional[Union[torch.qscheme, Dict, List]] = None,
+        group_size: Union[int, Dict, List] = None,
+        ch_axis: Union[int, Dict, List] = None,
     ):
         if self.input_cast is not None:
-            num_input_casts = len(self.input_cast)
             if ch_axis is not None:
-                if not isinstance(ch_axis, Iterable):
-                    ch_axis = [ch_axis for i in range(num_input_casts)]
-                if len(ch_axis) != num_input_casts:
-                    raise RuntimeError(
-                        "length of ch_axis mismatched with length of input_cast"
-                    )
-                for i in range(num_input_casts):
-                    self.input_cast[i].ch_axis = self.input_cast[
-                        i
-                    ].activation_post_process.ch_axis = ch_axis[i]
+                ch_axis = self.input_cast.pack_to_dict(ch_axis)
+                for k in ch_axis.keys():
+                    if k not in self.input_cast:
+                        raise RuntimeError(
+                            f"key {k} in ch_axis is not a key in self.input_cast!"
+                        )
+                    self.input_cast[k].ch_axis = self.input_cast[
+                        k
+                    ].activation_post_process.ch_axis = ch_axis[k]
             if qscheme_to_overload is not None:
-                if not isinstance(qscheme_to_overload, Iterable):
-                    qscheme_to_overload = [
-                        qscheme_to_overload for i in range(num_input_casts)
-                    ]
-                if len(qscheme_to_overload) != num_input_casts:
-                    raise RuntimeError(
-                        "length of qscheme_to_overload mismatched with length of input_cast"
-                    )
-                for i in range(num_input_casts):
-                    self.input_cast[i].qscheme = qscheme_to_overload[i]
-                    self.input_cast[i].is_per_channel = (
+                qscheme_to_overload = self.input_cast.pack_to_dict(qscheme_to_overload)
+                for k in qscheme_to_overload.keys():
+                    if k not in self.input_cast:
+                        raise RuntimeError(
+                            f"key {k} in qscheme_to_overload is not a key in self.input_cast!"
+                        )
+                    self.input_cast[k].qscheme = qscheme_to_overload[k]
+                    self.input_cast[k].is_per_channel = (
                         torch.ao.quantization.utils.is_per_channel(
-                            qscheme_to_overload[i]
+                            qscheme_to_overload[k]
                         )
                     )
             if group_size is not None:
-                if not isinstance(group_size, Iterable):
-                    group_size = [group_size for i in range(num_input_casts)]
-                if len(group_size) != num_input_casts:
-                    raise RuntimeError(
-                        "length of group_size mismatched with length of input_cast"
-                    )
-                for i in range(num_input_casts):
-                    self.input_cast[i].group_size = group_size[i]
-            for i in range(num_input_casts):
-                self.input_cast[i].activation_post_process = observer_cls(
-                    dtype=self.input_cast[i].format,
-                    qscheme=self.input_cast[i].qscheme,
-                    ch_axis=self.input_cast[i].ch_axis,
+                group_size = self.input_cast.pack_to_dict(group_size)
+                for k in group_size.keys():
+                    if k not in self.input_cast:
+                        raise RuntimeError(
+                            f"key {k} in group_size is not a key in self.input_cast!"
+                        )
+                    self.input_cast[k].group_size = group_size[k]
+            observer_cls = self.input_cast.pack_to_dict(observer_cls)
+            for k in self.input_cast.keys():
+                self.input_cast[k].activation_post_process = observer_cls[k](
+                    dtype=self.input_cast[k].format,
+                    qscheme=self.input_cast[k].qscheme,
+                    ch_axis=self.input_cast[k].ch_axis,
                 )
         else:
             warnings.warn(
                 "cannot set up activation calibration because of a lack of input_cast",
-                RuntimeWarning,
-            )
-
-    def set_residual_calibrator(
-        self,
-        observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size: int = None,
-        ch_axis: int = None,
-    ):
-        if self.residual_cast is not None:
-            if ch_axis is not None:
-                self.residual_cast.ch_axis = (
-                    self.residual_cast.activation_post_process.ch_axis
-                ) = ch_axis
-            if qscheme_to_overload is not None:
-                self.residual_cast.qscheme = qscheme_to_overload
-                self.residual_cast.is_per_channel = (
-                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
-                )
-            self.residual_cast.group_size = group_size if group_size else None
-            self.residual_cast.activation_post_process = observer_cls(
-                dtype=self.residual_cast.format,
-                qscheme=self.residual_cast.qscheme,
-                ch_axis=self.residual_cast.ch_axis,
-            ).to(self.weight.device)
-        else:
-            warnings.warn(
-                "cannot set up activation calibration because of a lack of residual_cast",
                 RuntimeWarning,
             )
 
@@ -155,13 +121,11 @@ class LayerReconstructionMixin:
 
     def enable_activation_calib(self, state: bool = True) -> None:
         if state:
-            for i in range(len(self.input_cast)):
-                self.input_cast[i].disable_fake_quant()
-                self.input_cast[i].enable_observer()
+            self.input_cast.disable_fake_quant()
+            self.input_cast.enable_observer()
         else:
-            for i in range(len(self.input_cast)):
-                self.input_cast[i].enable_fake_quant()
-                self.input_cast[i].disable_observer()
+            self.input_cast.enable_fake_quant()
+            self.input_cast.disable_observer()
 
     def enable_weight_calib(self, state: bool = True) -> None:
         if self._has_weight():

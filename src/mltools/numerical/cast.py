@@ -1,5 +1,5 @@
 import warnings
-from typing import Union, Optional, List, Iterable
+from typing import Union, Optional, Dict, Iterable
 import torch
 import torch.nn as nn
 from torch.autograd import Function
@@ -56,14 +56,15 @@ class CastToFormat(Function):
             return None
 
 
-class CastToList(torch.nn.ModuleList):
+class CastToDict(torch.nn.ModuleDict):
     def forward(self, x, *args, **kwargs):
+        keys = list(self.keys())
         i = 1
         new_args = []
         new_kwargs = {}
         for a in args:
             if isinstance(a, torch.Tensor):
-                new_args.append(self[i](a))
+                new_args.append(self[keys[i]](a))
                 i += 1
             else:
                 new_args.append(a)
@@ -72,20 +73,47 @@ class CastToList(torch.nn.ModuleList):
                 new_kwargs[k] = self[k](v)
             else:
                 new_kwargs[k] = v
-        return self[0](x), new_args, new_kwargs
+        return self[keys[0]](x), new_args, new_kwargs
 
-    def set_format(self, format: Union[List, str, torch.dtype, Format]):
-        if not isinstance(format, Iterable):
-            format = [format for i in len(self)]
-        if len(format) != len(self):
-            raise RuntimeError("length of format mismatched with length of input_cast")
-        for i, f in enumerate(format):
+    def pack_to_dict(self, param):
+        keys = list(self.keys())
+        if not isinstance(param, (tuple, list, dict)):
+            param = {k: param for k in keys}
+        elif isinstance(param, (tuple, list)):
+            if len(param) != len(self):
+                warnings.warn(
+                    f"length of parameters to set is not equal to length of input_cast, len({param}!={len(self)})"
+                )
+            param = {keys[i]: p for i, p in enumerate(param)}
+        return param
+
+    def set_format(self, format: Union[Dict, str, torch.dtype, Format]):
+        format = self.pack_to_dict(format)
+        for k, f in format.items():
             if isinstance(f, str):
                 f = Format.from_shorthand(f)
-            self[i].format = f
-            if hasattr(self[i], "dtype"):
-                self[i].dtype = f
-                self[i].activation_post_process.dtype = f
+            if k not in self.keys():
+                raise RuntimeError(f"No CastTo with key {k}!")
+            self[k].format = f
+            if hasattr(self[k], "dtype"):
+                self[k].dtype = f
+                self[k].activation_post_process.dtype = f
+
+    def disable_fake_quant(self):
+        for k in self.keys():
+            self[k].disable_fake_quant()
+
+    def enable_fake_quant(self):
+        for k in self.keys():
+            self[k].enable_fake_quant()
+
+    def enable_observer(self):
+        for k in self.keys():
+            self[k].enable_observer()
+
+    def disable_observer(self):
+        for k in self.keys():
+            self[k].disable_observer()
 
 
 class CastTo(FakeQuantize):
@@ -312,7 +340,7 @@ class NumericalCastMixin:
 
     def init_casts(self) -> None:
         # dynamic i/o casts
-        self.input_cast = CastToList([CastTo(ch_axis=self.ch_axis)])
+        self.input_cast = CastToDict({"input": CastTo(ch_axis=self.ch_axis)})
         self.output_cast = CastTo()
         # dynamic intermediate casts
         if isinstance(
@@ -400,7 +428,7 @@ class NumericalCastMixin:
 
     @property
     def input_format(self):
-        return [cast.format for cast in self.input_cast]
+        return {k: cast.format for k, cast in self.input_cast.items()}
 
     @property
     def input_precision(self):
