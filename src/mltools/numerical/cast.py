@@ -443,7 +443,7 @@ class NumericalCastMixin:
 
     @property
     def input_precision(self):
-        return self.input_cast.get_precision()
+        return self.input_cast["input"].get_precision()
 
     @property
     def weight_precision(self):
