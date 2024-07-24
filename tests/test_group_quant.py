@@ -84,7 +84,7 @@ def test_block_size_non_factor_linear_activation():
     layer = dmx.nn.Linear(in_dim, out_dim)
     layer.input_cast.set_format(dmx.format.INT4)
     x = torch.Tensor([[0, 1], [3, 7], [5.1, 8], [10, 14], [0.1, 0.7]])
-    layer.input_cast.ch_axis = 0
+    layer.input_cast["input"].ch_axis = 0
     layer.set_activation_calibrator(
         MinMaxObserver, torch.per_tensor_symmetric, group_size=2
     )
@@ -222,7 +222,7 @@ def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format
     module.set_activation_calibrator(
         observer_cls=observer,
         qscheme_to_overload=qscheme,
-        group_size=x.shape[module.input_cast.ch_axis],
+        group_size=x.shape[module.input_cast["input"].ch_axis],
     )
     module_ref.set_activation_calibrator(
         observer_cls=observer,

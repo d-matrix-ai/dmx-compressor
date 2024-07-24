@@ -57,8 +57,19 @@ class CastToFormat(Function):
 
 
 class CastToDict(torch.nn.ModuleDict):
-    def forward(self, x, *args, **kwargs):
+    def forward(
+        self,
+        x,
+        *args,
+        full_cast=False,
+        **kwargs,
+    ):
+        """
+        When full_cast = True, we return full casted (input, args, kwargs) even if args and kwargs are empty
+        """
         keys = list(self.keys())
+        if not full_cast and not args and not kwargs:
+            return self[keys[0]](x)
         i = 1
         new_args = []
         new_kwargs = {}

@@ -12,6 +12,7 @@ from mltools.fx.transform import substitute_transform
 from mltools.fx.transformer import get_op_set_from
 import functools
 import warnings
+from copy import deepcopy
 
 
 class DmxModelMixin:
@@ -269,11 +270,22 @@ class DmxModel(torch.nn.Module):
         return _forward
 
     @staticmethod
-    def is_same_signature(_model, kwargs):
-        tracing_kwargs = _model.tracing_kwargs
+    def is_same_signature(_model, args, kwargs):
+        tracing_args, tracing_kwargs = _model.tracing_kwargs
         # if kwargs has different keys, need to retrace
         if tracing_kwargs.keys() != kwargs.keys():
             return False
+        # if args has different length, need to retrace
+        if len(tracing_args) != len(args):
+            return False
+        # comparing args values between tracing args and new args
+        for a, new_a in zip(tracing_args, args):
+            # if bool argument has different values, need to retrace
+            if isinstance(new_a, bool) and a != new_a:
+                return False
+            # if one in None and other is not none, need to retrace
+            if not isinstance(new_a, bool) and (new_a is None) != (a is None):
+                return False
         # comparing kwargs values between tracing kwarg and new kwargs
         for k in kwargs.keys():
             # if bool argument has different values, need to retrace
@@ -316,6 +328,22 @@ class DmxModel(torch.nn.Module):
         return input_names, bool_inputs, dummy_inputs
 
     @staticmethod
+    def deepcopy_args(args):
+        def deepcopy_element(element):
+            if isinstance(element, torch.Tensor):
+                return element.detach().clone()
+            elif isinstance(element, tuple):
+                return tuple(deepcopy_element(e) for e in element)
+            elif isinstance(element, list):
+                return [deepcopy_element(e) for e in element]
+            elif isinstance(element, dict):
+                return {k: deepcopy_element(v) for k, v in element.items()}
+            else:
+                return deepcopy(element)
+
+        return deepcopy_element(args)
+
+    @staticmethod
     def post_process_gm(_model, args, kwargs):
         # some inputs were removed from input names due to None or bool, we want to add it back to maintain original input signature
         placeholders_needed = list(
@@ -346,13 +374,16 @@ class DmxModel(torch.nn.Module):
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
-            if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+            if not _m.transformed or not DmxModel.is_same_signature(_m, _args, _kwargs):
                 if not model.transformed:
                     raise Exception(
                         "model forward needs to be called before submodule forward."
                     )
                 warnings.warn("Submodule transformation triggered")
-                _m.tracing_kwargs = _kwargs.copy()
+                _m.tracing_kwargs = (
+                    DmxModel.deepcopy_args(_args),
+                    DmxModel.deepcopy_args(_kwargs),
+                )
                 _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                 _m.transformed = True
 
@@ -382,38 +413,39 @@ class DmxModel(torch.nn.Module):
     ) -> torch.nn.Module:
         if DmxModelMixin not in model.__class__.__bases__:
             model.__class__.__bases__ += (DmxModelMixin,)
-            model._gm = None
-            model.transformed = False
-            model.hf = model.__class__.__module__.startswith("transformers")
-            model.input_filter_rules = input_filter_rules
+        model._gm = None
+        model.transformed = False
+        model.hf = model.__class__.__module__.startswith("transformers")
+        model.input_filter_rules = input_filter_rules
 
-            def temp_forward(_m, *_args, **_kwargs):
-                _is_training = _m.training
-                if not _m.transformed or not DmxModel.is_same_signature(_m, _kwargs):
+        def temp_forward(_m, *_args, **_kwargs):
+            _is_training = _m.training
+            if not _m.transformed or not DmxModel.is_same_signature(_m, _args, _kwargs):
 
-                    if _m.transformed:
-                        curr_cfg = _m.dmx_config
-                    warnings.warn("Model transformation triggered")
-                    _m.tracing_kwargs = _kwargs.copy()
-                    _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
-                    if _m.transformed:
-                        _m.configure(curr_cfg)
-                    else:
-                        _m.transformed = True
-                        _m.baseline_config = _m.dmx_config  # BASELINE config recorded
-                        while len(_m._dmx_configurations_to_be_applied) != 0:
-                            _config, _rules = (
-                                _m._dmx_configurations_to_be_applied.popleft()
-                            )
-                            _m.configure(_config, *_rules)
-                    _m.train(_is_training)
-                    _m.forward = partial(temp_forward, _m)
-                    return _m._forward(*_args, **_kwargs)
-
+                if _m.transformed:
+                    curr_cfg = _m.dmx_config
+                warnings.warn("Model transformation triggered")
+                _m.tracing_kwargs = (
+                    DmxModel.deepcopy_args(_args),
+                    DmxModel.deepcopy_args(_kwargs),
+                )
+                _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
+                if _m.transformed:
+                    _m.configure(curr_cfg)
+                else:
+                    _m.transformed = True
+                    _m.baseline_config = _m.dmx_config  # BASELINE config recorded
+                    while len(_m._dmx_configurations_to_be_applied) != 0:
+                        _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
+                        _m.configure(_config, *_rules)
+                _m.train(_is_training)
+                _m.forward = partial(temp_forward, _m)
                 return _m._forward(*_args, **_kwargs)
 
-            model.old_forward = model.forward
-            model.forward = partial(temp_forward, model)
+            return _m._forward(*_args, **_kwargs)
+
+        model.old_forward = model.forward
+        model.forward = partial(temp_forward, model)
 
         return model
 

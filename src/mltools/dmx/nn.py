@@ -215,7 +215,7 @@ class DmxModule(
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
             input = self.smoothquant.scale_input(input)
-        _input, args, kwags = self.input_cast(input, *args, **kwags)
+        _input, args, kwags = self.input_cast(input, *args, full_cast=True, **kwags)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
         _input, args, kwags = self.align_device(_input, args, kwags, _device)
@@ -286,7 +286,7 @@ class DmxModuleConfig(dict):
                 freeze
                 or not all(isinstance(f, Same) for f in module.input_format.values())
             ):
-                cc.input_formats = module.input_format
+                cc.input_format = module.input_format
             if module.residual_format is not None and (
                 freeze or not isinstance(module.residual_format, Same)
             ):
