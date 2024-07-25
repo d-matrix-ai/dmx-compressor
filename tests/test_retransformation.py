@@ -43,7 +43,7 @@ def test_retransformation_after_calib():
         dmx.DmxConfigRule(
             module_types=(dmx.nn.Linear,),
             module_config=dict(
-                input_format=format,
+                input_formats=[format],
                 weight_format=format,
             ),
         ),
@@ -61,10 +61,10 @@ def test_retransformation_after_calib():
     # check all scales and zerpoints are the same
     if any(
         (
-            m.input_cast["input"].scale[0]
-            != target_layers_copy[n].input_cast["input"].scale[0]
-            or m.input_cast["input"].zero_point[0]
-            != target_layers_copy[n].input_cast["input"].zero_point[0]
+            m.input_casts.input_cast.scale[0]
+            != target_layers_copy[n].input_casts.input_cast.scale[0]
+            or m.input_casts.input_cast.zero_point[0]
+            != target_layers_copy[n].input_casts.input_cast.zero_point[0]
         )
         for n, m in target_layers.items()
     ):
@@ -73,10 +73,10 @@ def test_retransformation_after_calib():
     # check all fake_quant_enabled and observer_enabled are different
     if any(
         (
-            m.input_cast["input"].fake_quant_enabled
-            == target_layers_copy[n].input_cast["input"].fake_quant_enabled
-            or m.input_cast["input"].observer_enabled
-            == target_layers_copy[n].input_cast["input"].observer_enabled
+            m.input_casts.input_cast.fake_quant_enabled
+            == target_layers_copy[n].input_casts.input_cast.fake_quant_enabled
+            or m.input_casts.input_cast.observer_enabled
+            == target_layers_copy[n].input_casts.input_cast.observer_enabled
         )
         for n, m in target_layers.items()
     ):
@@ -98,7 +98,7 @@ def test_retransformation_during_calib():
         dmx.DmxConfigRule(
             module_types=(dmx.nn.Linear,),
             module_config=dict(
-                input_format=format,
+                input_formats=[format],
                 weight_format=format,
             ),
         ),
@@ -117,10 +117,10 @@ def test_retransformation_during_calib():
         # check not all scales and zerpoints are the same
         if all(
             (
-                m.input_cast["input"].scale[0]
-                == target_layers_copy[n].input_cast["input"].scale[0]
-                and m.input_cast["input"].zero_point[0]
-                == target_layers_copy[n].input_cast["input"].zero_point[0]
+                m.input_casts.input_cast.scale[0]
+                == target_layers_copy[n].input_casts.input_cast.scale[0]
+                and m.input_casts.input_cast.zero_point[0]
+                == target_layers_copy[n].input_casts.input_cast.zero_point[0]
             )
             for n, m in target_layers.items()
         ):
@@ -131,10 +131,10 @@ def test_retransformation_during_calib():
         # check all fake_quant_enabled and observer_enabled are the same
         if any(
             (
-                m.input_cast["input"].fake_quant_enabled
-                != target_layers_copy[n].input_cast["input"].fake_quant_enabled
-                or m.input_cast["input"].observer_enabled
-                != target_layers_copy[n].input_cast["input"].observer_enabled
+                m.input_casts.input_cast.fake_quant_enabled
+                != target_layers_copy[n].input_casts.input_cast.fake_quant_enabled
+                or m.input_casts.input_cast.observer_enabled
+                != target_layers_copy[n].input_casts.input_cast.observer_enabled
             )
             for n, m in target_layers.items()
         ):

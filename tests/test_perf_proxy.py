@@ -209,7 +209,7 @@ def _create_module(cls, layer_dims, weight_sparseness, input_format, weight_form
         raise ValueError("unsupported module class {cls}")
     _module.weight_sparsifier.configure(sparseness=weight_sparseness)
     if isinstance(input_format, numerical.Format):
-        _module.input_cast.set_format(input_format)
+        _module.input_casts.input_cast.set_format(input_format)
     if isinstance(weight_format, numerical.Format):
         _module.weight_cast.set_format(weight_format)
     elif weight_format == torch.float16:  # in order to work on both CPU/GPU

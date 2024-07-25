@@ -20,6 +20,7 @@ from mltools.functional import (
 from mltools.perf_proxy import PerformanceProxyMixin
 from mltools.layer_reconstruction import LayerReconstructionMixin
 import transformers.activations
+from collections import OrderedDict
 
 
 class DmxModuleType(type):
@@ -62,8 +63,8 @@ class DmxModule(
 
         """
         # numerics transformation
-        if "input_format" in config:
-            self.input_cast.set_format(format=config["input_format"])
+        if "input_formats" in config:
+            self.input_casts.set_format(format=config["input_formats"])
         if "output_format" in config:
             self.output_cast.set_format(format=config["output_format"])
         if self.accum_cast is not None and "accum_format" in config:
@@ -215,7 +216,7 @@ class DmxModule(
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
             input = self.smoothquant.scale_input(input)
-        _input, args, kwags = self.input_cast(input, *args, full_cast=True, **kwags)
+        _input, args, kwags = self.input_casts(input, *args, **kwags)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
         _input, args, kwags = self.align_device(_input, args, kwags, _device)
@@ -282,19 +283,11 @@ class DmxModuleConfig(dict):
         cc = SimpleNamespace()
         cc.instance = module.__class__
         if isinstance(module, DmxModule):
-            if module.input_format is not None and (
+            if module.input_formats is not None and (
                 freeze
-                or not all(isinstance(f, Same) for f in module.input_format.values())
+                or not all(isinstance(f, Same) for f in module.input_formats.values())
             ):
-                cc.input_format = module.input_format
-            if module.residual_format is not None and (
-                freeze or not isinstance(module.residual_format, Same)
-            ):
-                cc.residual_format = module.residual_format
-            if module.multiplier_format is not None and (
-                freeze or not isinstance(module.multiplier_format, Same)
-            ):
-                cc.multiplier_format = module.multiplier_format
+                cc.input_formats = module.input_formats
             if module.output_format is not None and (
                 freeze or not isinstance(module.output_format, Same)
             ):
@@ -338,7 +331,9 @@ class ResAdd(DmxModule, torch.nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = CastToDict({"input": CastTo(), "residual": CastTo()})
+        self.input_casts = CastToDict(
+            OrderedDict({"input_cast": CastTo(), "residual_cast": CastTo()})
+        )
 
     def forward(self, input, residual):
         if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
@@ -416,8 +411,13 @@ class ResAdd(DmxModule, torch.nn.Module):
 class Mul(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = CastToDict(
-            {"input": CastTo(block_dim=-1), "multiplier": CastTo(block_dim=-2)}
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "input_cast": CastTo(block_dim=-1),
+                    "multiplier_cast": CastTo(block_dim=-2),
+                }
+            )
         )
 
     def forward(self, input, multiplier):
@@ -433,13 +433,15 @@ class Mul(DmxModule):
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = CastToDict(
-            {
-                "query_states": CastTo(block_dim=-1),
-                "key_states": CastTo(block_dim=-1),
-                "value_states": CastTo(block_dim=-1),
-                "attn_mask": CastTo(block_dim=-1),
-            }
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "query_states_cast": CastTo(block_dim=-1),
+                    "key_states_cast": CastTo(block_dim=-1),
+                    "value_states_cast": CastTo(block_dim=-1),
+                    "attn_mask_cast": CastTo(block_dim=-1),
+                }
+            )
         )
 
     def _forward(
@@ -552,8 +554,13 @@ class ScaledDotProductAttention(DmxModule):
 class ActActMatMul(DmxModule, torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = CastToDict(
-            {"input": CastTo(block_dim=-1), "multiplier": CastTo(block_dim=-2)}
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "input_cast": CastTo(block_dim=-1),
+                    "multiplier_cast": CastTo(block_dim=-2),
+                }
+            )
         )
 
     def forward(self, input, multiplier):
@@ -622,12 +629,14 @@ class ActActMatMul(DmxModule, torch.nn.Module):
 class BAddBMM(DmxModule):
     def __init__(self) -> None:
         super().__init__()
-        self.input_cast = CastToDict(
-            {
-                "input": CastTo(block_dim=-1),
-                "batch1": CastTo(block_dim=-1),
-                "batch2": CastTo(block_dim=-2),
-            }
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "input_cast": CastTo(block_dim=-1),
+                    "batch1_cast": CastTo(block_dim=-1),
+                    "batch2_cast": CastTo(block_dim=-2),
+                }
+            )
         )
 
     def _forward(self, input, batch1, batch2, **kwargs):
@@ -661,7 +670,7 @@ class Linear(DmxModule, torch.nn.Linear):
         **kwargs,
     ) -> None:
         super().__init__(in_features, out_features, bias=bias, **kwargs)
-        self.input_cast["input"].block_dim = -1
+        self.input_casts.input_cast.block_dim = -1
         self.weight_cast.block_dim = -1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -954,7 +963,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast["input"].block_dim = 1
+        self.input_casts.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -1046,7 +1055,7 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast["input"].block_dim = 1
+        self.input_casts.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
@@ -1138,7 +1147,7 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             padding_mode=padding_mode,
             **kwargs,
         )
-        self.input_cast["input"].block_dim = 1
+        self.input_casts.input_cast.block_dim = 1
         self.weight_cast.block_dim = 1
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
