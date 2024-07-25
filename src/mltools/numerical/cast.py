@@ -76,7 +76,7 @@ class CastToDict(torch.nn.ModuleDict):
                 new_args.append(a)
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
-                new_kwargs[k] = self[k](v)
+                new_kwargs[k] = self[k + "_cast"](v)
             else:
                 new_kwargs[k] = v
         return self[keys[0]](x), new_args, new_kwargs
