@@ -52,7 +52,9 @@ def substitute_transform(
         )
     else:
         gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
-    transformer = DMXAwareTransformer(gm, tracer.node_name_to_scope)
+    transformer = DMXAwareTransformer(
+        gm, tracer.node_name_to_scope, root._gm if root.transformed else None
+    )
     transformed = transformer.transform()
     # Copy over all object attributes (i.e. config files)
     for key, val in root.__dict__.items():

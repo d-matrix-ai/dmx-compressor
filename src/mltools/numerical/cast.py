@@ -1,5 +1,5 @@
 import warnings
-from typing import Union, Optional
+from typing import Union, Optional, Dict, Iterable
 import torch
 import torch.nn as nn
 from torch.autograd import Function
@@ -16,6 +16,7 @@ from .format import (
 from .smoothquant import ActivationWeightSmoothQuant
 from .observer import DummyObserver
 import math
+from collections import OrderedDict
 
 
 class CastToFormat(Function):
@@ -54,6 +55,74 @@ class CastToFormat(Function):
             )
         else:
             return None
+
+
+class CastToDict(torch.nn.ModuleDict):
+    def forward(
+        self,
+        x,
+        *args,
+        **kwargs,
+    ):
+        keys = list(self.keys())
+        i = 1
+        new_args = []
+        new_kwargs = {}
+        for a in args:
+            if isinstance(a, torch.Tensor):
+                new_args.append(self[keys[i]](a))
+                i += 1
+            else:
+                new_args.append(a)
+        for k, v in kwargs.items():
+            if isinstance(v, torch.Tensor):
+                new_kwargs[k] = self[k + "_cast"](v)
+            else:
+                new_kwargs[k] = v
+        return self[keys[0]](x), new_args, new_kwargs
+
+    def pack_to_dict(self, param):
+        keys = list(self.keys())
+        if isinstance(param, (tuple, list)):
+            param = {
+                keys[i]: p if p is not None else "SAME" for i, p in enumerate(param)
+            }
+        if isinstance(param, dict):
+            if len(param) != len(self):
+                warnings.warn(
+                    f"length of format to set is not equal to length of input_casts, some CastTos might not be set properly!\nlen({param}!={len(self)})"
+                )
+        else:
+            raise ValueError("format needs to be a dict, tuple or list!")
+        return param
+
+    def set_format(self, format: Union[Dict, str, torch.dtype, Format]):
+        format = self.pack_to_dict(format)
+        for k, f in format.items():
+            if isinstance(f, str):
+                f = Format.from_shorthand(f)
+            if k not in self.keys():
+                raise RuntimeError(f"No CastTo with key {k}!")
+            self[k].format = f
+            if hasattr(self[k], "dtype"):
+                self[k].dtype = f
+                self[k].activation_post_process.dtype = f
+
+    def disable_fake_quant(self):
+        for k in self.keys():
+            self[k].disable_fake_quant()
+
+    def enable_fake_quant(self):
+        for k in self.keys():
+            self[k].enable_fake_quant()
+
+    def enable_observer(self):
+        for k in self.keys():
+            self[k].enable_observer()
+
+    def disable_observer(self):
+        for k in self.keys():
+            self[k].disable_observer()
 
 
 class CastTo(FakeQuantize):
@@ -96,6 +165,7 @@ class CastTo(FakeQuantize):
         Helper method for stepping observer in forward(),
         taken from torch.quantization.fake_quantize.FakeQuantize source
         """
+        self.activation_post_process.to(x.device)
         if self.group_size:
             if not hasattr(self, "activation_post_processes"):
                 group_num = math.ceil(x.shape[self.ch_axis] * 1.0 / self.group_size)
@@ -152,7 +222,11 @@ class CastTo(FakeQuantize):
 
     def forward(self, x):
         self.physical_dtype = x.dtype
-        if self.observer_enabled[0] == 1 and x is not None:
+        if (
+            self.observer_enabled[0] == 1
+            and x is not None
+            and not isinstance(self.format, Same)
+        ):
             self._observer_step(x)
         if self.fake_quant_enabled[0] == 1:
             if isinstance(self.format, Format):  # d-Matrix custom format
@@ -275,7 +349,9 @@ class NumericalCastMixin:
 
     def init_casts(self) -> None:
         # dynamic i/o casts
-        self.input_cast = CastTo(ch_axis=self.ch_axis)
+        self.input_casts = CastToDict(
+            OrderedDict({"input_cast": CastTo(ch_axis=self.ch_axis)})
+        )
         self.output_cast = CastTo()
         # dynamic intermediate casts
         if isinstance(
@@ -333,23 +409,31 @@ class NumericalCastMixin:
         return _good
 
     def check_input_format_dim_consistency(self) -> bool:
-        _good = self.input_cast is None or self._check_format_dim_consistency(
-            self.input_cast.format, self.ch_axis
+        _good = (
+            self.input_casts is None
+            or self.input_casts.input_cast is None
+            or self._check_format_dim_consistency(
+                self.input_casts.input_cast.format, self.ch_axis
+            )
         )
         if not _good:
             warnings.warn(
-                f"layer's input channel axis {self.ch_axis} might be inconsistent with format {self.input_format}",
+                f"Input format dim consistency check failed! Layer's input channel axis {self.ch_axis} might be inconsistent with format {self.input_formats}",
                 RuntimeWarning,
             )
         return _good
 
     def check_residual_format_dim_consistency(self) -> bool:
-        _good = self.residual_cast is None or self._check_format_dim_consistency(
-            self.residual_cast.format, self.ch_axis
+        _good = (
+            self.input_casts is None
+            or self.input_casts.residual_cast is None
+            or self._check_format_dim_consistency(
+                self.input_casts.residual_cast.format, self.ch_axis
+            )
         )
         if not _good:
             warnings.warn(
-                f"layer's residual channel axis {self.ch_axis} might be inconsistent with format {self.residual_format}",
+                f"Residual format dim consistency check failed! Layer's input channel axis {self.ch_axis} might be inconsistent with format {self.input_formats}",
                 RuntimeWarning,
             )
         return _good
@@ -362,12 +446,12 @@ class NumericalCastMixin:
         )
 
     @property
-    def input_format(self):
-        return self.input_cast.format
+    def input_formats(self):
+        return {k: cast.format for k, cast in self.input_casts.items()}
 
     @property
     def input_precision(self):
-        return self.input_cast.get_precision()
+        return self.input_casts.input_cast.get_precision()
 
     @property
     def weight_precision(self):

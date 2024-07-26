@@ -1,9 +1,9 @@
 import math
-from typing import Optional
+from typing import Optional, List, Union, Dict, Iterable, Any
 import torch
 import warnings
 from contextlib import contextmanager
-from mltools.numerical.observer import HistogramObserver
+from mltools.numerical.observer import HistogramObserver, ObserverBase
 
 
 class LayerReconstructionMixin:
@@ -25,59 +25,85 @@ class LayerReconstructionMixin:
 
     def set_activation_calibrator(
         self,
-        observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size: int = None,
-        ch_axis: int = None,
+        hyperparams: Dict[str, Dict[str, Any]] = None,
     ):
-        if self.input_cast is not None:
-            if ch_axis is not None:
-                self.input_cast.ch_axis = (
-                    self.input_cast.activation_post_process.ch_axis
-                ) = ch_axis
-            if qscheme_to_overload is not None:
-                self.input_cast.qscheme = qscheme_to_overload
-                self.input_cast.is_per_channel = (
-                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
+        """
+        This function sets the activation calibrators.
+        Args:
+            hyperparams: a dictionary mapping input_casts keys to a dictionary of calibration parameters.
+            Dictionary of calibration parameters can contain keys "observer_cls", "qscheme_to_overload","group_size","ch_axis";
+            if unspecified, their value defaults to HistogramObserver, None, None, None
+            if hyperparams is None, default is to set input_casts.input_cast to HistogramObserver.
+            Example value for hyperparams:
+            hyperparams={
+                "input_cast": dict(
+                    observer_cls=HistogramObserver,
+                    qscheme_to_overload: torch.per_tensor_symmetric,
+                    group_size: None,
+                    ch_axis: -1,
                 )
-            self.input_cast.group_size = group_size if group_size else None
-            self.input_cast.activation_post_process = observer_cls(
-                dtype=self.input_cast.format,
-                qscheme=self.input_cast.qscheme,
-                ch_axis=self.input_cast.ch_axis,
-            ).to(self.weight.device)
-        else:
-            warnings.warn(
-                "cannot set up activation calibration because of a lack of input_cast",
-                RuntimeWarning,
-            )
+                "multiplier_cast": dict(
+                    observer_cls=HistogramObserver,
+                    qscheme_to_overload: torch.per_channel_affine,
+                    group_size: 16,
+                    ch_axis: -2,
+                )
+            }
+        """
+        if self.input_casts is not None:
+            if hyperparams is None and hasattr(self.input_casts, "input_cast"):
+                hyperparams = {"input_cast": {}}
+                warnings.warn(
+                    "No calibration hyperparams specified, defaults to setting HistogramObserver for input_casts.input_cast only."
+                )
+            if len(hyperparams) != len(self.input_casts):
+                warnings.warn(
+                    "Number of keys for hyperparams does not match with length of input_casts, calibrators for some CastTos might not be set."
+                )
+            for k, params in hyperparams.items():
+                if hasattr(self.input_casts, k):
+                    observer_cls = (
+                        HistogramObserver
+                        if (
+                            "observer_cls" not in params
+                            or params["observer_cls"] is None
+                        )
+                        else params["observer_cls"]
+                    )
+                    qscheme_to_overload = (
+                        params["qscheme_to_overload"]
+                        if "qscheme_to_overload" in params
+                        else None
+                    )
+                    group_size = (
+                        params["group_size"] if "group_size" in params else None
+                    )
+                    ch_axis = params["ch_axis"] if "ch_axis" in params else None
 
-    def set_residual_calibrator(
-        self,
-        observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size: int = None,
-        ch_axis: int = None,
-    ):
-        if self.residual_cast is not None:
-            if ch_axis is not None:
-                self.residual_cast.ch_axis = (
-                    self.residual_cast.activation_post_process.ch_axis
-                ) = ch_axis
-            if qscheme_to_overload is not None:
-                self.residual_cast.qscheme = qscheme_to_overload
-                self.residual_cast.is_per_channel = (
-                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
-                )
-            self.residual_cast.group_size = group_size if group_size else None
-            self.residual_cast.activation_post_process = observer_cls(
-                dtype=self.residual_cast.format,
-                qscheme=self.residual_cast.qscheme,
-                ch_axis=self.residual_cast.ch_axis,
-            ).to(self.weight.device)
+                    if ch_axis is not None:
+                        self.input_casts[k].ch_axis = self.input_casts[
+                            k
+                        ].activation_post_process.ch_axis = ch_axis
+                    if qscheme_to_overload is not None:
+                        self.input_casts[k].qscheme = qscheme_to_overload
+                        self.input_casts[k].is_per_channel = (
+                            torch.ao.quantization.utils.is_per_channel(
+                                qscheme_to_overload
+                            )
+                        )
+                    if group_size is not None:
+                        self.input_casts[k].group_size = group_size
+                    self.input_casts[k].activation_post_process = observer_cls(
+                        dtype=self.input_casts[k].format,
+                        qscheme=self.input_casts[k].qscheme,
+                        ch_axis=self.input_casts[k].ch_axis,
+                    )
+                else:
+                    raise ValueError(f"{k} is not a key in input_casts!")
+
         else:
             warnings.warn(
-                "cannot set up activation calibration because of a lack of residual_cast",
+                "cannot set up activation calibration because of a lack of input_casts",
                 RuntimeWarning,
             )
 
@@ -127,11 +153,11 @@ class LayerReconstructionMixin:
 
     def enable_activation_calib(self, state: bool = True) -> None:
         if state:
-            self.input_cast.disable_fake_quant()
-            self.input_cast.enable_observer()
+            self.input_casts.disable_fake_quant()
+            self.input_casts.enable_observer()
         else:
-            self.input_cast.enable_fake_quant()
-            self.input_cast.disable_observer()
+            self.input_casts.enable_fake_quant()
+            self.input_casts.disable_observer()
 
     def enable_weight_calib(self, state: bool = True) -> None:
         if self._has_weight():
@@ -176,10 +202,10 @@ class LayerReconstructionMixin:
             if state:
                 self.obc = OptimalBrainCompressor(self)
                 # TODO: Weight Sparsifier should be handled.
-                self.input_cast.disable_fake_quant()
+                self.input_casts.disable_fake_quant()
                 self.weight_cast.disable_fake_quant()
             else:
-                self.input_cast.enable_fake_quant()
+                self.input_casts.enable_fake_quant()
                 self.weight_cast.enable_fake_quant()
                 self.obc.apply(**hyperparams)
                 self.obc = None

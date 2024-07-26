@@ -19,12 +19,19 @@ class DMXAwareTransformer(fx.Transformer):
     Attributes:
         module (fx.GraphModule): the module to transform
         node_name_to_scope (dict): A dictionary storing the mapping between node names and scopes
+        old_gm (fx.GraphModule): dmxmodules to reuse if module was already transformed
     """
 
-    def __init__(self, module: fx.GraphModule, node_name_to_scope: dict):
+    def __init__(
+        self,
+        module: fx.GraphModule,
+        node_name_to_scope: dict,
+        old_gm: fx.GraphModule = None,
+    ):
         super().__init__(module)
         self.module = module
         self.node_name_to_scope = node_name_to_scope
+        self.old_gm = old_gm
 
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
@@ -48,13 +55,20 @@ class DMXAwareTransformer(fx.Transformer):
         node_key = type(curr_mod).__module__ + "." + type(curr_mod).__name__
         if node_key not in dmx_aware_mapping:
             return super().call_module(target, args, kwargs)
-        self.module.add_submodule(
-            target, dmx_aware_mapping[node_key].from_raw(curr_mod)
-        )
+        self.add_submod(target, dmx_aware_mapping[node_key].from_raw(curr_mod))
         new_node = self.new_graph.create_node(
             "call_module", target, args=(args[0].node,)
         )
         return Proxy(new_node, self.tracer)
+
+    def add_submod(self, name, mod):
+        """
+        this function will try to reuse modules in old_gm if possible
+        """
+        try:
+            self.module.add_submodule(name, self.old_gm.get_submodule(name))
+        except:
+            self.module.add_submodule(name, mod)
 
     def call_method(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
@@ -73,8 +87,7 @@ class DMXAwareTransformer(fx.Transformer):
             # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
             if new_name != candidate:
                 self.new_graph._graph_namespace.create_name(candidate, None)
-
-            self.module.add_submodule(new_name, dmx.nn.BAddBMM())
+            self.add_submod(new_name, dmx.nn.BAddBMM())
             new_node = self.new_graph.create_node(
                 "call_module",
                 new_name,
@@ -178,9 +191,7 @@ class DMXAwareTransformer(fx.Transformer):
                 initkwargs[key] = value
             else:
                 newkwargs[key] = value
-        self.module.add_submodule(
-            new_name, dmx_aware_functional_mappings[node_key](**initkwargs)
-        )
+        self.add_submod(new_name, dmx_aware_functional_mappings[node_key](**initkwargs))
         new_node = self.new_graph.create_node(
             "call_module",
             new_name,

@@ -82,16 +82,22 @@ def test_block_size_non_factor_linear_activation():
     in_dim = 2
     out_dim = 5
     layer = dmx.nn.Linear(in_dim, out_dim)
-    layer.input_cast.set_format(dmx.format.INT4)
+    layer.input_casts.input_cast.set_format(dmx.format.INT4)
     x = torch.Tensor([[0, 1], [3, 7], [5.1, 8], [10, 14], [0.1, 0.7]])
-    layer.input_cast.ch_axis = 0
+    layer.input_casts.input_cast.ch_axis = 0
     layer.set_activation_calibrator(
-        MinMaxObserver, torch.per_tensor_symmetric, group_size=2
+        {
+            "input_cast": {
+                "observer_cls": MinMaxObserver,
+                "qscheme_to_overload": torch.per_tensor_symmetric,
+                "group_size": 2,
+            }
+        }
     )
     with layer.calibrating_activation(), torch.no_grad():
         layer(x)
     y = torch.Tensor([[0, 1], [3, 7], [6, 8], [10, 14], [0.1, 0.7]])
-    assert torch.allclose(layer.input_cast(x), y, rtol=0.0, atol=1e-6)
+    assert torch.allclose(layer.input_casts.input_cast(x), y, rtol=0.0, atol=1e-6)
 
 
 def test_hypernet_linear():
@@ -217,16 +223,24 @@ def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format
     x = _create_test_input(
         module,
     )
-    module.input_cast.set_format(format)
-    module_ref.input_cast.set_format(format)
+    module.input_casts.input_cast.set_format(format)
+    module_ref.input_casts.input_cast.set_format(format)
     module.set_activation_calibrator(
-        observer_cls=observer,
-        qscheme_to_overload=qscheme,
-        group_size=x.shape[module.input_cast.ch_axis],
+        {
+            "input_cast": {
+                "observer_cls": observer,
+                "qscheme_to_overload": qscheme,
+                "group_size": x.shape[module.input_casts.input_cast.ch_axis],
+            }
+        }
     )
     module_ref.set_activation_calibrator(
-        observer_cls=observer,
-        qscheme_to_overload=qscheme,
+        {
+            "input_cast": {
+                "observer_cls": observer,
+                "qscheme_to_overload": qscheme,
+            }
+        }
     )
 
     with module.calibrating_activation(), torch.no_grad():
@@ -234,7 +248,10 @@ def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format
     with module_ref.calibrating_activation(), torch.no_grad():
         module_ref(x)
     assert torch.allclose(
-        module.input_cast(x), module_ref.input_cast(x), rtol=0.0, atol=1e-8
+        module.input_casts.input_cast(x),
+        module_ref.input_casts.input_cast(x),
+        rtol=0.0,
+        atol=1e-8,
     )
 
 
@@ -266,21 +283,32 @@ def test_per_channel_equivalence_activation(module_cls, observer, qscheme, forma
         module,
     )
 
-    module.input_cast.set_format(format)
-    module_ref.input_cast.set_format(format)
+    module.input_casts.input_cast.set_format(format)
+    module_ref.input_casts.input_cast.set_format(format)
     module.set_activation_calibrator(
-        observer_cls=observer,
-        qscheme_to_overload=qscheme[0],
-        group_size=1,
+        {
+            "input_cast": {
+                "observer_cls": observer,
+                "qscheme_to_overload": qscheme[0],
+                "group_size": 1,
+            }
+        }
     )
     module_ref.set_activation_calibrator(
-        observer_cls=observer,
-        qscheme_to_overload=qscheme[1],
+        {
+            "input_cast": {
+                "observer_cls": observer,
+                "qscheme_to_overload": qscheme[1],
+            }
+        }
     )
     with module.calibrating_activation(), torch.no_grad():
         module(x)
     with module_ref.calibrating_activation(), torch.no_grad():
         module_ref(x)
     assert torch.allclose(
-        module.input_cast(x), module_ref.input_cast(x), rtol=0.0, atol=1e-8
+        module.input_casts.input_cast(x),
+        module_ref.input_casts.input_cast(x),
+        rtol=0.0,
+        atol=1e-8,
     )
