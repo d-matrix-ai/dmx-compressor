@@ -249,10 +249,10 @@ def get_modules(root: torch.nn.Module, prefix: str) -> Dict[str, torch.nn.Module
             modules.update(submodules)
     return modules
 
-def dmx_device_map(model: str, revision: Optional[str]= "main") -> Dict[str, int]: 
+def balanced_device_map(model: str, revision: Optional[str]= "main") -> Dict[str, int]: 
     """
     A function that computes a custom device map for the given model that distributes model weights
-    evenly across all devices. Enable with device_map = "dmx" when calling pipeline.
+    evenly across all devices. Enable with device_map = "balanced" when calling pipeline.
 
     Args:
         model (str): model name on huggingface
@@ -310,8 +310,8 @@ def pipeline(
     device_map: Optional[str] = "auto",
     **kwargs,
 ):
-    if device_map == "dmx":
-        device_map = dmx_device_map(kwargs.get("model"), kwargs.get("revision", "main"))
+    if device_map == "balanced":
+        device_map = balanced_device_map(kwargs.get("model"), kwargs.get("revision", "main"))
     kwargs.update(
         {
             "trust_remote_code": trust_remote_code,
