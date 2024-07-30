@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from mltools.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
+from dmx.compressor.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
 from ..fx import QuantTracer, InputOutputTransformer, QdQTransformer
-from mltools.fx import ConfigurationTransformer, DMXAwareTransformer
-from mltools.fx.transformer.utils import dmx_aware_mapping
+from dmx.compressor.fx import ConfigurationTransformer, DMXAwareTransformer
+from dmx.compressor.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
 from transformers.modeling_utils import get_parameter_device

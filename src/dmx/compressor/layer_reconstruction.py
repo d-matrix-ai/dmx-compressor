@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Dict, Iterable, Any
 import torch
 import warnings
 from contextlib import contextmanager
-from mltools.numerical.observer import HistogramObserver, ObserverBase
+from dmx.compressor.numerical.observer import HistogramObserver
 
 
 class LayerReconstructionMixin:

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
 from functools import partial
-from mltools import dmx
-from mltools.dmx.nn import *
-from mltools.fx.transform import substitute_transform
-from mltools.fx.transformer import get_op_set_from
+from dmx.compressor import dmx
+from dmx.compressor.dmx.nn import *
+from dmx.compressor.fx.transform import substitute_transform
+from dmx.compressor.fx.transformer import get_op_set_from
 import functools
 import warnings
 from copy import deepcopy
@@ -97,7 +97,7 @@ class DmxModelMixin:
         Args:
             include_type (bool): include the type of modules in the print out if True
         """
-        from mltools.utils import print_model_tree
+        from dmx.compressor.utils import print_model_tree
 
         print_model_tree(self, include_type)
 
@@ -480,7 +480,7 @@ class DmxConfig(dict):
         Returns:
             A DmxConfig object vreated from yaml file
         """
-        from mltools.utils import load_config_file
+        from dmx.compressor.utils import load_config_file
 
         return cls(load_config_file(fname))
 
@@ -491,7 +491,7 @@ class DmxConfig(dict):
         Args:
             fname (str): file path of the yaml file
         """
-        from mltools.utils import save_config_file
+        from dmx.compressor.utils import save_config_file
 
         save_config_file(dict(self), fname)
 

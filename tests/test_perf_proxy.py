@@ -1,7 +1,7 @@
 import pytest
 import torch
 from typing import Tuple, Optional, Union
-from compressor import dmx, sparse, numerical
+from dmx.compressor import dmx, sparse, numerical
 from dataclasses import dataclass
 
 RANDOM_SEED = 0

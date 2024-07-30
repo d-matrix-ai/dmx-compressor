@@ -3,9 +3,9 @@
 import torch
 from torch import fx, nn
 import torch.nn.functional as F
-from compressor import dmx
-from compressor.fx.transform import substitute_transform
-from compressor.fx.transformer import dmx_aware_mapping
+from dmx.compressor import dmx
+from dmx.compressor.fx.transform import substitute_transform
+from dmx.compressor.fx.transformer import dmx_aware_mapping
 
 RANDOM_SEED = 0
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

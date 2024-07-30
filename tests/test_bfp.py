@@ -1,5 +1,5 @@
 import torch
-from compressor import numerical
+from dmx.compressor import numerical
 
 
 RANDOM_SEED = 0

@@ -3,8 +3,8 @@ import torch
 import torch.fx as fx
 from typing import Any
 from graphviz import Digraph
-from mltools.fx import NodeDictTransformer, QuantTracer
-from mltools.utils.fx.interpreter import MetadataInterpreter
+from dmx.compressor.fx import NodeDictTransformer, QuantTracer
+from dmx.compressor.utils.fx.interpreter import MetadataInterpreter
 
 
 def visualize_graph(

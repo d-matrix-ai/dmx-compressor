@@ -4,7 +4,7 @@ from torch.fx.proxy import Proxy
 import re
 import torch
 
-from mltools import dmx
+from dmx.compressor import dmx
 
 dmx_aware_mapping = {
     "torch.nn.modules.sparse.Embedding": dmx.nn.Embedding,

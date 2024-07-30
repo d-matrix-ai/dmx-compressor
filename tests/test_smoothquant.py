@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
-from compressor import dmx
+from dmx.compressor import dmx
 
 RANDOM_SEED = 0
 

@@ -1,7 +1,7 @@
 import pytest
 
 import torch
-from compressor.sparse import Sparsify, Sparseness
+from dmx.compressor.sparse import Sparsify, Sparseness
 
 RANDOM_SEED = 0
 

@@ -3,8 +3,8 @@ import torch
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Dict, Iterator, List, Optional, Tuple
-from mltools.functional.approximate import NoApproximation
-from mltools import dmx
+from dmx.compressor.functional.approximate import NoApproximation
+from dmx.compressor import dmx
 
 FORMAT_DICT = {
     "input_cast": "SAME",

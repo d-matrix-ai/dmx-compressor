@@ -11,7 +11,7 @@ import torch.fx.traceback as fx_traceback
 
 import itertools
 
-from mltools.fx.transformer.utils import process_args
+from dmx.compressor.fx.transformer.utils import process_args
 
 from .utils import dmx_aware_mapping, dmx_aware_functional_mappings
 

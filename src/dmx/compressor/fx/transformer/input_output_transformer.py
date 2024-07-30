@@ -4,8 +4,8 @@ import torch.fx as fx
 from torch.fx.node import Argument, Target
 from torch.fx.proxy import Proxy
 
-from mltools.numerical import CastTo
-from mltools.sparse import Sparsify
+from dmx.compressor.numerical import CastTo
+from dmx.compressor.sparse import Sparsify
 from .utils import *
 
 

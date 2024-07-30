@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 from transformers import pipeline as hfpipeline
-from mltools.fx.transform import substitute_transform
+from dmx.compressor.fx.transform import substitute_transform
 import transformers
 from .model import DmxModelMixin, DmxConfig
 import evaluate

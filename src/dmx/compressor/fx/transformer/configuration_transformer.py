@@ -3,7 +3,7 @@ import torch.fx as fx
 from torch.fx.node import Argument, Target, map_aggregate
 from torch.fx.proxy import Proxy
 
-from mltools.sparse import Sparseness
+from dmx.compressor.sparse import Sparseness
 
 
 class ConfigurationTransformer(fx.Transformer):

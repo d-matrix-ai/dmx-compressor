@@ -7,24 +7,24 @@ import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
 
-from compressor.numerical import (
+from dmx.compressor.numerical import (
     NumericalCastMixin,
     Same,
     CastTo,
 )
-from compressor.sparse import (
+from dmx.compressor.sparse import (
     WeightSparseMixin,
     Dense,
     LazySparsify,
 )
-from compressor.functional import (
+from dmx.compressor.functional import (
     ApproximationMixin,
     NoApproximation,
 )
 import transformers.activations
 from collections import OrderedDict
-from compressor.perf_proxy import PerformanceProxyMixin
-from compressor.layer_reconstruction import LayerReconstructionMixin
+from dmx.compressor.perf_proxy import PerformanceProxyMixin
+from dmx.compressor.layer_reconstruction import LayerReconstructionMixin
 
 
 class DmxModuleType(type):

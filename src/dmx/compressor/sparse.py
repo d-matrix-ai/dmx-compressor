@@ -7,7 +7,7 @@ from torch.autograd import Function
 from torch.nn.modules.lazy import LazyModuleMixin
 from torch.nn.parameter import UninitializedParameter
 import transformers
-from mltools.utils.visualization import mask2braille
+from dmx.compressor.utils.visualization import mask2braille
 
 __ALL__ = [
     "Sparseness",

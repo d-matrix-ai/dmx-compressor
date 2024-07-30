@@ -1,7 +1,7 @@
 import math
 import torch
 import pptree
-import compressor
+import dmx.compressor
 
 
 def mask2braille(m, dims=(0, 1), max_elems=None):
