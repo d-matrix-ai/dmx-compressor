@@ -26,7 +26,7 @@ def get_workload_graphmodule(wl):
     x = W.create_batch(1)
     W.model(x["input_ids"])
     m = W.model.body._gm
-    return m.to('cpu'), x["input_ids"].to('cpu')
+    return m.to("cpu"), x["input_ids"].to("cpu")
 
 
 def test_distilgpt2():
@@ -48,11 +48,13 @@ def test_distilgpt2():
     config.use_tracing = True
     config.use_sharding = False
     config.generate_artifacts = True
-    config.decomposition_ops = [torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes, torch.ops.aten.t]
+    config.decomposition_ops = [
+        torch.ops.aten.split.Tensor,
+        torch.ops.aten.split_with_sizes,
+        torch.ops.aten.t,
+    ]
 
-    module = dmir_compiler.compile(
-        qdqm, x, "distilgpt2", config
-    )
+    module = dmir_compiler.compile(qdqm, x, "distilgpt2", config)
 
     return module
 

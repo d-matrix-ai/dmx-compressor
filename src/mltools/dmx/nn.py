@@ -249,7 +249,7 @@ class DmxModule(
         state_dic = self.state_dict()
         for key, val in raw.state_dict().items():
             state_dic[key] = val
-        self.load_state_dict(state_dic, assign=True)
+        self.load_state_dict(state_dic)
         # Inherit device from raw module
         for n, m in raw.named_parameters():
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -362,25 +362,30 @@ class ResAdd(DmxModule, torch.nn.Module):
         g = torch.fx.Graph()
         with g.inserting_after():
             _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_cast.scale")
-            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
             _input_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
             )
             _input_dq = g.call_function(
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
             residual = g.placeholder("residual")
-            residual_scale = g.get_attr("residual_cast.scale")
-            residual_zero_point = g.get_attr("residual_cast.zero_point")
+            residual_scale = g.get_attr("input_casts.residual_cast.scale")
+            residual_zero_point = g.get_attr("input_casts.residual_cast.zero_point")
             residual_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     residual,
                     residual_scale,
                     residual_zero_point,
-                    repr(self.residual_cast.format),
+                    repr(self.input_casts.residual_cast.format),
                 ),
             )
             residual_dq = g.call_function(
@@ -468,27 +473,19 @@ class ScaledDotProductAttention(DmxModule):
         """
         g = torch.fx.Graph()
         with g.inserting_after():
-            _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_cast.scale")
-            _input_zero_point = g.get_attr("input_cast.zero_point")
-            _input_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
-            )
-            _input_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
-            )
 
             value_states = g.placeholder("value_states")
-            value_states_scale = g.get_attr("value_states_cast.scale")
-            value_states_zero_point = g.get_attr("value_states_cast.zero_point")
+            value_states_scale = g.get_attr("input_casts.value_states_cast.scale")
+            value_states_zero_point = g.get_attr(
+                "input_casts.value_states_cast.zero_point"
+            )
             value_states_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     value_states,
                     value_states_scale,
                     value_states_zero_point,
-                    repr(self.value_states_cast.format),
+                    repr(self.input_casts.value_states_cast.format),
                 ),
             )
             value_states_dq = g.call_function(
@@ -497,15 +494,17 @@ class ScaledDotProductAttention(DmxModule):
             )
 
             query_states = g.placeholder("query_states")
-            query_states_scale = g.get_attr("query_states_cast.scale")
-            query_states_zero_point = g.get_attr("query_states_cast.zero_point")
+            query_states_scale = g.get_attr("input_casts.query_states_cast.scale")
+            query_states_zero_point = g.get_attr(
+                "input_casts.query_states_cast.zero_point"
+            )
             query_states_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     query_states,
                     query_states_scale,
                     query_states_zero_point,
-                    repr(self.query_states_cast.format),
+                    repr(self.input_casts.query_states_cast.format),
                 ),
             )
             query_states_dq = g.call_function(
@@ -514,15 +513,15 @@ class ScaledDotProductAttention(DmxModule):
             )
 
             key_states = g.placeholder("key_states")
-            key_states_scale = g.get_attr("key_states_cast.scale")
-            key_states_zero_point = g.get_attr("key_states_cast.zero_point")
+            key_states_scale = g.get_attr("input_casts.key_states_cast.scale")
+            key_states_zero_point = g.get_attr("input_casts.key_states_cast.zero_point")
             key_states_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     key_states,
                     key_states_scale,
                     key_states_zero_point,
-                    repr(self.key_states_cast.format),
+                    repr(self.input_casts.key_states_cast.format),
                 ),
             )
             key_states_dq = g.call_function(
@@ -530,8 +529,33 @@ class ScaledDotProductAttention(DmxModule):
                 (key_states_q, key_states_scale, key_states_zero_point),
             )
 
+            mask_states = g.placeholder("mask_states")
+            mask_states_scale = g.get_attr("input_casts.attn_mask_cast.scale")
+            mask_states_zero_point = g.get_attr("input_casts.attn_mask_cast.zero_point")
+            mask_states_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    mask_states,
+                    mask_states_scale,
+                    mask_states_zero_point,
+                    repr(self.input_casts.attn_mask_cast.format),
+                ),
+            )
+            mask_states_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (mask_states_q, mask_states_scale, mask_states_zero_point),
+            )
+
             _output = g.create_node(
-                "call_function", torch.matmul, (_input_dq, multiplier_dq), name="output"
+                "call_function",
+                torch.nn.functional.scaled_dot_product_attention,
+                (
+                    value_states_dq,
+                    query_states_dq,
+                    key_states_dq,
+                    mask_states_dq,
+                ),
+                name="output",
             )
             _output_scale = g.get_attr("output_cast.scale")
             _output_zero_point = g.get_attr("output_cast.zero_point")
@@ -580,25 +604,30 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         g = torch.fx.Graph()
         with g.inserting_after():
             _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_cast.scale")
-            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
             _input_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
             )
             _input_dq = g.call_function(
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
             multiplier = g.placeholder("multiplier")
-            multiplier_scale = g.get_attr("multiplier_cast.scale")
-            multiplier_zero_point = g.get_attr("multiplier_cast.zero_point")
+            multiplier_scale = g.get_attr("input_casts.multiplier_cast.scale")
+            multiplier_zero_point = g.get_attr("input_casts.multiplier_cast.zero_point")
             multiplier_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     multiplier,
                     multiplier_scale,
                     multiplier_zero_point,
-                    repr(self.multiplier_cast.format),
+                    repr(self.input_casts.multiplier_cast.format),
                 ),
             )
             multiplier_dq = g.call_function(
@@ -711,37 +740,45 @@ class Linear(DmxModule, torch.nn.Linear):
         Returns a compiler friendly graph
 
         >>> Reference:
-
-        opcode         name                   target                      args                                                       kwargs
-        -------------  ---------------------  --------------------------  ---------------------------------------------------------  --------
-        placeholder    _input                 _input                      ()                                                         {}
-        get_attr       input_cast_scale       input_cast.scale            ()                                                         {}
-        get_attr       input_cast_zero_point  input_cast.zero_point       ()                                                         {}
-        call_function  quantize               dmx.quantize                (_input, input_cast_scale, input_cast_zero_point, 'SAME')  {}
-        call_function  dequantize             dmx.dequantize              (quantize,)                                                {}
-        get_attr       _weight                _weight                     ()                                                         {}
-        get_attr       weight_scale           weight_scale                ()                                                         {}
-        get_attr       weight_zero_point      weight_zero_point           ()                                                         {}
-        call_function  quantize_1             dmx.quantize                (_weight, weight_scale, weight_zero_point, 'SAME')         {}
-        call_function  dequantize_1           dmx.dequantize              (quantize_1,)                                              {}
-        get_attr       _bias                  _bias                       ()                                                         {}
-        get_attr       bias_cast_scale        bias_cast.scale             ()                                                         {}
-        get_attr       bias_cast_zero_point   bias_cast.zero_point        ()                                                         {}
-        call_function  quantize_2             dmx.quantize                (_bias, bias_cast_scale, bias_cast_zero_point, 'SAME')     {}
-        call_function  dequantize_2           dmx.dequantize              (quantize_2,)                                              {}
-        call_function  _output                <built-in function linear>  (dequantize, dequantize_1, dequantize_2)                   {}
-        output         output                 output                      (_output,)                                                 {}
+            opcode         name                               target                             args                                                                               kwargs
+            -------------  ---------------------------------  ---------------------------------  ---------------------------------------------------------------------------------  --------
+            placeholder    _input                             _input                             ()                                                                                 {}
+            get_attr       input_casts_input_cast_scale       input_casts.input_cast.scale       ()                                                                                 {}
+            get_attr       input_casts_input_cast_zero_point  input_casts.input_cast.zero_point  ()                                                                                 {}
+            call_function  quantize                           dmx.quantize                       (_input, input_casts_input_cast_scale, input_casts_input_cast_zero_point, 'SAME')  {}
+            call_function  dequantize                         dmx.dequantize                     (quantize, input_casts_input_cast_scale, input_casts_input_cast_zero_point)        {}
+            get_attr       _weight                            _weight                            ()                                                                                 {}
+            get_attr       weight_scale                       weight_scale                       ()                                                                                 {}
+            get_attr       weight_zero_point                  weight_zero_point                  ()                                                                                 {}
+            call_function  quantize_1                         dmx.quantize                       (_weight, weight_scale, weight_zero_point, 'SAME')                                 {}
+            call_function  dequantize_1                       dmx.dequantize                     (quantize_1, weight_scale, weight_zero_point)                                      {}
+            get_attr       _bias                              _bias                              ()                                                                                 {}
+            get_attr       bias_cast_scale                    bias_cast.scale                    ()                                                                                 {}
+            get_attr       bias_cast_zero_point               bias_cast.zero_point               ()                                                                                 {}
+            call_function  quantize_2                         dmx.quantize                       (_bias, bias_cast_scale, bias_cast_zero_point, 'SAME')                             {}
+            call_function  dequantize_2                       dmx.dequantize                     (quantize_2, bias_cast_scale, bias_cast_zero_point)                                {}
+            call_function  _output                            <built-in function linear>         (dequantize, dequantize_1, dequantize_2)                                           {}
+            get_attr       output_cast_scale                  output_cast.scale                  ()                                                                                 {}
+            get_attr       output_cast_zero_point             output_cast.zero_point             ()                                                                                 {}
+            call_function  quantize_3                         dmx.quantize                       (_output, output_cast_scale, output_cast_zero_point, 'SAME')                       {}
+            call_function  dequantize_3                       dmx.dequantize                     (quantize_3, output_cast_scale, output_cast_zero_point)                            {}
+            output         output                             output                             (dequantize_3,)                                                                    {}
 
         """
         g = torch.fx.Graph()
         with g.inserting_after():
             # PLACEHOLDERS
             _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_cast.scale")
-            _input_zero_point = g.get_attr("input_cast.zero_point")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
             _input_q = g.call_function(
                 torch.ops.dmx.quantize,
-                (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)),
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
             )
             _input_dq = g.call_function(
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
