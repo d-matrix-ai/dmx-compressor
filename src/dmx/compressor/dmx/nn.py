@@ -11,6 +11,7 @@ from dmx.compressor.numerical import (
     NumericalCastMixin,
     Same,
     CastTo,
+    CastToDict
 )
 from dmx.compressor.sparse import (
     WeightSparseMixin,
