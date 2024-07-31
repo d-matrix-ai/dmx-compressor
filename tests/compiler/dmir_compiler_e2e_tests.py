@@ -3,7 +3,6 @@
 import torch
 
 from torch.export import ExportGraphSignature, ExportedProgram
-from torch.export.graph_signature import InputSpec, InputKind
 
 
 from torch.fx import replace_pattern, Transformer
@@ -36,7 +35,7 @@ def test_distilgpt2():
         >>> result = test_distilgpt2(); print(result.graph.print_tabular())
     """
 
-    from mlreferences import squad_bert_base as wl
+    from mlreferences import distilgpt2 as wl
 
     m, x = get_workload_graphmodule(wl)
     qdqm = qDq_transform(m)
