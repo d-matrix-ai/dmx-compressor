@@ -1,7 +1,7 @@
 import os
 import torch
-from mltools import dmx
-from mltools.dmx import pipeline, DmxModel
+from dmx.compressor import dmx
+from dmx.compressor.dmx import pipeline, DmxModel
 import evaluate
 from datasets import load_dataset
 

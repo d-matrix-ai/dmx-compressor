@@ -1,8 +1,8 @@
 # This is an example of how to do quantization and calibration for a model
-from mltools.dmx import pipeline
-from mltools import dmx
+from dmx.compressor.dmx import pipeline
+from dmx.compressor import dmx
 import torch
-from mltools.numerical.observer import HistogramObserver, MinMaxObserver
+from dmx.compressor.numerical.observer import HistogramObserver, MinMaxObserver
 
 # instantiating model
 pipe = pipeline(

@@ -1,7 +1,7 @@
 from torch import fx
-from mltools.dmx import pipeline, DmxModel
+from dmx.compressor.dmx import pipeline, DmxModel
 import torch
-from mltools import dmx
+from dmx.compressor import dmx
 
 
 class Submod(torch.nn.Module):

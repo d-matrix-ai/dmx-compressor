@@ -1,7 +1,7 @@
 import os
 import torch
-from mltools import dmx
-from mltools.dmx import pipeline, DmxModel
+from dmx.compressor import dmx
+from dmx.compressor.dmx import pipeline, DmxModel
 from transformers.modeling_utils import get_parameter_device
 
 

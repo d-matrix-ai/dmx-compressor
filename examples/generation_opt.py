@@ -1,9 +1,9 @@
-from mltools.dmx import pipeline
-from mltools.dmx.hf import dmx_transform
-from mltools.fx.transform import remove_new_forward
+from dmx.compressor.dmx import pipeline
+from dmx.compressor.dmx.hf import dmx_transform
+from dmx.compressor.fx.transform import remove_new_forward
 import os
 import torch
-from mltools import dmx
+from dmx.compressor import dmx
 
 pipe = pipeline(
     task="text-generation",
