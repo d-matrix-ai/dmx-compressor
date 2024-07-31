@@ -41,13 +41,13 @@ class InfoEdge:
 class MetadataInterpreter(fx.Interpreter):
     """Interpreter that captures the metadata, eg: device, dtype, shape, of tensors that passed through the Graphmodule
     Example:
-        >>> import mltools
+        >>> import dmx.compressor
         >>> import torch
         >>> net = torch.nn.Sequential(torch.nn.Linear(64,64),torch.nn.ReLU(),torch.nn.Linear(64,10))
-        >>> gm = mltools.fx.transform.substitute_transform(net)
+        >>> gm = dmx.compressor.fx.transform.substitute_transform(net)
         >>> inp = torch.rand(1,64)
-        >>> nodeDict = mltools.fx.transformer.NodeDictTransformer(gm).transform()
-        >>> gi = mltools.utils.MetadataInterpreter(gm, nodeDict)
+        >>> nodeDict = dmx.compressor.fx.transformer.NodeDictTransformer(gm).transform()
+        >>> gi = dmx.compressor.utils.MetadataInterpreter(gm, nodeDict)
         >>> gi.nodes[0].__dict__ # Check node information
         {'name': '_0',
         'args': ['140117175215088', '_0_0'],

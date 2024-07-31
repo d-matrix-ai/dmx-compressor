@@ -113,7 +113,7 @@ class DmxModule(
         Args:
             parent_dir (str): parent directory for the url
         """
-        from mltools.utils import save_state_dict_and_return_url
+        from dmx.compressor.utils import save_state_dict_and_return_url
 
         url = save_state_dict_and_return_url(self, parent_dir)
         self.state_dict_url = url

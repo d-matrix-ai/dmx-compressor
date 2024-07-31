@@ -1,10 +1,10 @@
-mltools.dmx package
+dmx.compressor.dmx package
 ===================
 
 Submodules
 ----------
 
-mltools.dmx.nn.Linear
+dmx.compressor.dmx.nn.Linear
 ----------------------------
 **to_compiler_graph**
 
@@ -35,7 +35,7 @@ mltools.dmx.nn.Linear
    output         output                  output                      (dequantize_3,)                                               {}
 
 
-mltools.dmx.nn.ResAdd
+dmx.compressor.dmx.nn.ResAdd
 ----------------------------
 **to_compiler_graph**
 
@@ -60,7 +60,7 @@ mltools.dmx.nn.ResAdd
    call_function  dequantize_2              dmx.dequantize                                          (quantize_2, output_cast_scale, output_cast_zero_point)            {}
    output         output_1                  output                                                  (dequantize_2,)                                                    {}
 
-mltools.dmx.nn.ActActMatMul
+dmx.compressor.dmx.nn.ActActMatMul
 ----------------------------------
 **to_compiler_graph**
 
@@ -86,7 +86,7 @@ mltools.dmx.nn.ActActMatMul
    output         output_1                    output                                                     (dequantize_2,)                                                          {}
 
 
-mltools.dmx.nn.Embedding
+dmx.compressor.dmx.nn.Embedding
 -------------------------------
 **to_compiler_graph**
 
@@ -99,7 +99,7 @@ mltools.dmx.nn.Embedding
    call_function  embedding  <function embedding at 0x7f9e211aadd0>  (input_1, weight)  {'padding_idx': None, 'max_norm': None, 'norm_type': 2.0, 'scale_grad_by_freq': False, 'sparse': False}
    output         output     output                                  (embedding,)       {}
 
-mltools.dmx.nn.SoftMax 
+dmx.compressor.dmx.nn.SoftMax
 -----------------------------
 **to_compiler_graph**
 
@@ -111,7 +111,7 @@ mltools.dmx.nn.SoftMax
    call_function  softmax  <function softmax at 0x7f9e211aa7a0>  (_input,)   {}
    output         output   output                                (softmax,)  {}
 
-mltools.dmx.nn.LayerNorm 
+dmx.compressor.dmx.nn.LayerNorm
 -------------------------------
 **to_compiler_graph**
 
@@ -135,7 +135,7 @@ mltools.dmx.nn.LayerNorm
    call_function  ln                    <function layer_norm at 0x7f9e211ab1c0>  (_input, normalized_shape, quantize, dequantize_1, eps)  {}
    output         output                output                                   (ln,)                                                    {}
 
-mltools.dmx.nn.Dropout 
+dmx.compressor.dmx.nn.Dropout
 -----------------------------
 **to_compiler_graph**
 
@@ -147,7 +147,7 @@ mltools.dmx.nn.Dropout
    call_function  dropout  <function dropout at 0x7f9e211a9bd0>  (input_1,)  {'p': 0.5, 'training': True, 'inplace': False}
    output         output   output                                (dropout,)  {}
 
-mltools.dmx.nn.GELU 
+dmx.compressor.dmx.nn.GELU
 --------------------------
 **to_compiler_graph**
 

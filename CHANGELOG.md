@@ -1,6 +1,6 @@
 # Changelog
 
-This file documents fixes/features added to mltools
+This file documents fixes/features added to dmx.compressor
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).

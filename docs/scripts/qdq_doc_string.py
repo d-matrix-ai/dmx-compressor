@@ -1,6 +1,6 @@
-from mltools.utils.fx.visualize_graph import visualize_graph
+from dmx.compressor.utils.fx.visualize_graph import visualize_graph
 import torch
-from mltools.dmx import nn
+from dmx.compressor.dmx import nn
 
 BATCH_SIZE = 16
 SEQ_LEN = 1024

@@ -99,7 +99,7 @@ def hf_symbolic_trace(
     Example:
 
         ```python
-        from mltools.fx.tracer import hf_symbolic_trace
+        from dmx.compressor.fx.tracer import hf_symbolic_trace
 
         traced_model,tracer = hf_symbolic_trace(model, input_names=["input_ids", "attention_mask", "token_type_ids"])
         ```

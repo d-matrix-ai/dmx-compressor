@@ -51,7 +51,7 @@ class DMXObserverBase(ObserverBase):
         self.register_buffer("eps", torch.tensor([eps], **factory_kwargs))
         assert isinstance(
             self.dtype, Format
-        ), "Default DMXObserver only works for mltools.numerical.Format objects as dtype"
+        ), "Default DMXObserver only works for dmx.compressor.numerical.Format objects as dtype"
         self.quant_min, self.quant_max = _get_qmin_qmax(self.dtype)
 
     @torch.jit.export

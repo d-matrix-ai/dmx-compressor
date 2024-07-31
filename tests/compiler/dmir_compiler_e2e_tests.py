@@ -15,8 +15,8 @@ import functools
 import itertools
 import inspect
 
-import mltools.numerical.custom_lib
-from mltools.fx.transform import substitute_transform, qDq_transform
+import dmx.compressor.numerical.custom_lib
+from dmx.compressor.fx.transform import substitute_transform, qDq_transform
 
 from torch.fx.experimental.proxy_tensor import make_fx, get_isolated_graphmodule
 
