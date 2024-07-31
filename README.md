@@ -1,32 +1,32 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/e406e98a-51d7-48a4-a283-653be71900e6">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/70f0aa39-139d-4f2e-932d-6c3fa1ee2926">
-    <img alt="dmatrix-logo" src="https://github.com/d-matrix-ai/mltools/assets/139168891/e406e98a-51d7-48a4-a283-653be71900e6" width="900" height="180" style="max-width: 100%;"> 
-  </picture>
-</p>
+<!-- <p align="center"> -->
+<!--   <picture> -->
+<!--     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/e406e98a-51d7-48a4-a283-653be71900e6"> -->
+<!--     <source media="(prefers-color-scheme: light)" srcset="https://github.com/d-matrix-ai/mltools/assets/139168891/70f0aa39-139d-4f2e-932d-6c3fa1ee2926"> -->
+<!--     <img alt="dmatrix-logo" src="https://github.com/d-matrix-ai/mltools/assets/139168891/e406e98a-51d7-48a4-a283-653be71900e6" width="900" height="180" style="max-width: 100%;">  -->
+<!--   </picture> -->
+<!-- </p> -->
 
 <p align="center">
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/actions/workflows/python-app.yml">
-        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-mltools/python-app.yml">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/actions/workflows/python-app.yml">
+        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-compressor/python-app.yml">
     </a>
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/blob/main/LICENSE">
-        <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-mltools">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/blob/main/LICENSE">
+        <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-compressor">
     </a>
-    <a href="https://dmx-mltools.readthedocs.io/en/latest/">
-        <img alt="Documentation" src="https://readthedocs.org/projects/dmx-mltools/badge/?version=latest">
+    <a href="https://dmx-compressor.readthedocs.io/en/latest/">
+        <img alt="Documentation" src="https://readthedocs.org/projects/dmx-compressor/badge/?version=latest">
     </a>
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/releases">
-        <img alt="GitHub release" src="https://img.shields.io/github/v/release/d-matrix-ai/dmx-mltools">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/releases">
+        <img alt="GitHub release" src="https://img.shields.io/github/v/release/d-matrix-ai/dmx-compressor">
     </a>
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/commits/main">
-        <img alt="Commits" src="https://img.shields.io/github/last-commit/d-matrix-ai/dmx-mltools/main">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/commits/main">
+        <img alt="Commits" src="https://img.shields.io/github/last-commit/d-matrix-ai/dmx-compressor/main">
     </a>
-    <a href="https://github.com/d-matrix-ai/dmx-mltools/graphs/contributors">
-        <img alt="Contributors" src="https://img.shields.io/github/contributors-anon/d-matrix-ai/dmx-mltools">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/graphs/contributors">
+        <img alt="Contributors" src="https://img.shields.io/github/contributors-anon/d-matrix-ai/dmx-compressor">
     </a>
-    <a href="https://github.com/d-matrix-ai/dmx-mltools">
-        <img alt="Stars" src="https://img.shields.io/github/stars/d-matrix-ai/dmx-mltools">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor">
+        <img alt="Stars" src="https://img.shields.io/github/stars/d-matrix-ai/dmx-compressor">
     </a>
 </p>
 <br/>
