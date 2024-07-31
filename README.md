@@ -54,7 +54,7 @@ In addition, the project provides a set of optimization tools for co-design usin
 
 ## Getting started
 
-`pip install -compressor`
+`pip install dmx-compressor`
 
 
 ## Usage
@@ -64,9 +64,9 @@ In addition, the project provides a set of optimization tools for co-design usin
 Given a PyTorch model, _e.g._ `Net()`, wrap it in a `dmx.Model` container: 
 
 ```python
-from dmx import compressor
+from dmx.compressor import dmx
 
-model = compressor.Model(Net())
+model = dmx.Model(Net())
 ```
 
 Here `model` is functionally equivalent to `Net()`, and all `torch` functionalities are still available, but `model` is equipped with d-Matrix specific features, making it ready for co-design configuration and/or optimization, at training time or post-training. 
@@ -81,7 +81,7 @@ There are two predefined special rule sets `compressor.config_rules.BASELINE` an
 ```python
 model = model.transform(
     model.dmx_config,
-    *compressor.config_rules.BASIC,
+    *dmx.config_rules.BASIC,
 )
 ```
 
