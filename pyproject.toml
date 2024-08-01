@@ -6,6 +6,7 @@ authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "
 include = [{ path = "tests", format = "sdist" }]
 packages = [
     { include = "dmx/compressor", from = "src" },
+    { include = "mltools", from = "src" },
 ]
 
 [tool.poetry.dependencies]
