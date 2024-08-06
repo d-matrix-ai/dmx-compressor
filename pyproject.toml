@@ -26,11 +26,6 @@ torchvision = ">=0.13.0, <0.21.0"
 diffusers = "^0.25"
 accelerate = "^0.31"
 
-[[tool.poetry.source]]
-name = "dmatrix"
-url = "http://pypi.d-matrix.ai"
-priority = "primary"
-
 [tool.poetry-dynamic-versioning]
 vcs = "git"
 style = "semver"
