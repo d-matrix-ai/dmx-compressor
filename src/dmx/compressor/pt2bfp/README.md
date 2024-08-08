@@ -36,10 +36,10 @@ Contains files used for initial experimentations
 * [x86_inductor_quantizer.py](x86_inductor_quantizer.py): Quantizer which can lower model to inductor level, not used yet, need to be validated
 
 ## tests
-- [test_benchmark.py](mltools/tests/test_benchmark.py): Test suite for for benchmarking the triton kernels across various BLOCKSIZEs and warps
-- [test_bfp_ptq.py](mltools/tests/test_bfp_ptq.py): Testing the bfp quantization with the triton kernels inttegrated (work in progress)
-- [test_fake_bfp.py](mltools/tests/test_fake_bfp.py): Testing the fake bfp quantization flow for various models - supports all linear layers. Need to add support for gpt models (conv1d layers)
-- [test_fake_ptq.py](mltools/tests/test_fake_ptq.py): Initial test for fake ptq with unit8
-- [test_quantize_bfp.py](mltools/tests/test_quantize_bfp.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA generated BFP tensor
-- [test_quantize_mx.py](mltools/tests/test_quantize_mx.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA and Python generated MX tensor
-- [test_toy_ptq.py](mltools/tests/test_toy_ptq.py): Another test for ptq using the PyTorch 2.0 flow
+- [test_benchmark.py](../../../../tests/test_benchmark.py): Test suite for for benchmarking the triton kernels across various BLOCKSIZEs and warps
+- [test_bfp_ptq.py](../../../../tests/test_bfp_ptq.py): Testing the bfp quantization with the triton kernels inttegrated (work in progress)
+- [test_fake_bfp.py](../../../../tests/test_fake_bfp.py): Testing the fake bfp quantization flow for various models - supports all linear layers. Need to add support for gpt models (conv1d layers)
+- [test_fake_ptq.py](../../../../tests/test_fake_ptq.py): Initial test for fake ptq with unit8
+- [test_quantize_bfp.py](../../../../tests/test_quantize_bfp.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA generated BFP tensor
+- [test_quantize_mx.py](../../../../tests/test_quantize_mx.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA and Python generated MX tensor
+- [test_toy_ptq.py](../../../../tests/test_toy_ptq.py): Another test for ptq using the PyTorch 2.0 flow
