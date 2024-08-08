@@ -35,6 +35,8 @@ class DMXObserverBase(ObserverBase):
         eps: float = torch.finfo(torch.float32).eps,
         **kwargs,
     ) -> None:
+        if dtype == torch.float32:
+            dtype = Format.from_shorthand("SAME")
         assert isinstance(dtype, Format), f"illegal format {dtype}"
         super().__init__(dtype=dtype, **kwargs)
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
