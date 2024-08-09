@@ -426,7 +426,7 @@ class CodeGen:
             return add_global(typename, o)
 
         def _get_repr(arg: Any) -> str:
-            from mltools.numerical.format import (
+            from dmx.compressor.numerical.format import (
                                                     Format,
                                                     Same,
                                                     FixedPoint,

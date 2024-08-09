@@ -1,5 +1,5 @@
 # pt2-bfp
-Implementation of Block Floating Point supporting the Pytorch 2.0 export quantization route.
+Implementation of Block Floating Point supporting the Pytorch 2.0 export quantization flow
 
 ## fx
 - Contains files for creating preparing and creating the graphs for Quantization of PyTorch modules
@@ -43,3 +43,6 @@ Contains files used for initial experimentations
 - [test_quantize_bfp.py](../../../../tests/test_quantize_bfp.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA generated BFP tensor
 - [test_quantize_mx.py](../../../../tests/test_quantize_mx.py): Tests for logical similarity of quantized representation of the Triton generated tensor with the CUDA and Python generated MX tensor
 - [test_toy_ptq.py](../../../../tests/test_toy_ptq.py): Another test for ptq using the PyTorch 2.0 flow
+
+## Notes
+- Made changes in local graph.py of (torch.fx), which are reflected in [graph.py](fx/graph.py)

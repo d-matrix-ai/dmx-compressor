@@ -141,7 +141,10 @@ class CastTo(FakeQuantize):
         **fake_quantize_kwargs,
     ):
         self.set_format(format)
-        super().__init__(observer=observer, dtype=self.format, **fake_quantize_kwargs)
+        if 'dtype' in fake_quantize_kwargs.keys():
+            super().__init__(observer=observer, **fake_quantize_kwargs)
+        else:
+            super().__init__(observer=observer, dtype=self.format, **fake_quantize_kwargs)
         if group_size:
             assert torch.ao.quantization.utils.is_per_tensor(
                 self.qscheme

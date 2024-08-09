@@ -5,7 +5,7 @@ Licensed under the MIT License.
 
 from enum import Enum, IntEnum
 
-from mltools.numerical.format import Format, FloatingPoint, BlockFloatingPoint, MXFP
+from dmx.compressor.numerical.format import Format, FloatingPoint, BlockFloatingPoint, MXFP
 
 MXFP8_E4M3K128_LD=Format.from_shorthand("MXFP8[E4M3]{128}")
 MXFP8_E4M3K128_FD=Format.from_shorthand("MXFP8[E4M3]{128}")

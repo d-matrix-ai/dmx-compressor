@@ -7,12 +7,10 @@ from mltools.numerical.observer import (DMXObserverBase,
 from collections import namedtuple
 from typing import Dict, List, Optional, Any, Union, Type, Tuple
 
-from mltools.numerical.format import Format, BlockFloatingPoint
+from dmx.compressor.numerical.format import Format, BlockFloatingPoint
 
 import re
 import torch
-import torch.nn as nn
-from abc import ABCMeta, abstractmethod
 from functools import partial
 import warnings
 
@@ -268,6 +266,7 @@ class UniformQuantizationObserverBase(DMXObserverBase):
         _ALLOWED_DTYPES = (
             Format,
             torch.float32,
+            BlockFloatingPoint
         )
         assert isinstance(self.dtype, Format), f"Default Observer only works for {_ALLOWED_DTYPES} data type"
         # assert self.dtype in _ALLOWED_DTYPES, f"Default Observer only works for {_ALLOWED_DTYPES} data type"

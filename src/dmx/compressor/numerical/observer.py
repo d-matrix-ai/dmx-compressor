@@ -7,7 +7,7 @@ from torch.ao.quantization.utils import (
     is_per_channel,
 )
 import numpy as np
-from .format import Format, FixedPoint
+from dmx.compressor.numerical.format import Format, FixedPoint, BlockFloatingPoint
 
 
 def _get_qmin_qmax(dtype: Format) -> Tuple[int, int]:
@@ -16,6 +16,10 @@ def _get_qmin_qmax(dtype: Format) -> Tuple[int, int]:
         quant_max = 2 ** (dtype.precision - 1) - 1
         if dtype.symmetric:
             quant_min += 1
+    elif isinstance(dtype, BlockFloatingPoint):
+        ebits = dtype.precision
+        quant_max = 2**(ebits - 1)
+        quant_min = 2 - (2 ** (ebits - 1))
     else:
         quant_min, quant_max = None, None
     return quant_min, quant_max
@@ -37,7 +41,7 @@ class DMXObserverBase(ObserverBase):
     ) -> None:
         if dtype == torch.float32:
             dtype = Format.from_shorthand("SAME")
-        assert isinstance(dtype, Format), f"illegal format {dtype}"
+        assert isinstance(type(dtype), Format) or isinstance(dtype, BlockFloatingPoint), f"illegal format {dtype}"
         super().__init__(dtype=dtype, **kwargs)
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
         self.qscheme = qscheme

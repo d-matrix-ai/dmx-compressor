@@ -23,14 +23,14 @@ from dmx.compressor.numerical.format import Format
 
 np.random.seed(0xd10)
 
-MXFP8_E4M3K128_LD=Format.from_shorthand("MXFP8[E4M3]{128,-1}")
-MXFP8_E4M3K128_FD=Format.from_shorthand("MXFP8[E4M3]{128,1}")
-MXFP8_E4M3K64_LD=Format.from_shorthand("MXFP8[E4M3]{64,-1}")
-MXFP8_E4M3K64_FD=Format.from_shorthand("MXFP8[E4M3]{64,1}")
-MXFP8_E5M2K128_LD=Format.from_shorthand("MXFP8[E5M2]{128,-1}")
-MXFP8_E5M2K128_FD=Format.from_shorthand("MXFP8[E5M2]{128,1}")
-MXFP8_E5M2K64_LD=Format.from_shorthand("MXFP8[E5M2]{64,-1}")
-MXFP8_E5M2K64_FD=Format.from_shorthand("MXFP8[E5M2]{64,1}")
+MXFP8_E4M3K128_LD=Format.from_shorthand("MXFP8[E4M3]{128}")
+MXFP8_E4M3K128_FD=Format.from_shorthand("MXFP8[E4M3]{128}")
+MXFP8_E4M3K64_LD=Format.from_shorthand("MXFP8[E4M3]{64}")
+MXFP8_E4M3K64_FD=Format.from_shorthand("MXFP8[E4M3]{64}")
+MXFP8_E5M2K128_LD=Format.from_shorthand("MXFP8[E5M2]{128}")
+MXFP8_E5M2K128_FD=Format.from_shorthand("MXFP8[E5M2]{128}")
+MXFP8_E5M2K64_LD=Format.from_shorthand("MXFP8[E5M2]{64}")
+MXFP8_E5M2K64_FD=Format.from_shorthand("MXFP8[E5M2]{64}")
 
 DEVICE__CUSTOM_CUDA = [
     ("cuda", True),

@@ -27,7 +27,7 @@ default_format = Format.from_shorthand("BFP[8|8]{64}(SN)")
 import torch
 import torch._dynamo as torchdynamo
 
-from pt2bfp.utils import(
+from dmx.compressor.pt2bfp.utils import(
     _annotate_input_qspec_map,
     _annotate_output_qspec,
     get_input_act_qspec,
@@ -38,7 +38,7 @@ from pt2bfp.utils import(
     BFPQuantizationConfig,
     BFPQuantizationSpec)
 
-from pt2bfp.quantizer import (
+from dmx.compressor.pt2bfp.quantizer import (
     BFPQuantizer,
     BFPQuantizationAnnotation,
     SharedBFPQuantizationSpec
@@ -48,18 +48,18 @@ from torch.fx import Node
 
 from torch.fx.passes.utils.source_matcher_utils import get_source_partitions
 
-from pt2bfp.observer import (
+from dmx.compressor.pt2bfp.observer import (
     HistogramObserver,
     PerChannelMinMaxObserver,
     PlaceholderObserver,
 )
-from pt2bfp.qconfig import _ObserverConstructor
-from pt2bfp.quantize_pt2e import (
+from dmx.compressor.pt2bfp.qconfig import _ObserverConstructor
+from dmx.compressor.pt2bfp.quantize_pt2e import (
     convert_pt2e,
     prepare_pt2e,
 )
 
-from pt2bfp.fake_quantize import default_fake_quant, default_weight_fake_quant
+from dmx.compressor.pt2bfp.fake_quantize import default_fake_quant, default_weight_fake_quant
 
 def _mark_nodes_as_annotated(nodes: List[Node]):
     for node in nodes:
@@ -287,7 +287,7 @@ if __name__ == "__main__":
     # assert torch.all((before_prepare_result-after_prepare_result) == torch.zeros_like(before_prepare_result))
     m = convert_pt2e(m)
     # import ipdb; ipdb.set_trace()
-    out = m(*input)
+    # out = m(*input)
     # out_base = m_base(*example_inputs)
     # print(torch.equal(out, out_base))
     # print("converted module is: {}".format(m), flush=True)

@@ -35,7 +35,7 @@ from torch.fx import Node
 from torch.fx.passes.utils.source_matcher_utils import get_source_partitions
 
 from dmx.compressor.pt2bfp.observer import (
-    HistogramObserver,
+    MinMaxObserver,
     PerChannelMinMaxObserver,
     PlaceholderObserver,
 )
@@ -150,7 +150,7 @@ class BackendQuantizer(BFPQuantizer):
 
 def get_symmetric_quantization_config():
     act_observer_or_fake_quant_ctr: _ObserverConstructor = \
-        HistogramObserver
+        MinMaxObserver
     act_quantization_spec = BFPQuantizationSpec(
         dtype=default_format,
         qscheme=torch.per_tensor_symmetric,
@@ -158,19 +158,22 @@ def get_symmetric_quantization_config():
         observer_or_fake_quant_ctr=act_observer_or_fake_quant_ctr.with_args(eps=2**-12),
     )
 
-    weight_observer_or_fake_quant_ctr: _ObserverConstructor = PerChannelMinMaxObserver
+    weight_observer_or_fake_quant_ctr: _ObserverConstructor = MinMaxObserver
     extra_args: Dict[str, Any] = {"eps": 2**-12}
     weight_quantization_spec = BFPQuantizationSpec(
         dtype=default_format,
-        qscheme=torch.per_channel_symmetric,
+        qscheme=torch.per_tensor_symmetric,
         ch_axis=0,
         is_dynamic=False,
         observer_or_fake_quant_ctr=weight_observer_or_fake_quant_ctr.with_args(**extra_args),
     )
 
-    bias_observer_or_fake_quant_ctr: _ObserverConstructor = PlaceholderObserver
+    bias_observer_or_fake_quant_ctr: _ObserverConstructor = MinMaxObserver #PlaceholderObserver
     bias_quantization_spec = BFPQuantizationSpec(
-        dtype=torch.float,
+        dtype=default_format,
+        qscheme=torch.per_tensor_symmetric,
+        ch_axis=0,
+        is_dynamic=False,
         observer_or_fake_quant_ctr=bias_observer_or_fake_quant_ctr
     )
     quantization_config = BFPQuantizationConfig(

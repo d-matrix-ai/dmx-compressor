@@ -167,7 +167,7 @@ def get_bias_qspec(quantization_config: Optional[BFPQuantizationConfig]):
         return None
     quantization_spec: BFPQuantizationSpec = quantization_config.bias
     assert (
-        quantization_spec.dtype == torch.float
+        quantization_spec.dtype == torch.float or isinstance(quantization_spec.dtype, BlockFloatingPoint)
     ), "Only float dtype for bias is supported for bias right now"
     return quantization_spec
 

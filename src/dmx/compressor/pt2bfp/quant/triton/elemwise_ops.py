@@ -25,7 +25,7 @@ import sys
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
 
-from mltools.numerical.format import ROUNDING_MODE
+from dmx.compressor.numerical.format import ROUNDING_MODE
 
 from .formats import _get_format_params
 from .formats import _get_min_norm, _get_max_norm

@@ -5,11 +5,11 @@ import os
 import torch
 import numpy as np
 
-from mltools.numerical.format import (Format, 
+from dmx.compressor.numerical.format import (Format, 
                                       ROUNDING_MODE)
-from mltools.quant.quant_function import block_quantize
-from mltools import numerical
-from mltools.numerical import CastTo
+from dmx.compressor.quant.quant_function import block_quantize
+from dmx.compressor import numerical
+from dmx.compressor.numerical import CastTo
 
 from . import funcs
 
