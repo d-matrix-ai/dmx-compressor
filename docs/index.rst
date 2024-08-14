@@ -6,15 +6,13 @@
 Welcome to dmx.compressor's documentation!
 ===================================
 
-.. toctree::
-   :maxdepth: 4
-   :caption: Contents
+.. autosummary::
+   :toctree: _autosummary
+   :recursive:
 
-   dmx.compressor.fx.rst
-   dmx.compressor.dmx.rst
-   dmx.compressor.quant.rst
-   dmx.compressor.utils.rst
-   
+   dmx.compressor
+
+
 
 
 Indices and tables
