@@ -18,6 +18,7 @@ extensions = [
     'sphinx.ext.duration',
     'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
+    'sphinx.ext.apidoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.autosummary']
 
@@ -28,6 +29,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_static_path = ['_static']
+html_theme = 'sphinx_rtd_theme'
 
 
 import pathlib
@@ -35,3 +37,5 @@ import sys
 import os
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 sys.path.insert(0, os.path.abspath('../../src/dmx'))
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('.'))
