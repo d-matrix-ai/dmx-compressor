@@ -13,7 +13,7 @@ Welcome!
    :caption: Contents:
 
    numerics
-   dmx.compressor
+   modules
    opgraphs
 
 
