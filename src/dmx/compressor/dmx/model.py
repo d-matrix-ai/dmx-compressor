@@ -221,7 +221,7 @@ class DmxModelMixin:
         )
 
 
-class DmxModel(torch.nn.Module):
+class DmxModel(DmxModelMixin):
     @staticmethod
     def _get_transformed_forward(_model, args, kwargs):
         if hasattr(_model, "old_forward"):
@@ -411,17 +411,17 @@ class DmxModel(torch.nn.Module):
     def from_torch(
         cls, model: torch.nn.Module, input_filter_rules: Optional[Dict] = None
     ) -> torch.nn.Module:
-        if DmxModelMixin not in model.__class__.__bases__:
-            model.__class__.__bases__ += (DmxModelMixin,)
+        if not isinstance(model, cls):
+            _cls = model.__class__
+            model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
         model._gm = None
         model.transformed = False
-        model.hf = model.__class__.__module__.startswith("transformers")
+        model.hf = model.__class__.__base__.__module__.startswith("transformers")
         model.input_filter_rules = input_filter_rules
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
             if not _m.transformed or not DmxModel.is_same_signature(_m, _args, _kwargs):
-
                 if _m.transformed:
                     curr_cfg = _m.dmx_config
                 warnings.warn("Model transformation triggered")
