@@ -6,3 +6,4 @@ parse
 pptree
 transformers
 torch
+sphinx-rtd-theme
