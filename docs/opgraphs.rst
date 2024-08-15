@@ -1,5 +1,5 @@
-dmx.compressor.dmx package
-===================
+Exported to Compiler Graph FXIR
+===============================
 
 Submodules
 ----------
