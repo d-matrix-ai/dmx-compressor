@@ -418,7 +418,7 @@ class DmxModel(DmxModelMixin):
         #     model.__class__.__bases__ += (DmxModelMixin,)
         model._gm = None
         model.transformed = False
-        model.hf = model.__class__.__module__.startswith("transformers")
+        model.hf = model.__class__.__base__.__module__.startswith("transformers")
         model.input_filter_rules = input_filter_rules
 
         def temp_forward(_m, *_args, **_kwargs):
