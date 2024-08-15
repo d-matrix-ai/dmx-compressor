@@ -6,11 +6,15 @@
 Welcome to dmx.compressor's documentation!
 ===================================
 
-.. autosummary::
-   :toctree: _autosummary
-   :recursive:
+Welcome!
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   numerics
    dmx.compressor
+   opgraphs
 
 
 

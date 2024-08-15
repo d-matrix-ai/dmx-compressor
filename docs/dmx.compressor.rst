@@ -1,5 +1,5 @@
 dmx.compressor module
-================
+=====================
 
 .. automodule:: dmx.compressor
     :members:

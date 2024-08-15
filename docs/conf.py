@@ -9,7 +9,7 @@
 project = 'dmx-compressor'
 copyright = '2023, d-Matrix'
 author = '"Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>", "Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>"'
-release = '0.1.2'
+release = '0.1.3'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
