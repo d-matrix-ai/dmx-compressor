@@ -7,12 +7,7 @@ import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
 
-from dmx.compressor.numerical import (
-    NumericalCastMixin,
-    Same,
-    CastTo,
-    CastToDict
-)
+from dmx.compressor.numerical import NumericalCastMixin, Same, CastTo, CastToDict
 from dmx.compressor.sparse import (
     WeightSparseMixin,
     Dense,
@@ -251,10 +246,7 @@ class DmxModule(
         Args:
             raw (torch.nn.Module): the torch module to copy parameters from.
         """
-        state_dic = self.state_dict()
-        for key, val in raw.state_dict().items():
-            state_dic[key] = val
-        self.load_state_dict(state_dic)
+        self.load_state_dict(raw.state_dict(), assign=True)
         # Inherit device from raw module
         for n, m in raw.named_parameters():
             device = "cuda" if torch.cuda.is_available() else "cpu"
