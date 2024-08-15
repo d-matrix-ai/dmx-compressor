@@ -414,8 +414,6 @@ class DmxModel(DmxModelMixin):
         if not isinstance(model, cls):
             _cls = model.__class__
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
-        # if DmxModelMixin not in model.__class__.__bases__:
-        #     model.__class__.__bases__ += (DmxModelMixin,)
         model._gm = None
         model.transformed = False
         model.hf = model.__class__.__base__.__module__.startswith("transformers")
