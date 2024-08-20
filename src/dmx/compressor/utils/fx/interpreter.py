@@ -4,17 +4,7 @@ import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from dmx.compressor.functional.approximate import NoApproximation
-from dmx.compressor import dmx
-
-FORMAT_DICT = {
-    "input_cast": "SAME",
-    "output_cast": "SAME",
-    "residual_cast": "SAME",
-    "multiplier_cast": "SAME",
-    "accum_cast": "SAME",
-    "weight_cast": "SAME",
-    "bias_cast": "SAME",
-}
+from dmx.compressor import numerical, dmx
 
 
 class InfoNode:
@@ -282,13 +272,12 @@ class MetadataInterpreter(fx.Interpreter):
         )
         if isinstance(curr_mod, dmx.nn.DmxModule):
             self.nodes[-1].kwargs["fillcolor"] = "#D5D6EA"
-            for ops in FORMAT_DICT:
-                cast = getattr(curr_mod, ops)
-                if cast:
+            for op_name, cast in curr_mod.named_modules():
+                if isinstance(cast, numerical.CastTo):
                     format = cast.format
-                    setattr(self.nodes[-1], ops, format)
-                    if repr(format) != FORMAT_DICT[ops]:
-                        print_out += "\n" + f"{ops}: {repr(format)}"
+                    setattr(self.nodes[-1], op_name, format)
+                    if repr(format) != "SAME":
+                        print_out += "\n" + f"{op_name}: {repr(format)}"
 
             sparsifier = curr_mod.weight_sparsifier
             if sparsifier:
