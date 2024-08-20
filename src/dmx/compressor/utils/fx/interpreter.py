@@ -4,7 +4,7 @@ import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from dmx.compressor.functional.approximate import NoApproximation
-from dmx.compressor import numerical, dmx
+from dmx.compressor import numerical, dmx, sparse
 
 
 class InfoNode:
@@ -276,14 +276,14 @@ class MetadataInterpreter(fx.Interpreter):
                 if isinstance(cast, numerical.CastTo):
                     format = cast.format
                     setattr(self.nodes[-1], op_name, format)
-                    if repr(format) != "SAME":
+                    if not isinstance(format, numerical.Same):
                         print_out += "\n" + f"{op_name}: {repr(format)}"
 
             sparsifier = curr_mod.weight_sparsifier
             if sparsifier:
                 sparseness = sparsifier.sparseness
                 setattr(self.nodes[-1], "weight_sparsifier", sparseness)
-                if repr(sparseness) != "DENSE":
+                if not isinstance(sparseness, sparse.Dense):
                     print_out += "\n" + f"weight_sparsifier: {repr(sparseness)}"
 
             approximator = curr_mod.approximator
