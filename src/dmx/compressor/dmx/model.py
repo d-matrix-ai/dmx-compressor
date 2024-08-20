@@ -413,6 +413,7 @@ class DmxModel(DmxModelMixin):
     ) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
+            model.class_for_deserialization = _cls
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
         model._gm = None
         model.transformed = False
