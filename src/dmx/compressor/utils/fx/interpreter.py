@@ -3,6 +3,7 @@ import torch
 import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+from dmx.compressor import sparse, numerical
 from dmx.compressor.functional.approximate import NoApproximation
 from dmx.compressor.modeling import nn as dmxnn
 

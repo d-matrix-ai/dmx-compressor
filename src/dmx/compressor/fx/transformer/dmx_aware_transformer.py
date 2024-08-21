@@ -87,7 +87,8 @@ class DMXAwareTransformer(fx.Transformer):
             # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
             if new_name != candidate:
                 self.new_graph._graph_namespace.create_name(candidate, None)
-            self.add_submod(new_name, dmx.nn.BAddBMM())
+            from dmx.compressor.modeling.nn import BAddBMM
+            self.add_submod(new_name, BAddBMM())
             new_node = self.new_graph.create_node(
                 "call_module",
                 new_name,
