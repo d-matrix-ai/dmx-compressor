@@ -4,7 +4,7 @@ import torch.fx as fx
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from dmx.compressor.functional.approximate import NoApproximation
-from dmx.compressor import numerical, dmx, sparse
+from dmx.compressor.modeling import nn as dmxnn
 
 
 class InfoNode:
@@ -270,7 +270,7 @@ class MetadataInterpreter(fx.Interpreter):
                 {"fillcolor": color, "shape": "circle"},
             )
         )
-        if isinstance(curr_mod, dmx.nn.DmxModule):
+        if isinstance(curr_mod, dmxnn.DmxModule):
             self.nodes[-1].kwargs["fillcolor"] = "#D5D6EA"
             for op_name, cast in curr_mod.named_modules():
                 if isinstance(cast, numerical.CastTo):

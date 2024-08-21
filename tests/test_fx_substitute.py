@@ -3,7 +3,8 @@
 import torch
 from torch import fx, nn
 import torch.nn.functional as F
-from dmx.compressor import dmx
+from dmx.compressor import DmxModel
+from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor.fx.transform import substitute_transform
 from dmx.compressor.fx.transformer.utils import dmx_aware_mapping
 
@@ -22,7 +23,7 @@ def check_all_dmx(gm: torch.nn.Module) -> bool:
             module = gm.get_submodule(node.target)
             node_key = type(module).__module__ + "." + type(module).__name__
             if (
-                not isinstance(module, dmx.nn.DmxModule)
+                not isinstance(module, dmxnn.DmxModule)
                 and node_key in dmx_aware_mapping
             ):
                 return False
@@ -53,7 +54,7 @@ class Lenet5(nn.Module):
 def test_lenet5():
     net = Lenet5()
     gm_before = fx.symbolic_trace(net)
-    gm = dmx.DmxModel.from_torch(net)
+    gm = DmxModel.from_torch(net)
     inp = torch.rand(1, 95, 95)
     output_before = gm_before(inp)
     output = gm(inp)
@@ -75,7 +76,7 @@ class MultiInputNet(nn.Module):
 def test_multiple_inputs():
     net = MultiInputNet()
     gm_before = fx.symbolic_trace(net)
-    gm = dmx.DmxModel.from_torch(net)
+    gm = DmxModel.from_torch(net)
     x = torch.rand(8, 32)
     y = torch.rand(8, 64)
     z = torch.rand(8, 16)
@@ -109,7 +110,7 @@ class ResConnection(nn.Module):
 def test_res_connection():
     net = ResConnection()
     gm_before = fx.symbolic_trace(net)
-    gm = dmx.DmxModel.from_torch(net)
+    gm = DmxModel.from_torch(net)
     x = torch.rand(8, 32)
     output_before = gm_before(x)
     output = gm(x)

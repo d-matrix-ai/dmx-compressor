@@ -1,6 +1,6 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 RANDOM_SEED = 0
 
@@ -20,7 +20,7 @@ def test_batchnorm2d(bsz, height, width, channels, eps, affine):
     bn0 = torch.nn.BatchNorm2d(
         channels, eps=eps, affine=affine, momentum=0.1, track_running_stats=True
     ).to(device)
-    bn1 = dmx.nn.BatchNorm2d(
+    bn1 = dmxnn.BatchNorm2d(
         channels, eps=eps, affine=affine, momentum=0.1, track_running_stats=True
     ).to(device)
 

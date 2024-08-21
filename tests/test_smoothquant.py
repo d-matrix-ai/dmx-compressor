@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 RANDOM_SEED = 0
 
@@ -17,11 +17,11 @@ IMG_SIZE = 8
 
 
 def _create_module(cls):
-    if cls == dmx.nn.Linear:
+    if cls == dmxnn.Linear:
         return cls(IN_DIM, OUT_DIM)
-    elif cls == dmx.nn.Conv1d:
+    elif cls == dmxnn.Conv1d:
         return cls(IN_DIM, 2, KER_SIZE)
-    elif cls == dmx.nn.Conv2d:
+    elif cls == dmxnn.Conv2d:
         return cls(IN_DIM, OUT_DIM, KER_SIZE, KER_SIZE)
     else:
         raise ValueError("unsupported module class {cls}")
@@ -51,9 +51,9 @@ def _create_test_input(module: torch.nn.Module, scaler: float):
 @pytest.mark.parametrize(
     "module_cls",
     (
-        dmx.nn.Linear,
-        dmx.nn.Conv1d,
-        dmx.nn.Conv2d,
+        dmxnn.Linear,
+        dmxnn.Conv1d,
+        dmxnn.Conv2d,
     ),
 )
 @pytest.mark.parametrize("dynamic", (True, False))

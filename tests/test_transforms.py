@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch import Tensor
 import torch.nn as nn
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor.fx.tracer import QuantTracer
 from dmx.compressor.fx.transform import cast_input_output_transform
 import torch.fx as fx
@@ -187,7 +187,7 @@ def test_lenet_fakecast_transform(layers):
 
 def test_conv2D_fakecast_transform():
     net = torch.nn.Conv2d(16, 8, 2)
-    cnet = dmx.nn.Conv2d(16, 8, 2)
+    cnet = dmxnn.Conv2d(16, 8, 2)
     input = torch.rand(1, 16, 16, 16)
     weight = torch.rand(8, 16, 2, 2)
     bias = torch.rand(8)
@@ -275,7 +275,7 @@ class Net(torch.nn.Module):
 class DmxNet(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.linear = dmx.nn.Linear(64, 64)
+        self.linear = dmxnn.Linear(64, 64)
 
     def forward(self, input):
         return self.linear(input)

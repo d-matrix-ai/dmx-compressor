@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor.numerical import Format
 from dmx.compressor.functional import ApproximationFunction
 
@@ -44,9 +44,9 @@ def test_layernorm(bsz, seq_len, embed_dim, algo, nform, norm, eps):
     ln0 = lambda x, gamma, beta: F.layer_norm(
         x, normalized_shape=normalized_shape, weight=gamma, bias=beta, eps=eps
     )
-    ln1 = dmx.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=True)
+    ln1 = dmxnn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=True)
     ln1.weight.data, ln1.bias.data = gamma.data, beta.data
-    ln2 = dmx.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=False)
+    ln2 = dmxnn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=False)
     ln1.transform(
         dict(
             input_format=Format.from_shorthand("SAME"),

@@ -7,7 +7,7 @@ import shutil
 import yaml
 from typing import Type
 
-from dmx.compressor.dmx import nn
+from dmx.compressor.modeling.nn import DmxModule, DmxModuleType
 from dmx.compressor.numerical import Format
 from dmx.compressor.sparse import Sparseness
 from dmx.compressor.functional import ApproximationFunction
@@ -37,7 +37,7 @@ def dmx_module_instance_constructor(
 
 
 def dmx_module_instance_representer(
-    dumper: yaml.SafeDumper, val: Type[nn.DmxModule]
+    dumper: yaml.SafeDumper, val: Type[DmxModule]
 ) -> yaml.nodes.ScalarNode:
     return dumper.represent_scalar("!DmxModule", val.__name__, style=None)
 
@@ -83,7 +83,7 @@ def get_loader():
 
 def get_dumper():
     dumper = yaml.SafeDumper
-    dumper.add_multi_representer(nn.DmxModuleType, dmx_module_instance_representer)
+    dumper.add_multi_representer(DmxModuleType, dmx_module_instance_representer)
     dumper.add_multi_representer(Format, format_representer)
     dumper.add_multi_representer(Sparseness, sparseness_representer)
     dumper.add_multi_representer(

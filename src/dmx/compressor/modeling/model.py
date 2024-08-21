@@ -6,11 +6,9 @@ from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
 from functools import partial
-from dmx.compressor import dmx
-from dmx.compressor.dmx.nn import *
+from dmx.compressor.modeling.nn import *
 from dmx.compressor.fx.transform import substitute_transform
 from dmx.compressor.fx.transformer import get_op_set_from
-import functools
 import warnings
 from copy import deepcopy
 
@@ -453,7 +451,7 @@ class DmxModel(DmxModelMixin):
 
 class DmxConfig(dict):
     r"""
-    This is a dict of Dmx-specific configurations for a dmx.Model
+    This is a dict of Dmx-specific configurations for a DmxModel
     This defines the 'states' to be optimized
     """
 
@@ -646,7 +644,7 @@ class DmxSimplePipeline(DmxPipelineMixin):
 
     def named_dmx_models(self):
         r"Returns a generator of named DmxModel instances"
-        return ((n, m) for n, m in self.model_dict.items() if isinstance(m, dmx.Model))
+        return ((n, m) for n, m in self.model_dict.items() if isinstance(m, Model))
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None):
         if torch_device is not None:

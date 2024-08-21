@@ -2,7 +2,9 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dmx.compressor import dmx
+from dmx.compressor import format
+from dmx.compressor import nn as dmxnn
+from dmx.compressor.modeling import DmxModel, DmxConfigRule, DmxModuleConfig
 from dmx.compressor.numerical.format import Same
 from dmx.compressor.sparse import Dense, Sparseness
 
@@ -42,31 +44,31 @@ class Lenet5(nn.Module):
         return x
 
 
-conv_quantize_input = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Conv2d,),
-    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128),
+conv_quantize_input = DmxConfigRule(
+    module_types=(dmxnn.Conv2d,),
+    module_config=DmxModuleConfig(input_format=format.BFP12_128),
 )
-conv_quantize_weight = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Conv2d,),
-    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128),
+conv_quantize_weight = DmxConfigRule(
+    module_types=(dmxnn.Conv2d,),
+    module_config=DmxModuleConfig(weight_format=format.BFP12_128),
 )
-conv_sparsify_weight = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Conv2d,),
-    module_config=dmx.DmxModuleConfig(
+conv_sparsify_weight = DmxConfigRule(
+    module_types=(dmxnn.Conv2d,),
+    module_config=DmxModuleConfig(
         weight_sparseness=Sparseness.from_shorthand("TOPK{0.5}(U)")
     ),
 )
-fc_quantize_input = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Linear,),
-    module_config=dmx.DmxModuleConfig(input_format=dmx.format.BFP12_128),
+fc_quantize_input = DmxConfigRule(
+    module_types=(dmxnn.Linear,),
+    module_config=DmxModuleConfig(input_format=format.BFP12_128),
 )
-fc_quantize_weight = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Linear,),
-    module_config=dmx.DmxModuleConfig(weight_format=dmx.format.BFP12_128),
+fc_quantize_weight = DmxConfigRule(
+    module_types=(dmxnn.Linear,),
+    module_config=DmxModuleConfig(weight_format=format.BFP12_128),
 )
-fc_sparsify_weight = dmx.DmxConfigRule(
-    module_types=(dmx.nn.Linear,),
-    module_config=dmx.DmxModuleConfig(
+fc_sparsify_weight = DmxConfigRule(
+    module_types=(dmxnn.Linear,),
+    module_config=DmxModuleConfig(
         weight_sparseness=Sparseness.from_shorthand("TOPK{0.5}(U)")
     ),
 )
@@ -77,7 +79,7 @@ def _create_input(batch_size: int = 1):
 
 
 def _create_model(transformations):
-    _model = dmx.DmxModel.from_torch(Lenet5())
+    _model = DmxModel.from_torch(Lenet5())
     conv_quantize_input.apply_to(_model)
     fc_quantize_input.apply_to(_model)
     for tr in transformations:
@@ -88,7 +90,7 @@ def _create_model(transformations):
     return _model
 
 
-def _check_if_folded(model: dmx.Model) -> bool:
+def _check_if_folded(model: DmxModel) -> bool:
     return all(
         [
             all(

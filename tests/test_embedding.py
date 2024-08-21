@@ -1,6 +1,6 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 
 RANDOM_SEED = 0
@@ -29,7 +29,7 @@ def test_conv2d(
     embedding_dim,
 ):
     torch_module = torch.nn.Embedding(num_embeddings, embedding_dim, device=device)
-    dmx_module = dmx.nn.Embedding(num_embeddings, embedding_dim, device=device)
+    dmx_module = dmxnn.Embedding(num_embeddings, embedding_dim, device=device)
     dmx_module.weight.data = torch_module.weight.data
     t_inp = torch.randint(0, num_embeddings, (batch_size,), device=device)
     c_inp = t_inp.clone().detach()

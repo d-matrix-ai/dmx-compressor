@@ -1,6 +1,6 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 
 RANDOM_SEED = 0
@@ -55,7 +55,7 @@ def test_conv2d(
     torch_module = eval(f"torch.nn.{module_type}")(
         in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
     )
-    dmx_module = eval(f"dmx.nn.{module_type}")(
+    dmx_module = eval(f"dmxnn.{module_type}")(
         in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
     )
     dmx_module.weight.data = torch_module.weight.data

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 
 RANDOM_SEED = 0
@@ -14,7 +14,7 @@ torch.manual_seed(RANDOM_SEED)
 @pytest.mark.parametrize("leading_dims", ((1,), (64,), (1, 16), (64, 16)))
 def test_linear(leading_dims, in_features, out_features, bias):
     torch_module = torch.nn.Linear(in_features, out_features, bias, device=device)
-    dmx_module = dmx.nn.Linear(in_features, out_features, bias, device=device)
+    dmx_module = dmxnn.Linear(in_features, out_features, bias, device=device)
     dmx_module.weight.data = torch_module.weight.data
     if bias:
         dmx_module.bias.data = torch_module.bias.data

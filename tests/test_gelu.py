@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor.numerical import Format
 from dmx.compressor.functional import ApproximationFunction
 
@@ -28,7 +28,7 @@ def test_gelu(bsz, seq_len, embed_dim, algo, nform):
     x = torch.randn(shape) * 3.0
 
     f0 = F.gelu
-    f1 = dmx.nn.GELU()
+    f1 = dmxnn.GELU()
     f1.transform(
         dict(
             input_format=Format.from_shorthand("SAME"),

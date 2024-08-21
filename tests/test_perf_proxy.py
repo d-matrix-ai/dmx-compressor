@@ -1,7 +1,9 @@
 import pytest
 import torch
 from typing import Tuple, Optional, Union
-from dmx.compressor import dmx, sparse, numerical
+
+from dmx.compressor import format, sparseness, sparse, numerical
+from dmx.compressor import nn as dmxnn
 from dataclasses import dataclass
 
 RANDOM_SEED = 0
@@ -11,7 +13,7 @@ torch.manual_seed(RANDOM_SEED)
 @dataclass(frozen=True)
 class TestCase:
     # Given:
-    layer_type: dmx.nn.DmxModule
+    layer_type: dmxnn.DmxModule
     layer_dims: Tuple[
         int, int, Optional[Tuple[int, ...]], Optional[int], Optional[int], Optional[str]
     ]
@@ -31,7 +33,7 @@ class TestCase:
 
 test_cases = [
     TestCase(
-        layer_type=dmx.nn.Linear,
+        layer_type=dmxnn.Linear,
         layer_dims=(16, 16, None, None, None, None),
         input_dims=(1, None),
         weight_sparseness=sparse.Dense(),
@@ -44,12 +46,12 @@ test_cases = [
         _bops=262144.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Linear,
+        layer_type=dmxnn.Linear,
         layer_dims=(8, 24, None, None, None, None),
         input_dims=(8, None),
-        weight_sparseness=dmx.sparseness.BTK8_4_LD,
-        input_format=dmx.format.BFP16_128,
-        weight_format=dmx.format.BFP12_128,
+        weight_sparseness=sparseness.BTK8_4_LD,
+        input_format=format.BFP16_128,
+        weight_format=format.BFP12_128,
         # --------------------------------
         _weight_elem_count=96.0,
         _weight_size_in_bytes=48.75,
@@ -57,7 +59,7 @@ test_cases = [
         _bops=25155.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (3, 3), 1, 1, "same"),
         input_dims=(8, (10, 10)),
         weight_sparseness=sparse.Dense(),
@@ -70,7 +72,7 @@ test_cases = [
         _bops=471859200.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (3, 3), 1, 1, "valid"),
         input_dims=(8, (10, 10)),
         weight_sparseness=sparse.Dense(),
@@ -83,10 +85,10 @@ test_cases = [
         _bops=301989888.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (3, 3), 1, 1, "same"),
         input_dims=(8, (10, 10)),
-        weight_sparseness=dmx.sparseness.BTK8_4_FD,
+        weight_sparseness=sparseness.BTK8_4_FD,
         input_format=torch.float16,
         weight_format=torch.float16,
         # --------------------------------
@@ -96,12 +98,12 @@ test_cases = [
         _bops=235929600.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (5, 5), 1, 1, "valid"),
         input_dims=(8, (10, 10)),
-        weight_sparseness=dmx.sparseness.BTK8_2_FD,
-        input_format=dmx.format.INT8,
-        weight_format=dmx.format.INT8,
+        weight_sparseness=sparseness.BTK8_2_FD,
+        input_format=format.INT8,
+        weight_format=format.INT8,
         # --------------------------------
         _weight_elem_count=1600.0,
         _weight_size_in_bytes=1600.0,
@@ -109,12 +111,12 @@ test_cases = [
         _bops=29491200.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (7, 7), 1, 1, "same"),
         input_dims=(16, (13, 13)),
-        weight_sparseness=dmx.sparseness.BTK8_2_FD,
-        input_format=dmx.format.INT8,
-        weight_format=dmx.format.INT4,
+        weight_sparseness=sparseness.BTK8_2_FD,
+        input_format=format.INT8,
+        weight_format=format.INT4,
         # --------------------------------
         _weight_elem_count=3136.0,
         _weight_size_in_bytes=1568.0,
@@ -122,12 +124,12 @@ test_cases = [
         _bops=271351808.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (7, 7), 1, 1, "valid"),
         input_dims=(16, (13, 13)),
-        weight_sparseness=dmx.sparseness.BTK8_2_FD,
-        input_format=dmx.format.INT8,
-        weight_format=dmx.format.INT4,
+        weight_sparseness=sparseness.BTK8_2_FD,
+        input_format=format.INT8,
+        weight_format=format.INT4,
         # --------------------------------
         _weight_elem_count=3136.0,
         _weight_size_in_bytes=1568.0,
@@ -135,12 +137,12 @@ test_cases = [
         _bops=78675968.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(8, 32, (7, 7), 1, 4, "same"),
         input_dims=(8, (13, 13)),
         weight_sparseness=sparse.Dense(),
-        input_format=dmx.format.INT4,
-        weight_format=dmx.format.INT4,
+        input_format=format.INT4,
+        weight_format=format.INT4,
         # --------------------------------
         _weight_elem_count=3136.0,
         _weight_size_in_bytes=1568.0,
@@ -148,12 +150,12 @@ test_cases = [
         _bops=67837952.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv2d,
+        layer_type=dmxnn.Conv2d,
         layer_dims=(32, 32, (3, 3), 2, 4, "valid"),
         input_dims=(8, (10, 10)),
-        weight_sparseness=dmx.sparseness.BTK8_4_FD,
-        input_format=dmx.format.BFP14_128,
-        weight_format=dmx.format.BFP12_128,
+        weight_sparseness=sparseness.BTK8_4_FD,
+        input_format=format.BFP14_128,
+        weight_format=format.BFP12_128,
         # --------------------------------
         _weight_elem_count=1152.0,
         _weight_size_in_bytes=585.0,
@@ -161,7 +163,7 @@ test_cases = [
         _bops=3631680.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv1d,
+        layer_type=dmxnn.Conv1d,
         layer_dims=(8, 16, (3,), 1, 2, "same"),
         input_dims=(16, (10,)),
         weight_sparseness=sparse.Dense(),
@@ -174,12 +176,12 @@ test_cases = [
         _bops=7864320.0,
     ),
     TestCase(
-        layer_type=dmx.nn.Conv1d,
+        layer_type=dmxnn.Conv1d,
         layer_dims=(8, 16, (3,), 2, 2, "valid"),
         input_dims=(16, (10,)),
         weight_sparseness=sparse.Dense(),
-        input_format=dmx.format.INT8,
-        weight_format=dmx.format.INT8,
+        input_format=format.INT8,
+        weight_format=format.INT8,
         # --------------------------------
         _weight_elem_count=192.0,
         _weight_size_in_bytes=192.0,
@@ -191,12 +193,12 @@ test_cases = [
 
 def _create_module(cls, layer_dims, weight_sparseness, input_format, weight_format):
     ch_in, ch_out, ker_size, stride, groups, padding = layer_dims
-    if cls == dmx.nn.Linear:
+    if cls == dmxnn.Linear:
         _module = cls(
             in_features=ch_in,
             out_features=ch_out,
         )
-    elif cls in (dmx.nn.Conv1d, dmx.nn.Conv2d):
+    elif cls in (dmxnn.Conv1d, dmxnn.Conv2d):
         _module = cls(
             in_channels=ch_in,
             out_channels=ch_out,
@@ -213,7 +215,7 @@ def _create_module(cls, layer_dims, weight_sparseness, input_format, weight_form
     if isinstance(weight_format, numerical.Format):
         _module.weight_cast.set_format(weight_format)
     elif weight_format == torch.float16:  # in order to work on both CPU/GPU
-        _module.weight_cast.set_format(dmx.format.FLOAT16)
+        _module.weight_cast.set_format(format.FLOAT16)
     return _module
 
 

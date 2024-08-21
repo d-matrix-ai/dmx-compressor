@@ -1,6 +1,6 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 RANDOM_SEED = 0
 
@@ -19,7 +19,7 @@ def test_groupnorm(bsz, height, width, channels, num_groups, eps, affine):
     shape = (bsz, channels, height, width)
     x = torch.randn(*shape, device=device).requires_grad_()
     gn0 = torch.nn.GroupNorm(num_groups, channels, affine=True, eps=eps).to(device)
-    gn1 = dmx.nn.GroupNorm(num_groups, channels, affine=True, eps=eps).to(device)
+    gn1 = dmxnn.GroupNorm(num_groups, channels, affine=True, eps=eps).to(device)
 
     if affine:
         gamma = torch.rand(channels, requires_grad=True, device=device)

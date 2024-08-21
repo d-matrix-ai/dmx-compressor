@@ -4,55 +4,55 @@ from torch.fx.proxy import Proxy
 import re
 import torch
 
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 
 dmx_aware_mapping = {
-    "torch.nn.modules.sparse.Embedding": dmx.nn.Embedding,
-    "torch.nn.modules.linear.Linear": dmx.nn.Linear,
-    "torch.nn.modules.conv.Conv1d": dmx.nn.Conv1d,
-    "torch.nn.modules.conv.Conv2d": dmx.nn.Conv2d,
-    "torch.nn.modules.pooling.AdaptiveAvgPool2d": dmx.nn.AdaptiveAvgPool2d,
-    "torch.nn.modules.pooling.MaxPool2d": dmx.nn.MaxPool2d,
-    "torch.nn.modules.batchnorm.BatchNorm2d": dmx.nn.BatchNorm2d,
-    "torch.nn.modules.normalization.LayerNorm": dmx.nn.LayerNorm,
-    "torch.nn.modules.dropout.Dropout": dmx.nn.Dropout,
-    "torch.nn.modules.activation.Softmax": dmx.nn.Softmax,
-    "torch.nn.modules.activation.ReLU": dmx.nn.ReLU,
-    "torch.nn.modules.activation.ReLU6": dmx.nn.ReLU6,
-    "torch.nn.modules.activation.SiLU": dmx.nn.SiLU,
-    "torch.nn.modules.activation.Tanh": dmx.nn.Tanh,
-    "torch.nn.modules.activation.GELU": dmx.nn.GELU,
-    "transformers.pytorch_utils.Conv1D": dmx.nn.Linear,
-    "transformers.activations.NewGELUActivation": dmx.nn.NewGELU,
-    "transformers.activations.GELUActivation": dmx.nn.GELU,
-    "transformers.activations.FastGELUActivation": dmx.nn.FastGELU,
-    "transformers.activations.QuickGELUActivation": dmx.nn.QuickGELU,
-    "transformers.activations.ClippedGELUActivation": dmx.nn.ClippedGELU,
-    "transformers.models.bloom.modeling_bloom.BloomGelu": dmx.nn.BloomGELU,
-    "transformers.activations.SiLUActivation": dmx.nn.SiLU,
-    "transformers.models.t5.modeling_t5.T5LayerNorm": dmx.nn.RMSNorm,
-    "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmx.nn.RMSNorm,
-    "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmx.nn.GemmaRMSNorm,
+    "torch.nn.modules.sparse.Embedding": dmxnn.Embedding,
+    "torch.nn.modules.linear.Linear": dmxnn.Linear,
+    "torch.nn.modules.conv.Conv1d": dmxnn.Conv1d,
+    "torch.nn.modules.conv.Conv2d": dmxnn.Conv2d,
+    "torch.nn.modules.pooling.AdaptiveAvgPool2d": dmxnn.AdaptiveAvgPool2d,
+    "torch.nn.modules.pooling.MaxPool2d": dmxnn.MaxPool2d,
+    "torch.nn.modules.batchnorm.BatchNorm2d": dmxnn.BatchNorm2d,
+    "torch.nn.modules.normalization.LayerNorm": dmxnn.LayerNorm,
+    "torch.nn.modules.dropout.Dropout": dmxnn.Dropout,
+    "torch.nn.modules.activation.Softmax": dmxnn.Softmax,
+    "torch.nn.modules.activation.ReLU": dmxnn.ReLU,
+    "torch.nn.modules.activation.ReLU6": dmxnn.ReLU6,
+    "torch.nn.modules.activation.SiLU": dmxnn.SiLU,
+    "torch.nn.modules.activation.Tanh": dmxnn.Tanh,
+    "torch.nn.modules.activation.GELU": dmxnn.GELU,
+    "transformers.pytorch_utils.Conv1D": dmxnn.Linear,
+    "transformers.activations.NewGELUActivation": dmxnn.NewGELU,
+    "transformers.activations.GELUActivation": dmxnn.GELU,
+    "transformers.activations.FastGELUActivation": dmxnn.FastGELU,
+    "transformers.activations.QuickGELUActivation": dmxnn.QuickGELU,
+    "transformers.activations.ClippedGELUActivation": dmxnn.ClippedGELU,
+    "transformers.models.bloom.modeling_bloom.BloomGelu": dmxnn.BloomGELU,
+    "transformers.activations.SiLUActivation": dmxnn.SiLU,
+    "transformers.models.t5.modeling_t5.T5LayerNorm": dmxnn.RMSNorm,
+    "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmxnn.RMSNorm,
+    "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmxnn.GemmaRMSNorm,
 }
 
 dmx_aware_functional_mappings = {
-    "torch.nn.functional.relu": dmx.nn.ReLU,
-    "torch.nn.functional.relu6": dmx.nn.ReLU6,
-    "torch.nn.functional.silu": dmx.nn.SiLU,
-    "torch.nn.functional.tanh": dmx.nn.Tanh,
-    "torch.nn.functional.gelu": dmx.nn.GELU,
-    "torch.nn.functional.softmax": dmx.nn.Softmax,
-    "torch.nn.functional.dropout": dmx.nn.Dropout,
-    "torch.matmul": dmx.nn.ActActMatMul,
-    "torch.bmm": dmx.nn.ActActMatMul,
-    "torch.nn.functional.scaled_dot_product_attention": dmx.nn.ScaledDotProductAttention,
+    "torch.nn.functional.relu": dmxnn.ReLU,
+    "torch.nn.functional.relu6": dmxnn.ReLU6,
+    "torch.nn.functional.silu": dmxnn.SiLU,
+    "torch.nn.functional.tanh": dmxnn.Tanh,
+    "torch.nn.functional.gelu": dmxnn.GELU,
+    "torch.nn.functional.softmax": dmxnn.Softmax,
+    "torch.nn.functional.dropout": dmxnn.Dropout,
+    "torch.matmul": dmxnn.ActActMatMul,
+    "torch.bmm": dmxnn.ActActMatMul,
+    "torch.nn.functional.scaled_dot_product_attention": dmxnn.ScaledDotProductAttention,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)
-dmx_aware_functional_mappings["<built-in function add>"] = dmx.nn.ResAdd
-dmx_aware_functional_mappings["<built-in function matmul>"] = dmx.nn.ActActMatMul
-dmx_aware_functional_mappings["<built-in function mul>"] = dmx.nn.Mul
+dmx_aware_functional_mappings["<built-in function add>"] = dmxnn.ResAdd
+dmx_aware_functional_mappings["<built-in function matmul>"] = dmxnn.ActActMatMul
+dmx_aware_functional_mappings["<built-in function mul>"] = dmxnn.Mul
 
 
 def process_args(args):

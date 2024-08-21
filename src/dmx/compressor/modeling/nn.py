@@ -1,11 +1,13 @@
 from abc import abstractmethod
 from typing import Union, List, Optional
 from types import SimpleNamespace
+from collections import OrderedDict
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
+import transformers.activations
 
 from dmx.compressor.numerical import NumericalCastMixin, Same, CastTo, CastToDict
 from dmx.compressor.sparse import (
@@ -17,8 +19,6 @@ from dmx.compressor.functional import (
     ApproximationMixin,
     NoApproximation,
 )
-import transformers.activations
-from collections import OrderedDict
 from dmx.compressor.perf_proxy import PerformanceProxyMixin
 from dmx.compressor.layer_reconstruction import LayerReconstructionMixin
 

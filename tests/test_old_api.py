@@ -6,4 +6,4 @@ def test_mltools_alias_dmx_compressor():
     import mltools
     import dmx.compressor
 
-    assert mltools.dmx.__file__ == dmx.compressor.dmx.__file__
+    assert mltools.__file__ == dmx.compressor.__file__

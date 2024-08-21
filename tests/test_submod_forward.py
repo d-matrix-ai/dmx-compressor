@@ -1,8 +1,7 @@
 import torch
-from torch import fx
 
-from dmx.compressor.dmx import pipeline, DmxModel
-from dmx.compressor import dmx
+from dmx.compressor import DmxModel, DmxConfigRule
+from dmx.compressor.modeling import nn as dmxnn
 
 
 class Submod(torch.nn.Module):
@@ -56,8 +55,8 @@ def test_unquantized():
 def test_quantized():
     bfp16 = "BFP[8|8]{64}(SN)"
     rules = (
-        dmx.DmxConfigRule(
-            module_types=(dmx.nn.Linear,),
+        DmxConfigRule(
+            module_types=(dmxnn.Linear,),
             module_config=dict(
                 input_format=bfp16,
                 weight_format=bfp16,

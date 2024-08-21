@@ -1,6 +1,7 @@
 ## This test file serves the purpose of testing the inheritance of castTo states after DmxModel retransformation
 import torch
-from dmx.compressor import dmx
+from dmx.compressor import DmxModel, DmxConfigRule
+from dmx.compressor.modeling import nn as dmxnn
 from copy import deepcopy
 
 torch.manual_seed(0)
@@ -35,13 +36,13 @@ def test_retransformation_after_calib():
     scales and zero points should be same while observer and fakequant states should be different
     """
     net = Net(in_dim, out_dim)
-    model = dmx.DmxModel.from_torch(net)
+    model = DmxModel.from_torch(net)
     with torch.no_grad():
         model(x)
     format = "XP[8,0](CSN)"
     rules = (
-        dmx.DmxConfigRule(
-            module_types=(dmx.nn.Linear,),
+        DmxConfigRule(
+            module_types=(dmxnn.Linear,),
             module_config=dict(
                 input_formats=[format],
                 weight_format=format,
@@ -50,7 +51,7 @@ def test_retransformation_after_calib():
     )
     model.configure(None, *rules)
     target_layers = {
-        n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmx.nn.Linear,))
+        n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmxnn.Linear,))
     }
     with model.calibrating_activations(
         target_layers.items()
@@ -90,13 +91,13 @@ def test_retransformation_during_calib():
     scales and zero points should be different while observer and fakequant states should be same
     """
     net = Net(in_dim, out_dim)
-    model = dmx.DmxModel.from_torch(net)
+    model = DmxModel.from_torch(net)
     with torch.no_grad():
         model(x)
     format = "XP[8,0](CSN)"
     rules = (
-        dmx.DmxConfigRule(
-            module_types=(dmx.nn.Linear,),
+        DmxConfigRule(
+            module_types=(dmxnn.Linear,),
             module_config=dict(
                 input_formats=[format],
                 weight_format=format,
@@ -105,7 +106,7 @@ def test_retransformation_during_calib():
     )
     model.configure(None, *rules)
     target_layers = {
-        n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmx.nn.Linear,))
+        n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmxnn.Linear,))
     }
     with model.calibrating_activations(
         target_layers.items()

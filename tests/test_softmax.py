@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor.numerical import Format
 from dmx.compressor.functional import ApproximationFunction
 
@@ -60,7 +60,7 @@ from dmx.compressor.functional import ApproximationFunction
 def test_softmax(bsz, shape, dim, algo, nform):
     shape = (bsz,) + shape
     sm1 = lambda x: F.softmax(x, dim=dim)
-    sm2 = dmx.nn.Softmax(dim=dim)
+    sm2 = dmxnn.Softmax(dim=dim)
     sm2.transform(
         dict(
             input_format=Format.from_shorthand("SAME"),

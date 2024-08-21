@@ -1,6 +1,7 @@
 import pytest
 import torch
-from dmx.compressor import dmx
+from dmx.compressor.modeling import nn as dmxnn
+from dmx.compressor import format
 from dmx.compressor.numerical.observer import MinMaxObserver, HistogramObserver
 from dmx.compressor.numerical import CastTo
 from torch import nn
@@ -19,11 +20,11 @@ IMG_SIZE = 8
 
 
 def _create_module(cls):
-    if cls == dmx.nn.Linear:
+    if cls == dmxnn.Linear:
         return cls(IN_DIM, OUT_DIM)
-    elif cls == dmx.nn.Conv1d:
+    elif cls == dmxnn.Conv1d:
         return cls(IN_DIM, 2, KER_SIZE)
-    elif cls == dmx.nn.Conv2d:
+    elif cls == dmxnn.Conv2d:
         return cls(IN_DIM, OUT_DIM, KER_SIZE, KER_SIZE)
     else:
         raise ValueError("unsupported module class {cls}")
@@ -45,7 +46,7 @@ def test_block_size_non_factor():
     verify performance of group quant when group size is not a factor of ch_axis
     """
     cast = CastTo(
-        format=dmx.format.INT4,
+        format=format.INT4,
         observer=MinMaxObserver,
         group_size=2,
         qscheme=torch.per_tensor_symmetric,
@@ -63,8 +64,8 @@ def test_block_size_non_factor_linear_weight():
     """
     in_dim = 2
     out_dim = 5
-    layer = dmx.nn.Linear(in_dim, out_dim)
-    layer.weight_cast.set_format(dmx.format.INT4)
+    layer = dmxnn.Linear(in_dim, out_dim)
+    layer.weight_cast.set_format(format.INT4)
     layer.weight.data = torch.Tensor([[0, 1], [3, 7], [5.1, 8], [10, 14], [0.1, 0.7]])
     layer.set_weight_calibrator(
         MinMaxObserver, torch.per_tensor_symmetric, group_size=2
@@ -81,8 +82,8 @@ def test_block_size_non_factor_linear_activation():
     """
     in_dim = 2
     out_dim = 5
-    layer = dmx.nn.Linear(in_dim, out_dim)
-    layer.input_casts.input_cast.set_format(dmx.format.INT4)
+    layer = dmxnn.Linear(in_dim, out_dim)
+    layer.input_casts.input_cast.set_format(format.INT4)
     x = torch.Tensor([[0, 1], [3, 7], [5.1, 8], [10, 14], [0.1, 0.7]])
     layer.input_casts.input_cast.ch_axis = 0
     layer.set_activation_calibrator(
@@ -106,8 +107,8 @@ def test_hypernet_linear():
     """
     in_dim = 2
     out_dim = 5
-    layer = dmx.nn.Linear(in_dim, out_dim)
-    layer.weight_cast.set_format(dmx.format.INT4)
+    layer = dmxnn.Linear(in_dim, out_dim)
+    layer.weight_cast.set_format(format.INT4)
     layer.set_weight_calibrator(
         MinMaxObserver, torch.per_tensor_symmetric, group_size=2
     )
@@ -122,16 +123,16 @@ def test_hypernet_linear():
 @pytest.mark.parametrize(
     "module_cls",
     (
-        dmx.nn.Linear,
-        dmx.nn.Conv1d,
-        dmx.nn.Conv2d,
+        dmxnn.Linear,
+        dmxnn.Conv1d,
+        dmxnn.Conv2d,
     ),
 )
 @pytest.mark.parametrize("observer", (MinMaxObserver, HistogramObserver))
 @pytest.mark.parametrize(
     "qscheme", (torch.per_tensor_affine, torch.per_tensor_symmetric)
 )
-@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+@pytest.mark.parametrize("format", (format.INT4, format.INT8))
 def test_per_tensor_equivalence_weight(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per tensor when group size is set to size of ch_axis
@@ -161,9 +162,9 @@ def test_per_tensor_equivalence_weight(module_cls, observer, qscheme, format):
 @pytest.mark.parametrize(
     "module_cls",
     (
-        dmx.nn.Linear,
-        dmx.nn.Conv1d,
-        dmx.nn.Conv2d,
+        dmxnn.Linear,
+        dmxnn.Conv1d,
+        dmxnn.Conv2d,
     ),
 )
 @pytest.mark.parametrize("observer", (MinMaxObserver,))
@@ -174,7 +175,7 @@ def test_per_tensor_equivalence_weight(module_cls, observer, qscheme, format):
         [torch.per_tensor_symmetric, torch.per_channel_symmetric],
     ),
 )
-@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+@pytest.mark.parametrize("format", (format.INT4, format.INT8))
 def test_per_channel_equivalence_weight(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per channel when group size is set to 1
@@ -204,16 +205,16 @@ def test_per_channel_equivalence_weight(module_cls, observer, qscheme, format):
 @pytest.mark.parametrize(
     "module_cls",
     (
-        dmx.nn.Linear,
-        dmx.nn.Conv1d,
-        dmx.nn.Conv2d,
+        dmxnn.Linear,
+        dmxnn.Conv1d,
+        dmxnn.Conv2d,
     ),
 )
 @pytest.mark.parametrize("observer", (MinMaxObserver, HistogramObserver))
 @pytest.mark.parametrize(
     "qscheme", (torch.per_tensor_affine, torch.per_tensor_symmetric)
 )
-@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+@pytest.mark.parametrize("format", (format.INT4, format.INT8))
 def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per tensor when group size is set to size of ch_axis
@@ -258,9 +259,9 @@ def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format
 @pytest.mark.parametrize(
     "module_cls",
     (
-        dmx.nn.Linear,
-        dmx.nn.Conv1d,
-        dmx.nn.Conv2d,
+        dmxnn.Linear,
+        dmxnn.Conv1d,
+        dmxnn.Conv2d,
     ),
 )
 @pytest.mark.parametrize("observer", (MinMaxObserver,))
@@ -271,7 +272,7 @@ def test_per_tensor_equivalence_activation(module_cls, observer, qscheme, format
         [torch.per_tensor_symmetric, torch.per_channel_symmetric],
     ),
 )
-@pytest.mark.parametrize("format", (dmx.format.INT4, dmx.format.INT8))
+@pytest.mark.parametrize("format", (format.INT4, format.INT8))
 def test_per_channel_equivalence_activation(module_cls, observer, qscheme, format):
     """
     verify that per group is equivalent to per channel when group size is set to 1
