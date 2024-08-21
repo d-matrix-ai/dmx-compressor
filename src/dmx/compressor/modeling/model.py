@@ -242,7 +242,7 @@ class DmxModel(DmxModelMixin):
             or not issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
         ):
             _output_cls = None
-        input_names, concrete_args, dummy_inputs = DmxModel().prepare_tracing_inputs(
+        input_names, concrete_args, dummy_inputs = DmxModel.prepare_tracing_inputs(
             _model, args, kwargs
         )
         _model._gm = substitute_transform(
@@ -253,7 +253,7 @@ class DmxModel(DmxModelMixin):
             dummy_inputs=dummy_inputs,
         )
 
-        DmxModel().post_process_gm(_model, args, kwargs)
+        DmxModel.post_process_gm(_model, args, kwargs)
 
         _model._output_cls = _output_cls
         _forward = (
