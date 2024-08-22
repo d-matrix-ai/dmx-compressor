@@ -1,2 +1,0 @@
-M,N,bfp_format_str,CUDA,Triton
-1024,2048,"BFP[8|8]{1,-1}(SU)",0.008943,0.006543
