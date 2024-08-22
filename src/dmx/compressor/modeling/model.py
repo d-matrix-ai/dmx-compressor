@@ -9,6 +9,7 @@ from functools import partial
 from dmx.compressor.modeling.nn import *
 from dmx.compressor.fx.transform import substitute_transform
 from dmx.compressor.fx.transformer import get_op_set_from
+from dmx.compressor.utils.fx.visualize_graph import visualize_graph
 import warnings
 from copy import deepcopy
 
@@ -447,6 +448,19 @@ class DmxModel(DmxModelMixin):
         model.forward = partial(temp_forward, model)
 
         return model
+
+    def visualize_graph(self, out_file="graph"):
+        if not self.transformed:
+            raise RuntimeError(
+                "A forward pass is needed before model can be visualized!"
+            )
+        tracing_args, tracing_kwargs = self.tracing_kwargs
+        inputs = tuple(
+            signature(self.old_forward)
+            .bind(*tracing_args, **tracing_kwargs)
+            .arguments.values()
+        )
+        visualize_graph(self._gm, inputs, out_file)
 
 
 class DmxConfig(dict):

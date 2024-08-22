@@ -15,10 +15,9 @@ def visualize_graph(
     visualizing non fx transformed:
         visualize_graph(torch.nn.Linear(64,64),torch.rand(1,64))
     visualizing fx transformed:
-        net = torch.nn.Linear(64,64)
-        gm = cast_input_output_transform(net)
-        visualize_graph(gm,torch.rand(1,64))
-    Note: remember to install pygraphviz by sudo apt install graphviz
+        net = DmxModel.from_torch(torch.nn.Linear(64,64))
+        visualize_graph(net,torch.rand(1,64))
+    Note: make sure inputs follow the same order of kwargs as the module signature, remember to install pygraphviz by sudo apt install graphviz
     """
     if not isinstance(model, fx.GraphModule):
         graph = tracer.trace(model)
