@@ -18,6 +18,7 @@ from transformers.utils.fx import (
 )
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
+from contextlib import contextmanager
 
 
 class DmxHFTracer(HFTracer):
@@ -72,6 +73,26 @@ class DmxHFTracer(HFTracer):
         return is_leaf
 
 
+@contextmanager
+def disable_hooked_forward(model):
+    """
+    This context manager disables hooks inserted by accelerate for fx tracing, and adds it back to the old forward upon exiting the context manager
+    """
+    for m in model.modules():
+        if hasattr(m, "_old_forward"):
+            m.hooked_forward = m.forward
+            m.forward = m._old_forward
+    if hasattr(model, "_old_forward"):
+        model.hooked_forward = model.forward
+        model.forward = model._old_forward
+    yield
+    for m in model.modules():
+        if hasattr(m, "hooked_forward"):
+            m.forward = m.hooked_forward
+    if hasattr(model, "hooked_forward"):
+        model.old_forward = model.hooked_forward
+
+
 def hf_symbolic_trace(
     model: PreTrainedModel,
     input_names: Optional[List[str]] = None,
@@ -104,32 +125,33 @@ def hf_symbolic_trace(
         traced_model,tracer = hf_symbolic_trace(model, input_names=["input_ids", "attention_mask", "token_type_ids"])
         ```
     """
-    if input_names is None:
-        input_names = model.dummy_inputs.keys()
+    with disable_hooked_forward(model):
+        if input_names is None:
+            input_names = model.dummy_inputs.keys()
 
-    input_names = list(input_names)
-    if concrete_args:
-        new_args = get_concrete_args(model, input_names)
-        for key, value in new_args.items():
-            if key not in concrete_args:
-                concrete_args[key] = value
-        concrete_args.update()
-    else:
-        concrete_args = get_concrete_args(model, input_names)
+        input_names = list(input_names)
+        if concrete_args:
+            new_args = get_concrete_args(model, input_names)
+            for key, value in new_args.items():
+                if key not in concrete_args:
+                    concrete_args[key] = value
+            concrete_args.update()
+        else:
+            concrete_args = get_concrete_args(model, input_names)
 
-    # Tracing.
-    tracer = tracer_cls()
-    traced_graph = tracer.trace(
-        model,
-        concrete_args=concrete_args,
-        dummy_inputs=dummy_inputs,
-    )
-    traced = GraphModule(model, traced_graph)
-    traced.config = model.config
-    # The model class must be stored as an attribute to allow model deserialization, which uses trace, and thus
-    # _generate_dummy_input, where the model class is needed.
-    traced.class_for_deserialization = model.__class__
-    traced.device = model.device
+        # Tracing.
+        tracer = tracer_cls()
+        traced_graph = tracer.trace(
+            model,
+            concrete_args=concrete_args,
+            dummy_inputs=dummy_inputs,
+        )
+        traced = GraphModule(model, traced_graph)
+        traced.config = model.config
+        # The model class must be stored as an attribute to allow model deserialization, which uses trace, and thus
+        # _generate_dummy_input, where the model class is needed.
+        traced.class_for_deserialization = model.__class__
+        traced.device = model.device
 
     return (traced, tracer)
 

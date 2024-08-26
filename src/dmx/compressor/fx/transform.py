@@ -9,7 +9,6 @@ from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
 from transformers.modeling_utils import get_parameter_device
 import inspect
-from contextlib import contextmanager
 
 
 def substitute_transform(
@@ -35,33 +34,30 @@ def substitute_transform(
         transformed = dmx_aware_mapping[mod_type].from_raw(root)
         return transformed
 
-    with disable_hooked_forward(root):
-        if not hf:
-            root.config = None
-            root.device = get_parameter_device(root)
-            # set dummy_input for params without default
-            sig = inspect.signature(
-                root.forward if isinstance(root, torch.nn.Module) else root
-            )
-            for param in sig.parameters.values():
-                if param.name in dummy_inputs:
-                    continue
-                if param.default is inspect.Parameter.empty:
-                    dummy_inputs[param.name] = None
-            gm, tracer = hf_symbolic_trace(
-                root,
-                input_names,
-                concrete_args=concrete_args,
-                dummy_inputs=dummy_inputs,
-            )
-        else:
-            gm, tracer = hf_symbolic_trace(
-                root, input_names, concrete_args=concrete_args
-            )
-        transformer = DMXAwareTransformer(
-            gm, tracer.node_name_to_scope, root._gm if root.transformed else None
+    if not hf:
+        root.config = None
+        root.device = get_parameter_device(root)
+        # set dummy_input for params without default
+        sig = inspect.signature(
+            root.forward if isinstance(root, torch.nn.Module) else root
         )
-        transformed = transformer.transform()
+        for param in sig.parameters.values():
+            if param.name in dummy_inputs:
+                continue
+            if param.default is inspect.Parameter.empty:
+                dummy_inputs[param.name] = None
+        gm, tracer = hf_symbolic_trace(
+            root,
+            input_names,
+            concrete_args=concrete_args,
+            dummy_inputs=dummy_inputs,
+        )
+    else:
+        gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
+    transformer = DMXAwareTransformer(
+        gm, tracer.node_name_to_scope, root._gm if root.transformed else None
+    )
+    transformed = transformer.transform()
 
     return transformed
 
@@ -87,26 +83,6 @@ def qDq_transform(
     transformed = transformer.transform()
     transformed.recompile()
     return transformed
-
-
-@contextmanager
-def disable_hooked_forward(model):
-    """
-    This context manager disables hooks inserted by accelerate for fx tracing, and adds it back to the old forward upon exiting the context manager
-    """
-    for m in model.modules():
-        if hasattr(m, "_old_forward"):
-            m.hooked_forward = m.forward
-            m.forward = m._old_forward
-    if hasattr(model, "_old_forward"):
-        model.hooked_forward = model.forward
-        model.forward = model._old_forward
-    yield
-    for m in model.modules():
-        if hasattr(m, "hooked_forward"):
-            m.forward = m.hooked_forward
-    if hasattr(model, "hooked_forward"):
-        model.old_forward = model.hooked_forward
 
 
 def cast_input_output_transform(
