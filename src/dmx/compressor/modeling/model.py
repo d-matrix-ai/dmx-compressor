@@ -119,6 +119,19 @@ class DmxModelMixin:
             for _, m in self.named_dmx_modules()
         )
 
+    def to_basic_mode(self):
+        """
+        Configures a transformed DmxModel to the BASIC mode on dmx hardware.
+
+        Returns:
+            The configured model.
+        """
+        from dmx.compressor import config_rules
+        return self.configure(
+            self.baseline_config,
+            *config_rules.BASIC,
+        )
+
     @contextmanager
     def keep_dmx_config(self):
         _dmx_config = self.dmx_config
