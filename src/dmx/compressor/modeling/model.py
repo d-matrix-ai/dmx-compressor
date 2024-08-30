@@ -382,7 +382,6 @@ class DmxModel(DmxModelMixin):
             submod.__class__.__bases__ += (DmxModelMixin,)
         submod._gm = None
         submod.transformed = False
-        submod.hf = isinstance(submod, transformers.PreTrainedModel)
         submod.input_filter_rules = model.input_filter_rules
         submod.config = model.config
 

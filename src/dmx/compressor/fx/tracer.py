@@ -130,8 +130,6 @@ def hf_symbolic_trace(
 
     if not hasattr(model,"config"):
         model.config = None
-    if not hasattr(model,"device") or not hasattr(model,"hf_device_map"):    
-        model.device = get_parameter_device(model)
     with disable_hooked_forward(model):
         if input_names is None:
             input_names = model.dummy_inputs.keys()
@@ -163,12 +161,6 @@ def hf_symbolic_trace(
             dummy_inputs=dummy_inputs,
         )
         traced = GraphModule(model, traced_graph)
-        traced.config = model.config
-        # The model class must be stored as an attribute to allow model deserialization, which uses trace, and thus
-        # _generate_dummy_input, where the model class is needed.
-        traced.class_for_deserialization = model.__class__
-        traced.device = model.device
-
     return (traced, tracer)
 
 
