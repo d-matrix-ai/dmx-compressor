@@ -262,7 +262,6 @@ class DmxModel(DmxModelMixin):
         )
         _model._gm = substitute_transform(
             _model,
-            hf=_model.hf,
             input_names=input_names,
             concrete_args=concrete_args,
             dummy_inputs=dummy_inputs,
@@ -309,6 +308,8 @@ class DmxModel(DmxModelMixin):
                 tracing_kwargs[k] is None
             ):
                 return False
+        if "past_key_values" in kwargs and len(kwargs["past_key_values"])!= len(tracing_kwargs["past_key_values"]):
+            return False
         return True
 
     @staticmethod
@@ -430,7 +431,6 @@ class DmxModel(DmxModelMixin):
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
         model._gm = None
         model.transformed = False
-        model.hf = model.__class__.__base__.__module__.startswith("transformers")
         model.input_filter_rules = input_filter_rules
 
         def temp_forward(_m, *_args, **_kwargs):

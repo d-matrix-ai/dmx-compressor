@@ -19,6 +19,8 @@ from transformers.utils.fx import (
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
 from contextlib import contextmanager
+from transformers.modeling_utils import get_parameter_device
+import inspect
 
 
 class DmxHFTracer(HFTracer):
@@ -125,6 +127,11 @@ def hf_symbolic_trace(
         traced_model,tracer = hf_symbolic_trace(model, input_names=["input_ids", "attention_mask", "token_type_ids"])
         ```
     """
+
+    if not hasattr(model,"config"):
+        model.config = None
+    if not hasattr(model,"device") or not hasattr(model,"hf_device_map"):    
+        model.device = get_parameter_device(model)
     with disable_hooked_forward(model):
         if input_names is None:
             input_names = model.dummy_inputs.keys()
@@ -138,6 +145,15 @@ def hf_symbolic_trace(
             concrete_args.update()
         else:
             concrete_args = get_concrete_args(model, input_names)
+        sig = inspect.signature(
+            model.forward if isinstance(model, torch.nn.Module) else model
+        )
+        # set dummy_input for params without default
+        for param in sig.parameters.values():
+            if param.name in dummy_inputs:
+                continue
+            if param.default is inspect.Parameter.empty:
+                dummy_inputs[param.name] = None
 
         # Tracing.
         tracer = tracer_cls()

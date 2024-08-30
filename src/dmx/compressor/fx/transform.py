@@ -7,14 +7,12 @@ from dmx.compressor.fx import ConfigurationTransformer, DMXAwareTransformer
 from dmx.compressor.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
-from transformers.modeling_utils import get_parameter_device
-import inspect
+
 
 
 def substitute_transform(
     root: torch.nn.Module,
     concrete_args: Optional[Dict[str, Any]] = None,
-    hf: bool = False,
     input_names: Optional[List[str]] = None,
     dummy_inputs: Optional[Dict[str, Any]] = None,
 ):
@@ -34,26 +32,13 @@ def substitute_transform(
         transformed = dmx_aware_mapping[mod_type].from_raw(root)
         return transformed
 
-    if not hf:
-        root.config = None
-        root.device = get_parameter_device(root)
-        # set dummy_input for params without default
-        sig = inspect.signature(
-            root.forward if isinstance(root, torch.nn.Module) else root
-        )
-        for param in sig.parameters.values():
-            if param.name in dummy_inputs:
-                continue
-            if param.default is inspect.Parameter.empty:
-                dummy_inputs[param.name] = None
-        gm, tracer = hf_symbolic_trace(
-            root,
-            input_names,
-            concrete_args=concrete_args,
-            dummy_inputs=dummy_inputs,
-        )
-    else:
-        gm, tracer = hf_symbolic_trace(root, input_names, concrete_args=concrete_args)
+    gm, tracer = hf_symbolic_trace(
+        root,
+        input_names,
+        concrete_args=concrete_args,
+        dummy_inputs=dummy_inputs,
+    )
+ 
     transformer = DMXAwareTransformer(
         gm, tracer.node_name_to_scope, root._gm if root.transformed else None
     )
