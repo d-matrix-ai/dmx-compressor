@@ -216,17 +216,6 @@ def pipe_eval(
         dataset_version,
     )
 
-
-def get_input_filter_rules(model):
-    rule_mapping = {
-        "d-matrix/Llama-2": {"cache_position": None},
-        "d-matrix/Llama-3": {"cache_position": None},
-    }
-    if model in rule_mapping:
-        return rule_mapping[model]
-    return None
-
-
 def contains_number(string):
     """
     This function checks whether a string contains a number or not.
@@ -343,7 +332,7 @@ def pipeline(
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
     pipe.model = DmxModel.from_torch(
-        pipe.model, get_input_filter_rules(pipe.model_name)
+        pipe.model
     )
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,

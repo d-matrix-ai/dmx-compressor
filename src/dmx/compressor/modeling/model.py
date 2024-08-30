@@ -313,19 +313,7 @@ class DmxModel(DmxModelMixin):
         return True
 
     @staticmethod
-    def apply_input_filter_rules(kwargs, _model):
-        """
-        Special treatment for kwargs that cannot be traced properly, this is model specific.
-        """
-        if _model.input_filter_rules:
-            for k, v in _model.input_filter_rules.items():
-                if k in kwargs:
-                    kwargs[k] = v
-        return kwargs
-
-    @staticmethod
     def prepare_tracing_inputs(_model, args, kwargs):
-        kwargs = DmxModel.apply_input_filter_rules(kwargs, _model)
         # remove kwargs with value None
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         # boolean inputs will affect tracing and need to be set as concrete args
@@ -382,7 +370,6 @@ class DmxModel(DmxModelMixin):
             submod.__class__.__bases__ += (DmxModelMixin,)
         submod._gm = None
         submod.transformed = False
-        submod.input_filter_rules = model.input_filter_rules
         submod.config = model.config
 
         def temp_forward(_m, *_args, **_kwargs):
@@ -422,7 +409,7 @@ class DmxModel(DmxModelMixin):
 
     @classmethod
     def from_torch(
-        cls, model: torch.nn.Module, input_filter_rules: Optional[Dict] = None
+        cls, model: torch.nn.Module
     ) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
@@ -430,7 +417,6 @@ class DmxModel(DmxModelMixin):
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
         model._gm = None
         model.transformed = False
-        model.input_filter_rules = input_filter_rules
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
