@@ -3,7 +3,7 @@ from typing import Any, Optional
 from parse import parse
 from bidict import bidict
 import torch
-from ..quant import fixed_point_quantize, block_quantize, float_quantize
+# from ..quant import fixed_point_quantize, block_quantize, float_quantize
 from .onnx import BFPTypeEnum
 
 ROUNDING_MODE = bidict(
