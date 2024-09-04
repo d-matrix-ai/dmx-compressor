@@ -1,8 +1,9 @@
 datasets
-dmx-compressor
 numpy
 bidict
 parse
 pptree
 transformers
 torch
+sphinx-rtd-theme
+-e .

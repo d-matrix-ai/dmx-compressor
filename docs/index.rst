@@ -6,14 +6,22 @@
 Welcome to dmx.compressor's documentation!
 ===================================
 
+Welcome!
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   numerics
+   modules
+   opgraphs
+
 .. autosummary::
    :toctree: _autosummary
+   :template: custom-module-template.rst
    :recursive:
 
-   dmx.compressor
-
-
-
+   dmx
 
 Indices and tables
 ==================
