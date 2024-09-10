@@ -16,8 +16,12 @@ Welcome!
    modules
    opgraphs
 
+.. autosummary::
+   :toctree: _autosummary
+   :template: custom-module-template.rst
+   :recursive:
 
-
+   dmx
 
 Indices and tables
 ==================
