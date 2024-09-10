@@ -18,10 +18,10 @@ extensions = [
     'sphinx.ext.duration',
     'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
-    'sphinx.ext.apidoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.autosummary']
 
+autosummary_generate = True
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
