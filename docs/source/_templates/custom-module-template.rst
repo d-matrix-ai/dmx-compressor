@@ -1,6 +1,9 @@
 {{ fullname | escape | underline}}
 
 .. automodule:: {{ fullname }}
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
    {% block attributes %}
    {%- if attributes %}
@@ -32,7 +35,6 @@
 
    .. autosummary::
       :toctree:
-      :template: custom-class-template.rst
    {% for item in classes %}
       {{ item }}
    {%- endfor %}
