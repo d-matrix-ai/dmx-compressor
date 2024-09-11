@@ -27,3 +27,7 @@ jobs:
         run: poetry install
       - name: Run the automated tests (for example)
         run: poetry run pytest -v
+      - name: Check project with ruff
+        uses: chartboost/ruff-action@v1
+        with:
+          src: './src'
