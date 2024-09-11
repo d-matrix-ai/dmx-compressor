@@ -6,6 +6,8 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      - name: Install Ninja
+        run: sudo apt-get install -y ninja-build
       - uses: actions/checkout@v4
       - name: Install Python
         uses: actions/setup-python@v4
