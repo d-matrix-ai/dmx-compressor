@@ -88,6 +88,7 @@ class DMXAwareTransformer(fx.Transformer):
             if new_name != candidate:
                 self.new_graph._graph_namespace.create_name(candidate, None)
             from dmx.compressor.modeling.nn import BAddBMM
+
             self.add_submod(new_name, BAddBMM())
             new_node = self.new_graph.create_node(
                 "call_module",

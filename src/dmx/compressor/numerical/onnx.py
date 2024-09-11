@@ -6,6 +6,7 @@ class BFPTypeEnum(Enum):
     The content of this Enum is final (June 9, 2023).
     No further modification allowed.
     """
+
     DMX_BFP_32_1 = 10001
     DMX_BFP_24_64 = 10002
     DMX_BFP_24_32 = 10003

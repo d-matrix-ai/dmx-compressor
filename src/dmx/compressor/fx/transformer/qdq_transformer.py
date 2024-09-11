@@ -71,26 +71,31 @@ class QdQTransformer(fx.Transformer):
             if node.op == "output":
                 rv = map_arg(node.args[0], lambda n: val_map[n])
                 return rv if not return_output_node else (rv, node)
-            val_map[node] = my_node_copy(og, node, curmod, rootmod, target_prefix, lambda n: val_map[n])
+            val_map[node] = my_node_copy(
+                og, node, curmod, rootmod, target_prefix, lambda n: val_map[n]
+            )
         return None
 
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
-        """ Check if the current module that 'target' points to is in the dmx_aware_mapping
-            and substitutes in the fxir subgraph
+        """Check if the current module that 'target' points to is in the dmx_aware_mapping
+        and substitutes in the fxir subgraph
         """
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         curr_mod = submod
 
-        dmx_module_targets = itertools.chain(dmx_aware_mapping.values(),
-                                             dmx_aware_functional_mappings.values())
+        dmx_module_targets = itertools.chain(
+            dmx_aware_mapping.values(), dmx_aware_functional_mappings.values()
+        )
         if any(map(lambda m: isinstance(curr_mod, m), dmx_module_targets)):
             {str(v): k for k, v in dmx_aware_mapping.items()}
             subgraph = curr_mod.to_compiler_graph()
             processed_args = process_args(args)
-            subgraph_input_nodes = filter(lambda n: n.op == "placeholder", list(subgraph.nodes))
+            subgraph_input_nodes = filter(
+                lambda n: n.op == "placeholder", list(subgraph.nodes)
+            )
             val_map = {n: processed_args[i] for i, n in enumerate(subgraph_input_nodes)}
             curr_node = self.substitute_compiler_graph(
                 self.new_graph, subgraph, val_map, target, curr_mod, self.module, False
@@ -106,7 +111,9 @@ class QdQTransformer(fx.Transformer):
         with fx_traceback.preserve_node_meta():
             result = super().run(enable_io_processing=False)
         if result is not None:
-            def strip_proxy(a : Union[Argument, Proxy]) -> Any:
+
+            def strip_proxy(a: Union[Argument, Proxy]) -> Any:
                 return a.node if isinstance(a, Proxy) else a
+
             self.new_graph.output(map_aggregate(result, strip_proxy))
         return fx.GraphModule(self.module, self.new_graph)

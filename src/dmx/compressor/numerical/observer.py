@@ -25,6 +25,7 @@ class DMXObserverBase(ObserverBase):
     r"""
     Taken from torch.ao.quantization.observer.UniformQuantizationObserverBase
     """
+
     eps: torch.Tensor
 
     def __init__(
@@ -140,6 +141,7 @@ class MinMaxObserver(DMXObserverBase):
     Adapted from torch.ao.quantization.observer.MinMaxObserver,
     supports per-channel
     """
+
     min_val: torch.Tensor
     max_val: torch.Tensor
 
@@ -213,6 +215,7 @@ class HistogramObserver(DMXObserverBase):
     Adapted from torch.ao.quantization.observer.HistogramObserver,
     still does not support per-channel
     """
+
     histogram: torch.Tensor
     min_val: torch.Tensor
     max_val: torch.Tensor
@@ -430,9 +433,9 @@ class HistogramObserver(DMXObserverBase):
         histogram_with_output_range = torch.zeros(
             (Nbins * downsample_rate), device=orig_hist.device
         )
-        histogram_with_output_range[
-            start_idx : Nbins * upsample_rate + start_idx
-        ] = upsampled_histogram
+        histogram_with_output_range[start_idx : Nbins * upsample_rate + start_idx] = (
+            upsampled_histogram
+        )
         # Compute integral histogram, double precision is needed to ensure
         # that there are no overflows
         integral_histogram = torch.cumsum(
@@ -626,4 +629,6 @@ class PercentileObserver(HistogramObserver):
 
     @torch.jit.export
     def extra_repr(self):
-        return "percentile = {}".format(self.min_val, )
+        return "percentile = {}".format(
+            self.min_val,
+        )

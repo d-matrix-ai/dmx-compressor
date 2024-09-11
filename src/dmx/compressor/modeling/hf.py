@@ -42,7 +42,12 @@ def dmx_transform(pipe, dmx_config_name):
 
 
 def prepare_dataset_and_column(
-    dataset, column_name=None, dataset_version=None, dataset_split="test", seed=42, trust_remote_code=True
+    dataset,
+    column_name=None,
+    dataset_version=None,
+    dataset_split="test",
+    seed=42,
+    trust_remote_code=True,
 ):
     dataset_column_mapping = {
         "wikitext": "text",
@@ -61,7 +66,12 @@ def prepare_dataset_and_column(
             f"Column name not found for dataset '{dataset}'. Please provide the column_name."
         )
 
-    dataset = load_dataset(dataset, dataset_version, split=dataset_split, trust_remote_code=trust_remote_code)
+    dataset = load_dataset(
+        dataset,
+        dataset_version,
+        split=dataset_split,
+        trust_remote_code=trust_remote_code,
+    )
     if dataset_split == "train":
         dataset = dataset.shuffle(seed=seed)
 
@@ -222,20 +232,20 @@ def contains_number(string):
     This function checks whether a string contains a number or not.
     This is used to identify hidden layers in the model.
     """
-    return bool(re.search(r'\d', string))
+    return bool(re.search(r"\d", string))
 
 
 def get_modules(root: torch.nn.Module, prefix: str) -> Dict[str, torch.nn.Module]:
     """
     A function that recursively traverses the model from the given root module and
     returns a dictionary of submodules for device mapping. In accordance with the format
-    of device_map = "auto", only submodules that are leaf nodes or hidden layers are 
+    of device_map = "auto", only submodules that are leaf nodes or hidden layers are
     included in the dictionary; submodules of hidden layers are ignored.
 
     Args:
         root (torch.nn.Module): model/module to traverse
         prefix (str): prefix for the submodule names
-    
+
     Returns:
         Dict[str, torch.nn.Module]: dictionary of submodules
     """
@@ -248,7 +258,8 @@ def get_modules(root: torch.nn.Module, prefix: str) -> Dict[str, torch.nn.Module
             modules.update(submodules)
     return modules
 
-def balanced_device_map(model: str, revision: Optional[str]= "main") -> Dict[str, int]: 
+
+def balanced_device_map(model: str, revision: Optional[str] = "main") -> Dict[str, int]:
     """
     A function that computes a custom device map for the given model that distributes model weights
     evenly across all devices. Enable with device_map = "balanced" when calling pipeline.
@@ -256,11 +267,13 @@ def balanced_device_map(model: str, revision: Optional[str]= "main") -> Dict[str
     Args:
         model (str): model name on huggingface
         revision (str): revision of the model on huggingface
-    
+
     Returns:
         Dict[str, int]: dictionary of the device map
     """
-    model = AutoModelForCausalLM.from_pretrained(model, revision=revision, device_map="meta")
+    model = AutoModelForCausalLM.from_pretrained(
+        model, revision=revision, device_map="meta"
+    )
     module_sizes = compute_module_sizes(model)
     tied_parameters = find_tied_parameters(model)
     modules = get_modules(model, "")
@@ -272,7 +285,7 @@ def balanced_device_map(model: str, revision: Optional[str]= "main") -> Dict[str
     device_map = {}
     total_params = sum(params.values())
     num_devices = torch.cuda.device_count()
-    
+
     cur_device = 0
     params_on_cur_device = 0
     accumulated_params = 0
@@ -287,18 +300,24 @@ def balanced_device_map(model: str, revision: Optional[str]= "main") -> Dict[str
 
     # distribute remaining modules across all devices
     for name, module in modules.items():
-        if isinstance(module, torch.nn.Embedding): continue
-        if params_on_cur_device > average_params or (params_on_cur_device != 0 and params_on_cur_device + params[name] > average_params * 1.2):
+        if isinstance(module, torch.nn.Embedding):
+            continue
+        if params_on_cur_device > average_params or (
+            params_on_cur_device != 0
+            and params_on_cur_device + params[name] > average_params * 1.2
+        ):
             cur_device = min(cur_device + 1, num_devices - 1)
             accumulated_params += params_on_cur_device
             params_on_cur_device = 0
-            average_params = (total_params - accumulated_params) // (num_devices - cur_device)
+            average_params = (total_params - accumulated_params) // (
+                num_devices - cur_device
+            )
         device_map[name] = cur_device
         params_on_cur_device += params[name]
 
     for pair in tied_parameters:
-        device_map[pair[0][:-len(".weight")]] = device_map[pair[1][:-len(".weight")]]
-    
+        device_map[pair[0][: -len(".weight")]] = device_map[pair[1][: -len(".weight")]]
+
     return device_map
 
 
@@ -310,7 +329,9 @@ def pipeline(
     **kwargs,
 ):
     if device_map == "balanced":
-        device_map = balanced_device_map(kwargs.get("model"), kwargs.get("revision", "main"))
+        device_map = balanced_device_map(
+            kwargs.get("model"), kwargs.get("revision", "main")
+        )
     kwargs.update(
         {
             "trust_remote_code": trust_remote_code,

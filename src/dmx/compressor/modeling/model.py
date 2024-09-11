@@ -127,6 +127,7 @@ class DmxModelMixin:
             The configured model.
         """
         from dmx.compressor import config_rules
+
         return self.configure(
             self.baseline_config,
             *config_rules.BASIC,
