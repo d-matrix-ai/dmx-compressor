@@ -1,6 +1,6 @@
 import torch
 
-from dmx.compressor import DmxModel, DmxConfigRule
+from dmx.compressor.modeling import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
 
 

@@ -1,6 +1,6 @@
 ## This test file serves the purpose of testing the inheritance of castTo states after DmxModel retransformation
 import torch
-from dmx.compressor import DmxModel, DmxConfigRule
+from dmx.compressor.modeling import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
 from copy import deepcopy
 
