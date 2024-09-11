@@ -3,7 +3,10 @@ from typing import Any, Optional
 from parse import parse
 from bidict import bidict
 import torch
-from ..quant import fixed_point_quantize, block_quantize, float_quantize
+try:
+    from ..quant import fixed_point_quantize, block_quantize, float_quantize
+except ImportError as error:
+    print("Error importing Block Quantize CUDA kernels")
 from .onnx import BFPTypeEnum
 
 ROUNDING_MODE = bidict(
