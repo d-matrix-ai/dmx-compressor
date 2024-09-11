@@ -28,7 +28,7 @@ jobs:
       - name: Install the project dependencies
         run: poetry install
       - name: Run the automated tests (for example)
-        run: poetry run pytest -v
+        run: poetry run pytest tests
       - name: Check project with ruff
         uses: chartboost/ruff-action@v1
         with:
