@@ -1,5 +1,5 @@
 import warnings
-from typing import Union, Optional, Dict, Iterable
+from typing import Union, Optional, Dict
 import torch
 import torch.nn as nn
 from torch.autograd import Function
@@ -10,8 +10,6 @@ from .format import (
     Same,
     FixedPoint,
     BlockFloatingPoint,
-    MXFP,
-    MXINT,
 )
 from .smoothquant import ActivationWeightSmoothQuant
 from .observer import DummyObserver

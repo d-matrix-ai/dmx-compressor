@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from dmx.compressor.fx.tracer import HFQuantTracer, symbolic_trace, hf_symbolic_trace
+from dmx.compressor.fx.tracer import HFQuantTracer, hf_symbolic_trace
 from ..fx import QuantTracer, InputOutputTransformer, QdQTransformer
 from dmx.compressor.fx import ConfigurationTransformer, DMXAwareTransformer
 from dmx.compressor.fx.transformer.utils import dmx_aware_mapping
@@ -77,7 +77,6 @@ def qDq_transform(
         transformed model
     """
     # import compiler so q/dq ops are registered
-    import dmir_compiler.custom_ops
 
     transformer = QdQTransformer(root)
     transformed = transformer.transform()

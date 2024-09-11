@@ -5,27 +5,13 @@ from functools import partialmethod
 torch.nn.Module.load_state_dict = partialmethod(
     torch.nn.Module.load_state_dict, strict=False
 )
-from . import (
-    utils,
-    numerical,
-    functional,
-    sparse,
-    fx,
-    perf_proxy,
-    layer_reconstruction,
-)
 
 from .numerical import Format
 from .sparse import Sparseness
 from .functional import ApproximationFunction
 from .modeling import (
     nn,
-    DmxModel,
-    DmxConfig,
     DmxConfigRule,
-    DmxPipelineMixin,
-    DmxSimplePipeline,
-    Model,
 )
 
 # Numerical format aliases

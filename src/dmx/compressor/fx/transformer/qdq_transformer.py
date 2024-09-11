@@ -87,7 +87,7 @@ class QdQTransformer(fx.Transformer):
         dmx_module_targets = itertools.chain(dmx_aware_mapping.values(),
                                              dmx_aware_functional_mappings.values())
         if any(map(lambda m: isinstance(curr_mod, m), dmx_module_targets)):
-            inv_dmx_aware_mapping = {str(v): k for k, v in dmx_aware_mapping.items()}
+            {str(v): k for k, v in dmx_aware_mapping.items()}
             subgraph = curr_mod.to_compiler_graph()
             processed_args = process_args(args)
             subgraph_input_nodes = filter(lambda n: n.op == "placeholder", list(subgraph.nodes))
