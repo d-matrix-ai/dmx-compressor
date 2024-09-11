@@ -210,7 +210,7 @@ class DmxModule(
             **kwargs (Optional[Dict]): variable length of kwargs
         """
         _dtype, _device = input.dtype, input.device
-        if hasattr(self, "weight") and self.weight != None:
+        if hasattr(self, "weight") and self.weight is not None:
             _device = self.weight.device
         if self.smoothquant is not None:
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
@@ -316,7 +316,8 @@ class DmxModuleConfig(dict):
         return cc.__dict__
 
 
-is_configurable = lambda m: isinstance(m, DmxModule)
+def is_configurable(m):
+    return isinstance(m, DmxModule)
 
 
 class ResAdd(DmxModule, torch.nn.Module):
@@ -721,13 +722,13 @@ class Linear(DmxModule, torch.nn.Linear):
     def from_raw(raw: torch.nn.Module) -> DmxModule:
         if isinstance(raw, transformers.pytorch_utils.Conv1D):
             initial_dmx = Linear(
-                raw.weight.shape[0], raw.weight.shape[1], bias=raw.bias != None
+                raw.weight.shape[0], raw.weight.shape[1], bias=raw.bias is not None
             )
             initial_dmx.weight.data = raw.weight.data.t()
             initial_dmx.bias = raw.bias
         else:
             initial_dmx = Linear(
-                raw.in_features, raw.out_features, bias=raw.bias != None
+                raw.in_features, raw.out_features, bias=raw.bias is not None
             )
             initial_dmx.update_params_with_raw(raw)
         return initial_dmx
@@ -1032,7 +1033,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             padding=raw.padding,
             dilation=raw.dilation,
             groups=raw.groups,
-            bias=raw.bias != None,
+            bias=raw.bias is not None,
             padding_mode=raw.padding_mode,
         )
         initial_dmx.update_params_with_raw(raw)
@@ -1124,7 +1125,7 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
             padding=raw.padding,
             dilation=raw.dilation,
             groups=raw.groups,
-            bias=raw.bias != None,
+            bias=raw.bias is not None,
             padding_mode=raw.padding_mode,
         )
         initial_dmx.update_params_with_raw(raw)
@@ -1237,7 +1238,7 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             padding=raw.padding,
             dilation=raw.dilation,
             groups=raw.groups,
-            bias=raw.bias != None,
+            bias=raw.bias is not None,
             padding_mode=raw.padding_mode,
         )
         initial_dmx.update_params_with_raw(raw)

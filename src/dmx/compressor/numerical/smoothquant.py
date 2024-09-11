@@ -410,7 +410,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
             a_dynamic=dynamic,
             b_dynamic=False,
             scale_min=scale_min,
-            **kwargs
+            **kwargs,
         )
         self.ch_axis = ch_axis
         self.win_ch_axis = win_ch_axis

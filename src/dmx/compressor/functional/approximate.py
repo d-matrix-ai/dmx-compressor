@@ -2,7 +2,7 @@ from typing import Union, Optional
 from parse import parse
 import torch
 import torch.nn as nn
-from . import functions, vsimd
+from . import vsimd, functions
 
 
 __ALL__ = [

@@ -26,6 +26,7 @@ class Sparseness(Function):
     operations, we may have different forward and backward passes.  Child
     classes to implement `get_mask()` and `from_shorthand()` method.
     """
+
     blocked: bool
 
     def __init__(self, mask_gradient=False):
@@ -68,6 +69,7 @@ class Dense(Sparseness):
     This is a dummy sparsity whose `forward` and `backward` are equivalent to an
     identity function.
     """
+
     blocked = False
 
     def __init__(self, mask_gradient=False):
@@ -96,6 +98,7 @@ class TopK(Sparseness):
     r"""
     Fine-grain unstructured sparsity with top-K scored entries non-zero
     """
+
     blocked = False
 
     def __init__(self, density=0.5, mask_gradient=False):
@@ -146,6 +149,7 @@ class BlockTopK(Sparseness):
     Fine-grain structured sparsity with K non-zeros out of `block_size` elements
     long `block_dim`.
     """
+
     blocked = True
 
     def __init__(self, K=4, block_size=8, block_dim=-1, mask_gradient=False):
