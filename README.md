@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-    <a href="https://github.com/d-matrix-ai/dmx-compressor/actions/workflows/python-app.yml">
-        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-compressor/python-app.yml">
+    <a href="https://github.com/d-matrix-ai/dmx-compressor/actions/workflows/default-test-workflow.yml">
+        <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/d-matrix-ai/dmx-compressor/default-test-workflow.yml">
     </a>
     <a href="https://github.com/d-matrix-ai/dmx-compressor/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/github/license/d-matrix-ai/dmx-compressor">
