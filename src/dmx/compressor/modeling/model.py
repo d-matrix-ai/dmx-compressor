@@ -307,7 +307,8 @@ class DmxModel(DmxModelMixin):
             # if type of argument does not match, need to retrace
             if type(kwargs[k]) != type(tracing_kwargs[k]):
                 return False
-            # if kwargs is DynamicCache and shape is different (i.e: one is empty), need to retrace
+            # if kwargs is DynamicCache and shape is different (i.e: one is empty), need to retrace.
+            # NOTE: to be deprecated
             if isinstance(kwargs[k],transformers.DynamicCache) and len(kwargs[k]) != len(tracing_kwargs[k]):
                 return False
         return True
