@@ -45,6 +45,7 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.dropout": dmxnn.Dropout,
     "torch.matmul": dmxnn.ActActMatMul,
     "torch.bmm": dmxnn.ActActMatMul,
+    "torch.baddbmm": dmxnn.BAddBMM,
     "torch.nn.functional.scaled_dot_product_attention": dmxnn.ScaledDotProductAttention,
 }
 for f_key in list(dmx_aware_functional_mappings.keys()):

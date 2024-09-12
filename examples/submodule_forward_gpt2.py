@@ -1,19 +1,16 @@
-import os
 import torch
-from dmx.compressor import dmx
-from dmx.compressor.dmx import pipeline, DmxModel
-import evaluate
-from datasets import load_dataset
+from dmx.compressor.modeling.hf import pipeline, DmxModel
+from dmx.compressor.modeling import DmxConfigRule, nn
 
 
 pipe = pipeline(
     task="text-generation",
     model="d-matrix/gpt2",
-    revision="test_zf",  # distilgpt2 with gelu instead of gelu_new as activation function
+    revision="distilgpt2",  # distilgpt2 with gelu instead of gelu_new as activation function
     dmx_config="BASELINE",
+    device_map="cuda:0",
     # use_auth_token=os.environ.get("HUGGING_FACE_HUB_TOKEN"),
     trust_remote_code=True,
-    device_map="auto",  # enabling model parallel on multi-GPU nodes
 )
 x = torch.randint(1, 100, (1, 1024)).to("cuda")
 y = pipe.model(x)
@@ -47,10 +44,10 @@ assert torch.all(output0[0] == output[0])
 print("\ntests passed: unquantized submods are same as original submods!\n")
 
 
-bfp16 = "BFP[8|8]{64,-1}(SN)"
+bfp16 = "BFP[8|8]{64}(SN)"
 rules = (
-    dmx.DmxConfigRule(
-        module_types=(dmx.nn.Linear,),
+    DmxConfigRule(
+        module_types=(nn.Linear,),
         module_config=dict(
             input_format=bfp16,
             weight_format=bfp16,

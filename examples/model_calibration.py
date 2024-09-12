@@ -1,6 +1,6 @@
 # This is an example of how to do quantization and calibration for a model
-from dmx.compressor.dmx import pipeline
-from dmx.compressor import dmx
+from dmx.compressor.modeling.hf import pipeline
+from dmx.compressor.modeling import DmxConfigRule, nn
 import torch
 from dmx.compressor.numerical.observer import HistogramObserver, MinMaxObserver
 
@@ -11,7 +11,7 @@ pipe = pipeline(
     revision="Llama2-7b",
     dmx_config="BASELINE",
     trust_remote_code=True,
-    device_map="dmx",  # enabling model parallel on multi-GPU nodes. splitting layers evenly across devices based on module size.
+    device_map="auto",  # enabling model parallel on multi-GPU nodes. splitting layers evenly across devices based on module size.
 )
 
 # creating config rules
@@ -19,16 +19,16 @@ pipe = pipeline(
 # input_formats takes a list or a dictionary. When a list is passed, the formats will be set in the order of the castTos within input_casts.
 format = "XP[8,0](CSN)"
 rules = (
-    dmx.DmxConfigRule(
-        module_types=(dmx.nn.Linear,),
+    DmxConfigRule(
+        module_types=(nn.Linear,),
         module_config=dict(
             input_formats=[format],  # option 1
             # input_formats = {"input_cast": format} # option 2
             weight_format=format,
         ),
     ),
-    dmx.DmxConfigRule(
-        module_types=(dmx.nn.ScaledDotProductAttention,),
+    DmxConfigRule(
+        module_types=(nn.ScaledDotProductAttention,),
         module_config=dict(
             input_formats=[format, format, format],  # option 1
             # input_formats={
@@ -40,10 +40,10 @@ rules = (
             weight_format=format,
         ),
     ),
-    dmx.DmxConfigRule(
-        module_types=(dmx.nn.ActActMatMul,),
+    DmxConfigRule(
+        module_types=(nn.ActActMatMul,),
         module_config=dict(
-            input_formats=[format, format],
+            input_formats=[format, format],  # option 1
             # input_formats = {"input_cast": format, "multiplier_cast":format} # option 2
         ),
     ),
@@ -63,17 +63,15 @@ with torch.no_grad():
 
 # specifying layers to calibrate
 calibration_layers_matmul = {
-    n: m
-    for n, m in pipe.model.named_dmx_modules()
-    if isinstance(m, dmx.nn.ActActMatMul)
+    n: m for n, m in pipe.model.named_dmx_modules() if isinstance(m, nn.ActActMatMul)
 }
 calibration_layers_lin = {
-    n: m for n, m in pipe.model.named_dmx_modules() if isinstance(m, (dmx.nn.Linear,))
+    n: m for n, m in pipe.model.named_dmx_modules() if isinstance(m, (nn.Linear,))
 }
 calibration_layers_attention = {
     n: m
     for n, m in pipe.model.named_dmx_modules()
-    if isinstance(m, (dmx.nn.ScaledDotProductAttention,))
+    if isinstance(m, (nn.ScaledDotProductAttention,))
 }
 
 # specifying hyperparameters to use for calibration
@@ -133,8 +131,7 @@ with torch.no_grad(), pipe.model.calibrating_weights(
 ):
     pipe.model(x, labels=x)
 
-# check scale and zero point of modules by printing pipe.model._gm
-breakpoint()
+
 # do evaluation
 metric = pipe.evaluate(
     "d-matrix/dmx_perplexity",
