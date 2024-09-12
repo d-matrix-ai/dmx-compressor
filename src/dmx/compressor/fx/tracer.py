@@ -28,7 +28,7 @@ class DmxHFProxy(HFProxy):
     def install_metadata(self, metadata):
         super().install_metadata(metadata)
         if isinstance(metadata,transformers.cache_utils.Cache):
-            self.__class__ = type("MyModifiedClass", (HFProxy, metadata.__class__), {})
+            self.__class__ = type("HFCacheProxy", (HFProxy, metadata.__class__), {})
 
 class DmxHFTracer(HFTracer):
     """
