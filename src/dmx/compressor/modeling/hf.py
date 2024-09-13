@@ -34,7 +34,7 @@ def dmx_transform(pipe, dmx_config_name):
         pipe.model.configure(config)
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
-
+            from dmx.compressor import config_rules
             # NOTE: assuming pipe.model is in BASELINE mode
             pipe.model.configure(None, *eval(f"config_rules.{dmx_config_name}"))
         else:
