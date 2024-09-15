@@ -13,6 +13,7 @@ import torch
 from transformers import AutoModelForCausalLM
 from accelerate.utils import compute_module_sizes, find_tied_parameters
 import re
+from dmx.compressor import config_rules
 
 
 def get_config_file(repo_name, revision, config_name):
@@ -34,7 +35,6 @@ def dmx_transform(pipe, dmx_config_name):
         pipe.model.configure(config)
     else:
         if dmx_config_name in ["BASELINE", "BASIC"]:
-            from dmx.compressor import config_rules
             # NOTE: assuming pipe.model is in BASELINE mode
             pipe.model.configure(None, *eval(f"config_rules.{dmx_config_name}"))
         else:
@@ -216,6 +216,7 @@ def pipe_eval(
         dataset_version,
     )
 
+
 def contains_number(string):
     """
     This function checks whether a string contains a number or not.
@@ -331,9 +332,7 @@ def pipeline(
     pipe.task = kwargs.get("task")
     pipe.model_name = kwargs.get("model")
     pipe.revision = kwargs.get("revision", "main")
-    pipe.model = DmxModel.from_torch(
-        pipe.model
-    )
+    pipe.model = DmxModel.from_torch(pipe.model)
     pipe.evaluate = lambda metric, dataset, column_name=None, dataset_version=None, dataset_split="test": pipe_eval(
         pipe.model,
         pipe.tokenizer,
