@@ -61,12 +61,12 @@ In addition, the project provides a set of optimization tools for co-design usin
 
 ### Basic API
 
-Given a PyTorch model, _e.g._ `Net()`, wrap it in a `dmx.Model` container: 
+Given a PyTorch model, _e.g._ `Net()`, wrap it in a `DmxModel` container: 
 
 ```python
-from dmx.compressor import dmx
+from dmx.compressor.modeling import DmxModel
 
-model = dmx.Model(Net())
+model = DmxModel.from_torch(Net())
 ```
 
 Here `model` is functionally equivalent to `Net()`, and all `torch` functionalities are still available, but `model` is equipped with d-Matrix specific features, making it ready for co-design configuration and/or optimization, at training time or post-training. 
@@ -76,25 +76,26 @@ See advanced topics for further details.
 Use method `model.transform()` to set these configurations, through application of configuration rules. 
 See advanced topics for engineering of configuration rules.  
 
-There are two predefined special rule sets `compressor.config_rules.BASELINE` and `compressor.config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
+There are two predefined special rule sets `config_rules.BASELINE` and `config_rules.BASIC`; the former is a dummy that does not change the original model's functional behavior, whereas the latter brings the model to a functional state that is equivalent to basic-mode execution on d-Matrix's hardware, _e.g._ 
 
 ```python
+from dmx.compressor import config_rules
 model = model.transform(
     model.dmx_config,
-    *dmx.config_rules.BASIC,
+    *config_rules.BASIC,
 )
 ```
 
 ### Hugging Face pipeline API
 
-To leverage the popularity of [Hugging Face's pipeline API for inference](https://huggingface.co/docs/transformers/en/pipeline_tutorial), we extend `transformers.pipeline()` to `compressor.pipeline()`, which retains all existing functionality of pipelines while enabling model transformation and configuration for deployment on d-Matrix hardware.  
+To leverage the popularity of [Hugging Face's pipeline API for inference](https://huggingface.co/docs/transformers/en/pipeline_tutorial), we extend `transformers.pipeline()` to `dmx.compressor.modeling.hf.pipeline()`, which retains all existing functionality of pipelines while enabling model transformation and configuration for deployment on d-Matrix hardware.  
 
 ```python
-from dmx.compressor import pipeline
+from dmx.compressor.modeling.hf import pipeline
 
 pipe = pipeline(
     task="text-generation",
-    model="openai-community/gpt2-xl",
+    model="facebook/opt-125m",
     dmx_config="BASIC",  # make the model deployable on d-Matrix backend
     ...
 )
@@ -105,7 +106,7 @@ pipe = pipeline(
 
 ## Next steps
 
-For more detailed information, go over the following documents on specific topics.
+For more detailed information, go over the following documents on specific topics. Find more usage examples [here](docs/notebooks).
 
 - Configurations
 - [Numerics](docs/numerics.rst)
