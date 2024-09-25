@@ -432,6 +432,63 @@ class Mul(DmxModule):
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         return _input * multiplier
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+            multiplier = g.placeholder("multiplier")
+            multiplier_scale = g.get_attr("input_casts.multiplier_cast.scale")
+            multiplier_zero_point = g.get_attr("input_casts.multiplier_cast.zero_point")
+            multiplier_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    multiplier,
+                    multiplier_scale,
+                    multiplier_zero_point,
+                    repr(self.input_casts.multiplier_cast.format),
+                ),
+            )
+            multiplier_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (multiplier_q, multiplier_scale, multiplier_zero_point),
+            )
+            _output = g.create_node(
+                "call_function", torch.mul, (_input_dq, multiplier_dq), name="output"
+            )
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_output_dq)
+        return g
+
 
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
@@ -916,24 +973,6 @@ class Embedding(DmxModule, torch.nn.Embedding):
         """
         Returns a compiler friendly graph
         """
-        # dmx_graph = torch.fx.Graph()
-        # with dmx_graph.inserting_after():
-        #     # PLACEHOLDERS
-        #     _input = dmx_graph.placeholder('_input')
-        #     _input_scale = dmx_graph.get_attr('input_cast.scale')
-        #     _input_zero_point = dmx_graph.get_attr('input_cast.zero_point')
-        #     _input_q = dmx_graph.call_function(torch.ops.dmx.quantize, (_input, _input_scale, _input_zero_point, repr(self.input_cast.format)))
-        #     _input_dq = dmx_graph.call_function(torch.ops.dmx.dequantize, (_input_q,))
-
-        #     # ATTRIBUTES
-
-        #     # _weight
-        #     _weight = dmx_graph.get_attr('_weight')
-        #     _weight_scale = dmx_graph.get_attr('weight_scale')
-        #     _weight_zero_point = dmx_graph.get_attr('weight_zero_point')
-        #     _weight_q = dmx_graph.call_function(torch.ops.dmx.quantize, (_weight, _weight_scale, _weight_zero_point, repr(self.weight_cast.format)))
-        #     _weight_dq = dmx_graph.call_function(torch.ops.dmx.dequantize, (_weight_q,))
-
         initial_dmx = torch.nn.Embedding(
             num_embeddings=self.num_embeddings,
             embedding_dim=self.embedding_dim,
@@ -1630,6 +1669,38 @@ class RMSNorm(DmxModule, _RMSNorm):
         )
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+            # Non Tensor Attributes (no need to quantize)
+            dim=g.get_attr('weight.shape[0]')
+            eps=g.get_attr('raw.variance_epsilon') if hasattr(self, "variance_epsilon") else g.get_attr('eps'),
+
+            args = ((_input_dq), dim, eps)
+            ln = g.create_node(
+                "call_function", torch.nn.functional.rms_norm, args, name="RMSNorm"
+            )
+            g.output(ln)
+        return g
 
 
 class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSNorm):
