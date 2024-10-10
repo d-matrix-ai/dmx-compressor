@@ -1,3 +1,4 @@
+on: [push]
 # .github/workflows/ci-cd.yml
 jobs:
   pypi-publish:
