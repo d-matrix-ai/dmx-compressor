@@ -323,8 +323,6 @@ def is_configurable(m):
 class ResAdd(DmxModule, torch.nn.Module):
     """
     A module for handling residual connections.
-
-
     """
 
     def __init__(self) -> None:
@@ -1484,9 +1482,12 @@ class Softmax(DmxModule, torch.nn.Softmax):
             _input_dq = g.call_function(
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
-            dim = g.get_attr('dim')
+            dim = g.get_attr("dim")
             _output = g.create_node(
-                "call_function", torch.nn.functional.softmax, (_input, dim), name="softmax"
+                "call_function",
+                torch.nn.functional.softmax,
+                (_input, dim),
+                name="softmax",
             )
 
             _output_scale = g.get_attr("output_cast.scale")
@@ -1722,8 +1723,14 @@ class RMSNorm(DmxModule, _RMSNorm):
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
             # Non Tensor Attributes (no need to quantize)
-            dim=g.get_attr('weight.shape[0]')
-            eps=g.get_attr('raw.variance_epsilon') if hasattr(self, "variance_epsilon") else g.get_attr('eps'),
+            dim = g.get_attr("weight.shape[0]")
+            eps = (
+                (
+                    g.get_attr("raw.variance_epsilon")
+                    if hasattr(self, "variance_epsilon")
+                    else g.get_attr("eps")
+                ),
+            )
 
             args = ((_input_dq), dim, eps)
             ln = g.create_node(
@@ -1865,6 +1872,52 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+
+            num_groups = g.get_attr("num_groups")
+            eps = g.get_attr("eps")
+
+            args = (_input, self.num_groups, _weight, _bias, self.eps)
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output = g.create_node(
+                "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
+            )
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_input)
+        return g
+
 
 class GroupNorm(DmxModule, torch.nn.GroupNorm):
     r"""
@@ -1899,6 +1952,52 @@ class GroupNorm(DmxModule, torch.nn.GroupNorm):
         _output = F.group_norm(_input, self.num_groups, _weight, _bias, self.eps)
 
         return _output
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            _input = g.placeholder("_input")
+            _input_scale = g.get_attr("input_casts.input_cast.scale")
+            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
+            _input_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _input,
+                    _input_scale,
+                    _input_zero_point,
+                    repr(self.input_casts.input_cast.format),
+                ),
+            )
+            _input_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            )
+
+            num_groups = g.get_attr("num_groups")
+            eps = g.get_attr("eps")
+
+            args = (_input, self.num_groups, _weight, _bias, self.eps)
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output = g.create_node(
+                "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
+            )
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_input)
+        return g
 
 
 class Dropout(DmxModule, torch.nn.Dropout):
@@ -1958,11 +2057,11 @@ class Dropout(DmxModule, torch.nn.Dropout):
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
 
-            p = g.get_attr('p')
-            training = g.get_attr('training')
-            inplace = g.get_attr('inplace')
+            p = g.get_attr("p")
+            training = g.get_attr("training")
+            inplace = g.get_attr("inplace")
 
-            args = (_input_dq,p,training,inplace)
+            args = (_input_dq, p, training, inplace)
             _output_scale = g.get_attr("output_cast.scale")
             _output_zero_point = g.get_attr("output_cast.zero_point")
             _output = g.create_node(
@@ -2117,7 +2216,7 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
 
-            args = (_input_dq)
+            args = _input_dq
             _output_scale = g.get_attr("output_cast.scale")
             _output_zero_point = g.get_attr("output_cast.zero_point")
             _output = g.create_node(
@@ -2217,6 +2316,7 @@ class SiLU(DmxModule, torch.nn.SiLU):
             g.output(_output_dq)
         return g
 
+
 class Tanh(DmxModule, torch.nn.Tanh):
     r"""
     An extension of PyTorch's Tanh (Hyperbolic Tangent) layer to support DmxModule configurations.
@@ -2270,7 +2370,7 @@ class Tanh(DmxModule, torch.nn.Tanh):
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
 
-            args = (_input_dq)
+            args = _input_dq
             _output_scale = g.get_attr("output_cast.scale")
             _output_zero_point = g.get_attr("output_cast.zero_point")
             _output = g.create_node(
