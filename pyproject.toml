@@ -10,7 +10,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-datasets = "^2.16"
+datasets = "^3.0"
 numpy = "^1.22.3"
 bidict = "^0.22.0"
 parse = "^1.19.0"
@@ -24,7 +24,7 @@ transformers = "^4.35.0"
 torch = "^2.4"
 torchvision = ">=0.13.0, <0.21.0"
 diffusers = "^0.25"
-accelerate = "^0.31"
+accelerate = "^1.0"
 
 [tool.poetry-dynamic-versioning]
 vcs = "git"
