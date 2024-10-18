@@ -1658,7 +1658,7 @@ class _RMSNorm(torch.nn.Module):
         return output * self.weight
 
 
-class RMSNorm(DmxModule, _RMSNorm):
+class RMSNorm(DmxModule, torch.nn.RMSNorm):
     r"""
     An extension of RMSNorm layer to support DmxModule configurations.
     This module performs RMS-based layer normalization on the input tensor.
@@ -1694,6 +1694,7 @@ class RMSNorm(DmxModule, _RMSNorm):
         Returns:
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
+        import ipdb; ipdb.set_trace()
         initial_dmx = RMSNorm(
             dim=raw.weight.shape[0],
             eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
