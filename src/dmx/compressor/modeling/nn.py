@@ -1603,11 +1603,26 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
             normalized_shape = g.get_attr("normalized_shape")
             eps = g.get_attr("eps")
 
-            ln_args = ((_input), normalized_shape, _weight_q, _bias_dq)
-            ln = g.create_node(
-                "call_function", torch.nn.functional.layer_norm, ln_args, name="ln"
+            args = ((_input), normalized_shape, _weight_q, _bias_dq)
+            output = g.create_node(
+                "call_function", torch.nn.functional.layer_norm, args, name="ln"
             )
-            g.output(ln)
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (_output_q, _output_scale, _output_zero_point),
+            )
+            g.output(_output_dq)
         return g
 
 
@@ -1694,7 +1709,6 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
         Returns:
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
-        import ipdb; ipdb.set_trace()
         initial_dmx = RMSNorm(
             dim=raw.weight.shape[0],
             eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
@@ -1708,6 +1722,23 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
         """
         g = torch.fx.Graph()
         with g.inserting_after():
+
+            _weight = g.get_attr("_weight")
+            _weight_scale = g.get_attr("weight_scale")
+            _weight_zero_point = g.get_attr("weight_zero_point")
+            _weight_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _weight,
+                    _weight_scale,
+                    _weight_zero_point,
+                    repr(self.weight_cast.format),
+                ),
+            )
+            _weight_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
+            )
+
             _input = g.placeholder("_input")
             _input_scale = g.get_attr("input_casts.input_cast.scale")
             _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
@@ -1724,21 +1755,29 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
                 torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
             )
             # Non Tensor Attributes (no need to quantize)
-            dim = g.get_attr("weight.shape[0]")
-            eps = (
-                (
-                    g.get_attr("raw.variance_epsilon")
-                    if hasattr(self, "variance_epsilon")
-                    else g.get_attr("eps")
-                ),
-            )
+            normalized_shape = g.get_attr("normalized_shape")
+            eps = g.get_attr("eps")
 
-            args = ((_input_dq), dim, eps)
-            ln = g.create_node(
+            args = ((_input_dq), normalized_shape, _weight_dq, eps)
+            output = g.create_node(
                 "call_function", torch.nn.functional.rms_norm, args, name="RMSNorm"
             )
-            # TODO Add output casts
-            g.output(ln)
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (_output_q, _output_scale, _output_zero_point),
+            )
+            g.output(_output_dq)
         return g
 
 
