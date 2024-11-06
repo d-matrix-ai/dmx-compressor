@@ -54,6 +54,7 @@ for f_key in list(dmx_aware_functional_mappings.keys()):
 dmx_aware_functional_mappings["<built-in function add>"] = dmxnn.ResAdd
 dmx_aware_functional_mappings["<built-in function matmul>"] = dmxnn.ActActMatMul
 dmx_aware_functional_mappings["<built-in function mul>"] = dmxnn.Mul
+dmx_aware_functional_mappings["core_kernel_ops.qkt_matmul_softmax"] = dmxnn.QKTMatMulSoftmax
 
 
 def process_args(args):

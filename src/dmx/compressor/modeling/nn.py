@@ -487,6 +487,16 @@ class Mul(DmxModule):
             g.output(_output_dq)
         return g
 
+class QKTMatMulSoftmax(DmxModule):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _forward(
+        self,
+        q, k, iter_ids, slot_ids, kv_cache_k_data, kv_cache_k_prompt,
+        scale_attn_weights, head_size, attention_mask, skip_causal_mask
+    ):
+        1/0
 
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
