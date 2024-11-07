@@ -502,23 +502,8 @@ class ScaledDotProductAttention(DmxModule):
             )
         )
 
-    def _forward(
-        self,
-        query_states,
-        key_states,
-        value_states,
-        attn_mask=None,
-        dropout_p=0,
-        is_causal=None,
-    ):
-        return torch.nn.functional.scaled_dot_product_attention(
-            query_states,
-            key_states,
-            value_states,
-            attn_mask=(attn_mask if attn_mask is not None else None),
-            dropout_p=dropout_p,
-            is_causal=attn_mask is None,
-        )
+    def _forward(self, *args, **kwargs):
+        return torch.nn.functional.scaled_dot_product_attention(*args, **kwargs)
 
     def to_compiler_graph(self) -> Graph:
         """
