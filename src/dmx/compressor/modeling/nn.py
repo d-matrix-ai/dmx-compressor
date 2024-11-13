@@ -5,7 +5,7 @@ from collections import OrderedDict
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
-from torch.fx import Graph, symbolic_trace
+from torch.fx import Graph, Node, symbolic_trace
 import transformers
 import transformers.activations
 
@@ -490,13 +490,85 @@ class Mul(DmxModule):
 class QKTMatMulSoftmax(DmxModule):
     def __init__(self) -> None:
         super().__init__()
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "q_cast": CastTo(block_dim=-1),
+                    "k_cast": CastTo(block_dim=-1),
+                    "iter_ids_cast": CastTo(block_dim=-1),
+                    "slot_ids_cast": CastTo(block_dim=-1),
+                    "kv_cache_k_data_cast": CastTo(block_dim=-1),
+                    "kv_cache_k_prompt_cast": CastTo(block_dim=-1),
+                    "scale_attn_weights_cast": CastTo(block_dim=-1),
+                    "attention_mask_cast": CastTo(block_dim=-1),
+                }
+            )
+        )
 
     def _forward(
         self,
         q, k, iter_ids, slot_ids, kv_cache_k_data, kv_cache_k_prompt,
         scale_attn_weights, head_size, attention_mask, skip_causal_mask
     ):
-        1/0
+        x = torch.ops.core_kernel_ops.qkt_matmul_softmax(
+            q, k, iter_ids, slot_ids, kv_cache_k_data, kv_cache_k_prompt,
+            scale_attn_weights, head_size, attention_mask, skip_causal_mask
+        )
+        return x
+
+    def insert_qdq_placeholder(self, g: Graph, name: str) -> Node:
+        placeholder_node = g.placeholder(name)
+        scale_node = g.get_attr("input_casts." + name + "_cast.scale")
+        zero_point_node = g.get_attr("input_casts." + name + "_cast.zero_point")
+        q_node = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    placeholder_node,
+                    scale_node,
+                    zero_point_node,
+                    repr(self.input_casts[name + "_cast"].format),
+                ),
+            )
+        dq_node = g.call_function(
+            torch.ops.dmx.dequantize, (q_node, scale_node, zero_point_node)
+        )
+        return dq_node
+
+
+    def to_compiler_graph(self) -> Graph:
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            q_dq = self.insert_qdq_placeholder(g, "q")
+            k_dq = self.insert_qdq_placeholder(g, "k")
+            iter_ids = g.placeholder("iter_ids")
+            slot_ids = g.placeholder("slot_ids")
+            kv_cache_k_data_dq = self.insert_qdq_placeholder(g, "kv_cache_k_data")
+            kv_cache_k_prompt = g.placeholder("kv_cache_k_prompt")
+            scale_attn_weights = g.placeholder("scale_attn_weights")
+            head_size = g.placeholder("head_size")
+            attention_mask_dq = self.insert_qdq_placeholder(g, "attention_mask")
+            skip_causal_mask = g.placeholder("skip_causal_mask")
+
+            args = (q_dq, k_dq, iter_ids, slot_ids, kv_cache_k_data_dq, kv_cache_k_prompt, scale_attn_weights, head_size, attention_mask_dq, skip_causal_mask)
+            _output = g.create_node(
+                "call_function", torch.ops.core_kernel_ops.qkt_matmul_softmax, args, name="output"
+            )
+            _output_scale = g.get_attr("output_cast.scale")
+            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    _output,
+                    _output_scale,
+                    _output_zero_point,
+                    repr(self.output_cast.format),
+                ),
+            )
+            _output_dq = g.call_function(
+                torch.ops.dmx.dequantize, (_output_q, _output_scale, _output_zero_point)
+            )
+            g.output(_output_dq)
+        return g
 
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
