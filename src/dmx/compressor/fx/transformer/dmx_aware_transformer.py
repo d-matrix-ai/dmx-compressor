@@ -6,6 +6,8 @@ from torch.fx.proxy import Proxy
 import inspect
 from .utils import *
 
+from dmx.compressor.modeling.nn import DmxModule
+
 
 class DMXAwareTransformer(fx.Transformer):
     """
@@ -32,6 +34,10 @@ class DMXAwareTransformer(fx.Transformer):
         self.module = module
         self.node_name_to_scope = node_name_to_scope
         self.old_gm = old_gm
+        self.dmx_aware_functional_mappings = dmx_aware_functional_mappings
+
+    def add_dmx_aware_functional_mapping(self, target: str, dmx_module_cls):
+        self.dmx_aware_functional_mappings[target] = dmx_module_cls
 
     def call_module(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]

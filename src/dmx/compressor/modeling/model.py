@@ -123,6 +123,7 @@ class DmxModelMixin:
         """
         Configures a transformed DmxModel to the BASIC mode on dmx hardware.
 
+
         Returns:
             The configured model.
         """
@@ -265,6 +266,7 @@ class DmxModel(DmxModelMixin):
             input_names=input_names,
             concrete_args=concrete_args,
             dummy_inputs=dummy_inputs,
+            additional_mappings=_model.additional_dmx_aware_mappings
         )
 
         DmxModel.post_process_gm(_model, args, kwargs)
@@ -412,12 +414,13 @@ class DmxModel(DmxModelMixin):
         submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod
-    def from_torch(cls, model: torch.nn.Module) -> torch.nn.Module:
+    def from_torch(cls, model: torch.nn.Module, additional_dmx_aware_mappings) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
             model.class_for_deserialization = _cls
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
         model._gm = None
+        model.additional_dmx_aware_mappings = additional_dmx_aware_mappings
         model.transformed = False
 
         def temp_forward(_m, *_args, **_kwargs):

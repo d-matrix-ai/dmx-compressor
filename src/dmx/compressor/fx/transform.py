@@ -15,6 +15,7 @@ def substitute_transform(
     concrete_args: Optional[Dict[str, Any]] = None,
     input_names: Optional[List[str]] = None,
     dummy_inputs: Optional[Dict[str, Any]] = None,
+    additional_mappings: Optional[Dict[str, Any]] = None,
 ):
     """
     A function that transforms the model by substituting torch.nn.modules and activation functions to dmx.nn.modules.
@@ -42,6 +43,8 @@ def substitute_transform(
     transformer = DMXAwareTransformer(
         gm, tracer.node_name_to_scope, root._gm if root.transformed else None
     )
+    for target, dmx_module in additional_mappings:
+        transformer.add_dmx_aware_functional_mapping(target, dmx_module)
     transformed = transformer.transform()
 
     return transformed
