@@ -487,6 +487,7 @@ class Mul(DmxModule):
             g.output(_output_dq)
         return g
 
+
 class ScaledDotProductAttention(DmxModule):
     def __init__(self) -> None:
         super().__init__()
