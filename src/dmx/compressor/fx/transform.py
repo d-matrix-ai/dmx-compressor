@@ -43,8 +43,9 @@ def substitute_transform(
     transformer = DMXAwareTransformer(
         gm, tracer.node_name_to_scope, root._gm if root.transformed else None
     )
-    for target, dmx_module in additional_mappings:
-        transformer.add_dmx_aware_functional_mapping(target, dmx_module)
+    if additional_mappings:
+        for target, dmx_module in additional_mappings:
+            transformer.add_dmx_aware_functional_mapping(target, dmx_module)
     transformed = transformer.transform()
 
     return transformed

@@ -367,13 +367,14 @@ class DmxModel(DmxModelMixin):
         _model._gm.recompile()
 
     @classmethod
-    def create_submod_transform_forward(cls, model: torch.nn.Module, submod_name: str):
+    def create_submod_transform_forward(cls, model: torch.nn.Module, submod_name: str, additional_dmx_aware_mappings = None):
         submod = model.get_submodule(submod_name)
         if DmxModelMixin not in submod.__class__.__bases__:
             submod.__class__.__bases__ += (DmxModelMixin,)
         submod._gm = None
         submod.transformed = False
         submod.config = model.config
+        submod.additional_dmx_aware_mappings = additional_dmx_aware_mappings
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
