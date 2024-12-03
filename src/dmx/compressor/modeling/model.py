@@ -414,7 +414,7 @@ class DmxModel(DmxModelMixin):
         submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod
-    def from_torch(cls, model: torch.nn.Module, additional_dmx_aware_mappings) -> torch.nn.Module:
+    def from_torch(cls, model: torch.nn.Module, additional_dmx_aware_mappings = None) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
             model.class_for_deserialization = _cls
