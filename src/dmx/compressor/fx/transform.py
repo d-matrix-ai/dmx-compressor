@@ -44,8 +44,11 @@ def substitute_transform(
         gm, tracer.node_name_to_scope, root._gm if root.transformed else None
     )
     if additional_mappings:
-        for target, dmx_module in additional_mappings:
-            transformer.add_dmx_aware_functional_mapping(target, dmx_module)
+        for target, dmx_module in additional_mappings.items():
+             # "torch.ops.mylib.my_func.default"
+
+            new_target = target.replace("torch.ops.", "")
+            transformer.add_dmx_aware_functional_mapping(new_target, dmx_module)
     transformed = transformer.transform()
 
     return transformed
