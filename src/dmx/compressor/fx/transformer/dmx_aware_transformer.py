@@ -34,7 +34,7 @@ class DMXAwareTransformer(fx.Transformer):
         self.module = module
         self.node_name_to_scope = node_name_to_scope
         self.old_gm = old_gm
-        self.dmx_aware_functional_mappings = dmx_aware_functional_mappings
+        self.dmx_aware_functional_mappings = dmx_aware_functional_mappings.copy()
 
     def add_dmx_aware_functional_mapping(self, target: str, dmx_module_cls):
         self.dmx_aware_functional_mappings[target] = dmx_module_cls
@@ -138,7 +138,7 @@ class DMXAwareTransformer(fx.Transformer):
         """
         assert callable(target)
         node_key = str(target)
-        if node_key not in dmx_aware_functional_mappings:
+        if node_key not in self.dmx_aware_functional_mappings:
             return super().call_function(target, args, kwargs)
 
         candidate = self.new_graph._target_to_str(target)
@@ -190,7 +190,7 @@ class DMXAwareTransformer(fx.Transformer):
         else:
             new_name = curr_name
         # find out what kwargs to pass in to new module init, which kwargs to pass into forward function of module
-        empty_mod = dmx_aware_functional_mappings[node_key]()
+        empty_mod = self.dmx_aware_functional_mappings[node_key]()
         accepted_kwarg_keys = inspect.signature(empty_mod.__init__).parameters.keys()
         initkwargs = {}
         newkwargs = {}
@@ -199,7 +199,9 @@ class DMXAwareTransformer(fx.Transformer):
                 initkwargs[key] = value
             else:
                 newkwargs[key] = value
-        self.add_submod(new_name, dmx_aware_functional_mappings[node_key](**initkwargs))
+        self.add_submod(
+            new_name, self.dmx_aware_functional_mappings[node_key](**initkwargs)
+        )
         new_node = self.new_graph.create_node(
             "call_module",
             new_name,
