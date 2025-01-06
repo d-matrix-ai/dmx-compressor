@@ -1,12 +1,10 @@
 from typing import Any, Dict, Tuple
 import torch.fx as fx
-from torch.fx.node import Argument, Target
+from torch.fx.node import Argument, Target, Node
 from torch.fx.proxy import Proxy
 
 import inspect
 from .utils import *
-
-from dmx.compressor.modeling.nn import DmxModule
 
 
 class DMXAwareTransformer(fx.Transformer):
@@ -29,12 +27,14 @@ class DMXAwareTransformer(fx.Transformer):
         module: fx.GraphModule,
         node_name_to_scope: dict,
         old_gm: fx.GraphModule = None,
+        nodeInputs: dict = None,
     ):
         super().__init__(module)
         self.module = module
         self.node_name_to_scope = node_name_to_scope
         self.old_gm = old_gm
         self.dmx_aware_functional_mappings = dmx_aware_functional_mappings.copy()
+        self.nodeInputs = nodeInputs
 
     def add_dmx_aware_functional_mapping(self, target: str, dmx_module_cls):
         self.dmx_aware_functional_mappings[target] = dmx_module_cls
@@ -189,6 +189,7 @@ class DMXAwareTransformer(fx.Transformer):
             self.new_graph._graph_namespace.create_name(curr_name, None)
         else:
             new_name = curr_name
+
         # find out what kwargs to pass in to new module init, which kwargs to pass into forward function of module
         empty_mod = self.dmx_aware_functional_mappings[node_key]()
         accepted_kwarg_keys = inspect.signature(empty_mod.__init__).parameters.keys()
@@ -199,13 +200,74 @@ class DMXAwareTransformer(fx.Transformer):
                 initkwargs[key] = value
             else:
                 newkwargs[key] = value
-        self.add_submod(
-            new_name, self.dmx_aware_functional_mappings[node_key](**initkwargs)
-        )
-        new_node = self.new_graph.create_node(
-            "call_module",
-            new_name,
-        )
-        new_node.args = process_args(args)
-        new_node.kwargs = process_kwargs(newkwargs)
+        newmod = self.dmx_aware_functional_mappings[node_key](**initkwargs)
+        newargs, newkwargs = process_args(args), process_kwargs(newkwargs)
+        if self.dmx_aware_functional_mappings[
+            node_key
+        ].is_compound:  # if the module is a compound op
+            mod_args, mod_kwargs = self.nodeInputs[curr_name]
+            # remove kwargs used for init
+            mod_kwargs = {k: v for k, v in mod_kwargs.items() if k not in initkwargs}
+            module_graph = newmod.module_graph(*mod_args, **mod_kwargs)
+            # last node inserted from merging module_graph
+            new_node = self.merge_graph(module_graph, new_name, newargs, newkwargs)
+
+        else:
+            self.add_submod(new_name, newmod)
+            new_node = self.new_graph.create_node(
+                "call_module",
+                new_name,
+            )
+            new_node.args = newargs
+            new_node.kwargs = newkwargs
         return Proxy(new_node, self.tracer)
+
+    def merge_graph(self, subgraph, scope, args, kwargs):
+        """
+        This function is to merge subgraph to graph
+        """
+        # add submodules of subgraph to self
+        for n, m in subgraph.named_children():
+            self.add_submod(scope + "." + n, m)
+
+        # add nodes of subgraph to self.new_graph
+        node_mapping = {}
+        arg_counter = 0
+        for node in subgraph.graph.nodes:
+            newargs = tuple(
+                node_mapping[arg.name] if isinstance(arg, Node) else arg
+                for arg in node.args
+            )
+            newkwargs = {
+                k: node_mapping[str(v)] if isinstance(v, Node) else v
+                for k, v in node.kwargs.items()
+            }
+            # placeholder nodes should be skipped and they should be mapped to args/kwargs input to the subgraph
+            if node.op == "placeholder":
+                if arg_counter < len(args):
+                    node_mapping[node.name] = args[arg_counter]
+                    arg_counter += 1
+                elif node.name in kwargs.keys():
+                    node_mapping[node.name] = kwargs[node.name]
+                else:
+                    raise ValueError("Input to the compound function is incorrect!")
+
+            elif node.op == "call_function" or node.op == "call_method":
+                new_node = self.new_graph.create_node(
+                    node.op,
+                    node.target,
+                    newargs,
+                    newkwargs,
+                )
+                node_mapping[node.name] = new_node
+
+            elif node.op == "call_module":
+                new_node = self.new_graph.create_node(
+                    node.op,
+                    scope + "." + node.target,
+                    newargs,
+                    newkwargs,
+                )
+                node_mapping[node.name] = new_node
+
+        return new_node

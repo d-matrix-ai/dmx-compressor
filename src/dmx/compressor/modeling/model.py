@@ -411,7 +411,8 @@ class DmxModel(DmxModelMixin):
                 return _m._forward(*forward_args, **forward_kwargs)
 
             return _m._forward(*_args, **_kwargs)
-
+        
+        submod.old_forward = submod.forward
         submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod

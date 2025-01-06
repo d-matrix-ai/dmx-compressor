@@ -3,11 +3,15 @@ import torch.nn as nn
 
 from dmx.compressor.fx.tracer import HFQuantTracer, hf_symbolic_trace
 from ..fx import QuantTracer, InputOutputTransformer, QdQTransformer
-from dmx.compressor.fx import ConfigurationTransformer, DMXAwareTransformer
+from dmx.compressor.fx import (
+    ConfigurationTransformer,
+    DMXAwareTransformer,
+    RecordInputInterpreter,
+)
 from dmx.compressor.fx.transformer.utils import dmx_aware_mapping
 from torch.fx import GraphModule
 from typing import Any, Dict, List, Optional, Union
-
+from inspect import signature
 
 
 def substitute_transform(
@@ -39,9 +43,21 @@ def substitute_transform(
         concrete_args=concrete_args,
         dummy_inputs=dummy_inputs,
     )
- 
+
+    gi = RecordInputInterpreter(gm)
+    tracing_args, tracing_kwargs = root.tracing_kwargs
+    inputs = tuple(
+        signature(root.old_forward)
+        .bind(*tracing_args, **tracing_kwargs)
+        .arguments.values()
+    )
+    gi.run(*inputs)
+
     transformer = DMXAwareTransformer(
-        gm, tracer.node_name_to_scope, root._gm if root.transformed else None
+        gm,
+        tracer.node_name_to_scope,
+        root._gm if root.transformed else None,
+        gi.nodeInputs,
     )
     if additional_mappings:
         for target, dmx_module in additional_mappings.items():

@@ -6,6 +6,7 @@ import torch
 from torch import fx
 from .. import numerical
 from .. import sparse
+from .. import modeling
 
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
@@ -23,12 +24,14 @@ from contextlib import contextmanager
 from transformers.modeling_utils import get_parameter_device
 import inspect
 
+
 class DmxHFProxy(HFProxy):
 
     def install_metadata(self, metadata):
         super().install_metadata(metadata)
-        if isinstance(metadata,transformers.cache_utils.Cache):
+        if isinstance(metadata, transformers.cache_utils.Cache):
             self.__class__ = type("HFCacheProxy", (HFProxy, metadata.__class__), {})
+
 
 class DmxHFTracer(HFTracer):
     """
@@ -72,6 +75,7 @@ class DmxHFTracer(HFTracer):
                 transformers.models.bloom.modeling_bloom.BloomGelu,
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
                 transformers.models.gemma.modeling_gemma.GemmaRMSNorm,
+                modeling.nn.DmxModule,
             ),
         )
         is_leaf = is_leaf or (

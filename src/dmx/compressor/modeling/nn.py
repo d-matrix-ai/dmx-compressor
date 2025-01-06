@@ -22,6 +22,8 @@ from dmx.compressor.functional import (
 from dmx.compressor.perf_proxy import PerformanceProxyMixin
 from dmx.compressor.layer_reconstruction import LayerReconstructionMixin
 
+import math
+
 
 class DmxModuleType(type):
     pass
@@ -47,6 +49,8 @@ class DmxModule(
     Attributes:
         state_dict_url (str): Url for loading the module state dicts.
     """
+
+    is_compound = False
 
     def __init__(self, *args, state_dict_url: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -489,7 +493,9 @@ class Mul(DmxModule):
 
 
 class ScaledDotProductAttention(DmxModule):
-    def __init__(self) -> None:
+    is_compound = True
+
+    def __init__(self, dropout_p=0.0) -> None:
         super().__init__()
         self.input_casts = CastToDict(
             OrderedDict(
@@ -501,9 +507,61 @@ class ScaledDotProductAttention(DmxModule):
                 }
             )
         )
+        self.add = ResAdd()
+        self.matmul = ActActMatMul()
+        self.softmax = Softmax(dim=-1)
+        self.dropout = Dropout(p=dropout_p)
 
-    def _forward(self, *args, **kwargs):
-        return torch.nn.functional.scaled_dot_product_attention(*args, **kwargs)
+    def forward(
+        self,
+        query,
+        key,
+        value,
+        attn_mask=None,
+        is_causal=False,
+        scale=None,
+        enable_gqa=False,
+    ):
+        L, S = query.size(-2), key.size(-2)
+        scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
+        attn_bias = torch.zeros(L, S, dtype=query.dtype)
+
+        if is_causal:
+            assert attn_mask is None
+            temp_mask = torch.ones(L, S, dtype=torch.bool).tril(diagonal=0)
+            attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
+            attn_bias.to(query.dtype)
+
+        if attn_mask is not None:
+            if attn_mask.dtype == torch.bool:
+                attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
+            else:
+                attn_bias = self.add(attn_bias, attn_mask)
+
+        if enable_gqa:
+            key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
+            value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
+
+        attn_weight = self.matmul(query, key.transpose(-2, -1) * scale_factor)
+        attn_weight = self.add(attn_weight, attn_bias)
+        attn_weight = self.softmax(attn_weight)
+        attn_weight = self.dropout(attn_weight)
+        return self.matmul(attn_weight, value)
+
+    def module_graph(self, *args, **kwargs) -> Graph:
+        from dmx.compressor.modeling import DmxModel
+        from dmx.compressor.fx.tracer import hf_symbolic_trace
+
+        input_names, concrete_args, dummy_inputs = DmxModel.prepare_tracing_inputs(
+            self, args, kwargs
+        )
+        gm, tracer = hf_symbolic_trace(
+            self,
+            input_names,
+            concrete_args=concrete_args,
+            dummy_inputs=dummy_inputs,
+        )
+        return gm
 
     def to_compiler_graph(self) -> Graph:
         """

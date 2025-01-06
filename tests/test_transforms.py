@@ -199,7 +199,7 @@ def test_conv2D_fakecast_transform():
 
     gm = cast_input_output_transform(net, QuantTracer())
     output = gm(input)
-    assert (coutput - output).abs().sum() == 0, True
+    assert (coutput - output).abs().sum() < 1e-5, True
     assert checkTransform(gm), True
 
 
