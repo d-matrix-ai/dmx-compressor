@@ -75,9 +75,12 @@ class DmxHFTracer(HFTracer):
                 transformers.models.bloom.modeling_bloom.BloomGelu,
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
                 transformers.models.gemma.modeling_gemma.GemmaRMSNorm,
-                modeling.nn.DmxModule,
             ),
         )
+        is_leaf = is_leaf or (
+            isinstance(m, modeling.nn.DmxModule) and not m.is_compound
+        )
+
         is_leaf = is_leaf or (
             (
                 m.__module__.startswith("torch.nn")
