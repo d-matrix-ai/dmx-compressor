@@ -258,10 +258,11 @@ class DMXAwareTransformer(fx.Transformer):
                     node.target,
                     newargs,
                     newkwargs,
+                    name=scope + "." + node.name,
                 )
                 node_mapping[node.name] = new_node
 
-            elif node.op == "call_module":
+            elif node.op == "call_module" or node.op == "get_attr":
                 new_node = self.new_graph.create_node(
                     node.op,
                     scope + "." + node.target,
@@ -269,5 +270,4 @@ class DMXAwareTransformer(fx.Transformer):
                     newkwargs,
                 )
                 node_mapping[node.name] = new_node
-
         return new_node
