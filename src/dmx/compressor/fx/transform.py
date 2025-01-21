@@ -60,8 +60,6 @@ def substitute_transform(
     )
     if additional_mappings:
         for target, dmx_module in additional_mappings.items():
-            # "torch.ops.mylib.my_func.default"
-
             new_target = target.replace("torch.ops.", "")
             transformer.add_dmx_aware_functional_mapping(new_target, dmx_module)
     transformed = transformer.transform()
