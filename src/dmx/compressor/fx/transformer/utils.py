@@ -33,6 +33,7 @@ dmx_aware_mapping = {
     "transformers.models.t5.modeling_t5.T5LayerNorm": dmxnn.RMSNorm,
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmxnn.RMSNorm,
     "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmxnn.GemmaRMSNorm,
+    "transformers.models.mistral.modeling_mistral.MistralRMSNorm": dmxnn.RMSNorm,
 }
 
 dmx_aware_functional_mappings = {

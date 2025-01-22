@@ -75,6 +75,7 @@ class DmxHFTracer(HFTracer):
                 transformers.models.bloom.modeling_bloom.BloomGelu,
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
                 transformers.models.gemma.modeling_gemma.GemmaRMSNorm,
+                transformers.models.mistral.modeling_mistral.MistralRMSNorm,
             ),
         )
         is_leaf = is_leaf or (
