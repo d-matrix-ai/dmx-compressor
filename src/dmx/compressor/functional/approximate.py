@@ -367,7 +367,10 @@ class ApproximationMixin:
         self.approximation_error = None
 
     def approx_forward(self, inputs, *args, **kwargs):
-        _output = super().forward(*inputs)
+        if not self.functional_forward is None:
+            _output = self.functional_forward(*inputs, *args, **kwargs)
+        else:
+            _output = super().forward(*inputs)
         if not isinstance(
             self.approximator.function,
             (NoApproximation,),

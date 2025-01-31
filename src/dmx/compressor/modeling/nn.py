@@ -51,6 +51,7 @@ class DmxModule(
     """
 
     is_compound = False
+    functional_forward = None
 
     def __init__(self, *args, state_dict_url: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -1580,6 +1581,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         super().__init__(
             normalized_shape, eps=eps, elementwise_affine=elementwise_affine
         )
+        self.functional_forward = F.layer_norm
 
     def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward(
@@ -1685,13 +1687,16 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
 
     def __init__(
         self,
-        dim: int,
+        normalized_shape: int,
         eps: float = 1e-6,
     ) -> None:
-        super().__init__(dim, eps=eps)
+        super().__init__(normalized_shape, eps=eps)
+        self.functional_forward = F.rms_norm
 
     def _forward(self, _input: Tensor) -> Tensor:
-        _output = self.approx_forward((_input,))
+        _output = self.approx_forward(
+            (_input,), self.normalized_shape, self._weight, self.eps
+        )
         return _output
 
     @staticmethod
@@ -1706,7 +1711,7 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
         initial_dmx = RMSNorm(
-            dim=raw.weight.shape[0],
+            normalized_shape=raw.weight.shape[0],
             eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
         )
         initial_dmx.update_params_with_raw(raw)
@@ -1798,8 +1803,16 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
     ) -> None:
         super().__init__(dim, eps=eps)
 
+    def _norm(self, x, eps):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps)
+
+    def functional_forward(self, x, weight, eps):
+        output = self._norm(x.float(), eps)
+        output = output * (1.0 + weight.float())
+        return output.type_as(x)
+
     def _forward(self, _input: Tensor) -> Tensor:
-        _output = self.approx_forward((_input,))
+        _output = self.approx_forward((_input,), self._weight, self.eps)
         return _output
 
     @staticmethod
