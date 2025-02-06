@@ -21,7 +21,6 @@ from transformers.utils.fx import (
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
 from contextlib import contextmanager
-from transformers.modeling_utils import get_parameter_device
 import inspect
 
 
@@ -38,7 +37,11 @@ class DmxHFTracer(HFTracer):
     Custom HFTracer where definition of leaf nodes
     """
 
-    def __init__(self, autowrap_modules=(math,), autowrap_functions=()):
+    def __init__(
+        self,
+        autowrap_modules=(math,),
+        autowrap_functions=(),
+    ):
         super().__init__(
             autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions
         )

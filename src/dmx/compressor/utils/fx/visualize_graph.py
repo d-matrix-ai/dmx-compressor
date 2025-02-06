@@ -24,10 +24,11 @@ def visualize_graph(
         model = fx.GraphModule(tracer.root, graph)
     nodeDict = NodeDictTransformer(model).transform()
     gi = MetadataInterpreter(model, nodeDict)
-    if isinstance(input, tuple):
-        gi.run(*input)
-    else:
-        gi.run(input)
+    with torch.no_grad():
+        if isinstance(input, tuple):
+            gi.run(*input)
+        else:
+            gi.run(input)
     node_attr = dict(
         style="filled",
         shape="box",

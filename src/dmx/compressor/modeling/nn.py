@@ -550,10 +550,10 @@ class ScaledDotProductAttention(DmxModule):
         return self.matmul(attn_weight, value)
 
     def module_graph(self, *args, **kwargs) -> Graph:
-        from dmx.compressor.modeling import DmxModel
+        from dmx.compressor.fx.transform import prepare_tracing_inputs
         from dmx.compressor.fx.tracer import hf_symbolic_trace
 
-        input_names, concrete_args, dummy_inputs = DmxModel.prepare_tracing_inputs(
+        input_names, concrete_args, dummy_inputs = prepare_tracing_inputs(
             self, args, kwargs
         )
         gm, tracer = hf_symbolic_trace(

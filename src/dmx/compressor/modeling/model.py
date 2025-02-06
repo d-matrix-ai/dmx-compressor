@@ -7,7 +7,7 @@ from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
 from functools import partial
 from dmx.compressor.modeling.nn import *
-from dmx.compressor.fx.transform import substitute_transform
+from dmx.compressor.fx.transform import substitute_transform, prepare_tracing_inputs
 from dmx.compressor.fx.transformer import get_op_set_from
 from dmx.compressor.utils.fx.visualize_graph import visualize_graph
 import warnings
@@ -258,7 +258,7 @@ class DmxModel(DmxModelMixin):
             or not issubclass(_output_cls, transformers.modeling_utils.ModelOutput)
         ):
             _output_cls = None
-        input_names, concrete_args, dummy_inputs = DmxModel.prepare_tracing_inputs(
+        input_names, concrete_args, dummy_inputs = prepare_tracing_inputs(
             _model, args, kwargs
         )
         _model._gm = substitute_transform(
@@ -266,7 +266,7 @@ class DmxModel(DmxModelMixin):
             input_names=input_names,
             concrete_args=concrete_args,
             dummy_inputs=dummy_inputs,
-            additional_mappings=_model.additional_dmx_aware_mappings
+            additional_mappings=_model.additional_dmx_aware_mappings,
         )
 
         DmxModel.post_process_gm(_model, args, kwargs)
@@ -285,7 +285,7 @@ class DmxModel(DmxModelMixin):
 
     @staticmethod
     def is_same_signature(_model, args, kwargs):
-        
+
         tracing_args, tracing_kwargs = _model.tracing_kwargs
         # if kwargs has different keys, need to retrace
         if tracing_kwargs.keys() != kwargs.keys():
@@ -311,26 +311,11 @@ class DmxModel(DmxModelMixin):
                 return False
             # if kwargs is DynamicCache and shape is different (i.e: one is empty), need to retrace.
             # NOTE: to be deprecated
-            if isinstance(kwargs[k],transformers.DynamicCache) and len(kwargs[k]) != len(tracing_kwargs[k]):
+            if isinstance(kwargs[k], transformers.DynamicCache) and len(
+                kwargs[k]
+            ) != len(tracing_kwargs[k]):
                 return False
         return True
-
-    @staticmethod
-    def prepare_tracing_inputs(_model, args, kwargs):
-        # remove kwargs with value None
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        # boolean inputs will affect tracing and need to be set as concrete args
-        bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
-        kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
-
-        input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
-        dummy_inputs = {}
-        for k in input_names:
-            if k not in kwargs:
-                dummy_inputs[k] = args[0]
-            else:
-                dummy_inputs[k] = kwargs[k]
-        return input_names, bool_inputs, dummy_inputs
 
     @staticmethod
     def deepcopy_args(args):
@@ -367,7 +352,12 @@ class DmxModel(DmxModelMixin):
         _model._gm.recompile()
 
     @classmethod
-    def create_submod_transform_forward(cls, model: torch.nn.Module, submod_name: str, additional_dmx_aware_mappings = None):
+    def create_submod_transform_forward(
+        cls,
+        model: torch.nn.Module,
+        submod_name: str,
+        additional_dmx_aware_mappings=None,
+    ):
         submod = model.get_submodule(submod_name)
         if DmxModelMixin not in submod.__class__.__bases__:
             submod.__class__.__bases__ += (DmxModelMixin,)
@@ -389,7 +379,9 @@ class DmxModel(DmxModelMixin):
                     DmxModel.deepcopy_args(_kwargs),
                 )
                 # because some args and kwargs are changed in place in forward, we need to keep a copy fo the _args and _kwargs
-                forward_args, forward_kwargs = DmxModel.deepcopy_args(_args),DmxModel.deepcopy_args(_kwargs)
+                forward_args, forward_kwargs = DmxModel.deepcopy_args(
+                    _args
+                ), DmxModel.deepcopy_args(_kwargs)
 
                 _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                 _m.transformed = True
@@ -411,12 +403,14 @@ class DmxModel(DmxModelMixin):
                 return _m._forward(*forward_args, **forward_kwargs)
 
             return _m._forward(*_args, **_kwargs)
-        
+
         submod.old_forward = submod.forward
         submod.transformed_forward = partial(temp_forward, submod)
 
     @classmethod
-    def from_torch(cls, model: torch.nn.Module, additional_dmx_aware_mappings = None) -> torch.nn.Module:
+    def from_torch(
+        cls, model: torch.nn.Module, additional_dmx_aware_mappings=None
+    ) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
             model.class_for_deserialization = _cls
@@ -436,7 +430,9 @@ class DmxModel(DmxModelMixin):
                     DmxModel.deepcopy_args(_kwargs),
                 )
                 # because some args and kwargs are changed in place in forward, we need to keep a copy fo the _args and _kwargs
-                forward_args, forward_kwargs = DmxModel.deepcopy_args(_args),DmxModel.deepcopy_args(_kwargs)
+                forward_args, forward_kwargs = DmxModel.deepcopy_args(
+                    _args
+                ), DmxModel.deepcopy_args(_kwargs)
                 _m._forward = DmxModel._get_transformed_forward(_m, _args, _kwargs)
                 if _m.transformed:
                     _m.configure(curr_cfg)
@@ -448,7 +444,7 @@ class DmxModel(DmxModelMixin):
                         _m.configure(_config, *_rules)
                 _m.train(_is_training)
                 _m.forward = partial(temp_forward, _m)
-                
+
                 return _m._forward(*forward_args, **forward_kwargs)
 
             return _m._forward(*_args, **_kwargs)

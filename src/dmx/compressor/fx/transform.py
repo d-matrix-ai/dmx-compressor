@@ -14,6 +14,28 @@ from typing import Any, Dict, List, Optional, Union
 from inspect import signature
 
 
+def prepare_tracing_inputs(_model, args, kwargs):
+    # remove kwargs with value None
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    # boolean inputs will affect tracing and need to be set as concrete args
+    bool_inputs = {k: v for k, v in kwargs.items() if isinstance(v, bool)}
+    kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, bool)}
+
+    if hasattr(_model, "old_forward"):
+        input_names = (
+            signature(_model.old_forward).bind(*args, **kwargs).arguments.keys()
+        )
+    else:
+        input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
+    dummy_inputs = {}
+    for k in input_names:
+        if k not in kwargs:
+            dummy_inputs[k] = args[0]
+        else:
+            dummy_inputs[k] = kwargs[k]
+    return input_names, bool_inputs, dummy_inputs
+
+
 def substitute_transform(
     root: torch.nn.Module,
     concrete_args: Optional[Dict[str, Any]] = None,
@@ -46,10 +68,8 @@ def substitute_transform(
 
     gi = RecordInputInterpreter(gm)
     tracing_args, tracing_kwargs = root.tracing_kwargs
-    inputs = tuple(
-        signature(root.old_forward)
-        .bind(*tracing_args, **tracing_kwargs)
-        .arguments.values()
+    inputs = list(
+        prepare_tracing_inputs(root, tracing_args, tracing_kwargs)[2].values()
     )
     gi.run(*inputs)
     transformer = DMXAwareTransformer(
