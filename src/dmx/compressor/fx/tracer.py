@@ -15,21 +15,12 @@ import transformers
 
 from transformers.utils.fx import (
     HFTracer,
-    HFProxy,
     get_concrete_args,
 )
 from torch.fx.graph_module import GraphModule
 from transformers.modeling_utils import PreTrainedModel
 from contextlib import contextmanager
 import inspect
-
-
-class DmxHFProxy(HFProxy):
-
-    def install_metadata(self, metadata):
-        super().install_metadata(metadata)
-        if isinstance(metadata, transformers.cache_utils.Cache):
-            self.__class__ = type("HFCacheProxy", (HFProxy, metadata.__class__), {})
 
 
 class DmxHFTracer(HFTracer):
@@ -45,9 +36,6 @@ class DmxHFTracer(HFTracer):
         super().__init__(
             autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions
         )
-
-    def proxy(self, node):
-        return DmxHFProxy(node, self)
 
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
         """
