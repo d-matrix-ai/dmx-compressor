@@ -2,6 +2,7 @@ from torch.fx import Interpreter
 from .utils import dmx_aware_functional_mappings
 from torch.fx.node import Node
 from typing import Any
+import torch
 
 
 class RecordInputInterpreter(Interpreter):
@@ -36,6 +37,7 @@ class RecordInputInterpreter(Interpreter):
             assert isinstance(kwargs, dict)
 
             target = n.target
+
             # recording inputs
             if (
                 str(target) in dmx_aware_functional_mappings
@@ -43,4 +45,13 @@ class RecordInputInterpreter(Interpreter):
             ):
                 self.nodeInputs[n.name] = (args, kwargs)
 
+            device = None
+            if target in self.submodules and hasattr(self.submodules[target], "weight"):
+                device = self.submodules[target].weight.device
+            for a in args:
+                if isinstance(a, torch.Tensor) and device is None:
+                    device = a.device
+            if device is not None:
+                args = tuple(a.to(device) if isinstance(a,torch.Tensor) else a for a in args)
+                kwargs = {k:v.to(device) if isinstance(v, torch.Tensor) else v for k,v in kwargs.items()} 
             return getattr(self, n.op)(n.target, args, kwargs)
