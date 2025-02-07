@@ -28,9 +28,11 @@ def prepare_tracing_inputs(_model, args, kwargs):
     else:
         input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
     dummy_inputs = {}
+    i=0
     for k in input_names:
         if k not in kwargs:
-            dummy_inputs[k] = args[0]
+            dummy_inputs[k] = args[i]
+            i+=1
         else:
             dummy_inputs[k] = kwargs[k]
     return input_names, bool_inputs, dummy_inputs
