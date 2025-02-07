@@ -46,7 +46,7 @@ class RecordInputInterpreter(Interpreter):
                 self.nodeInputs[n.name] = (args, kwargs)
 
             device = None
-            if target in self.submodules and hasattr(self.submodules[target], "weight"):
+            if target in self.submodules and hasattr(self.submodules[target], "weight") and self.submodules[target].weight is not None :
                 device = self.submodules[target].weight.device
             for a in args:
                 if isinstance(a, torch.Tensor) and device is None:
