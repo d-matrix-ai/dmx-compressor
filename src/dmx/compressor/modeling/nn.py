@@ -1090,7 +1090,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             self._conv_forward(_input.to(_weight.dtype), _weight, None)
         )
         if self.bias is not None:
-            _output = torch.add(_convolution, self._bias.unsqueeze(-1).unsqueeze(-1))
+            _output = torch.add(_convolution, self._bias.unsqueeze(-1))
         else:
             _output = _convolution
         return _output
