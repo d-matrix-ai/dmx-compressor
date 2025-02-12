@@ -28,11 +28,11 @@ def prepare_tracing_inputs(_model, args, kwargs):
     else:
         input_names = signature(_model.forward).bind(*args, **kwargs).arguments.keys()
     dummy_inputs = {}
-    i=0
+    i = 0
     for k in input_names:
         if k not in kwargs:
             dummy_inputs[k] = args[i]
-            i+=1
+            i += 1
         else:
             dummy_inputs[k] = kwargs[k]
     return input_names, bool_inputs, dummy_inputs
@@ -69,11 +69,7 @@ def substitute_transform(
     )
 
     gi = RecordInputInterpreter(gm)
-    tracing_args, tracing_kwargs = root.tracing_kwargs
-    inputs = list(
-        prepare_tracing_inputs(root, tracing_args, tracing_kwargs)[2].values()
-    )
-    gi.run(*inputs)
+    gi.run(*list(dummy_inputs.values()))
     transformer = DMXAwareTransformer(
         gm,
         tracer.node_name_to_scope,

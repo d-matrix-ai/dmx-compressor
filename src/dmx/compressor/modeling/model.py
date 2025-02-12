@@ -323,11 +323,13 @@ class DmxModel(DmxModelMixin):
             if isinstance(element, torch.Tensor):
                 return element.detach().clone()
             elif isinstance(element, tuple):
-                return tuple(deepcopy_element(e) for e in element)
+                return type(element)(deepcopy_element(e) for e in element)
             elif isinstance(element, list):
-                return [deepcopy_element(e) for e in element]
+                return type(element)([deepcopy_element(e) for e in element])
             elif isinstance(element, dict):
-                return {k: deepcopy_element(v) for k, v in element.items()}
+                return type(element)(
+                    {k: deepcopy_element(v) for k, v in element.items()}
+                )
             else:
                 return deepcopy(element)
 
