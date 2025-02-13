@@ -4,7 +4,16 @@ from collections import deque, OrderedDict
 from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Dict, Optional, Union, Sequence, get_args, get_origin
+from typing import (
+    Any,
+    Dict,
+    Optional,
+    Union,
+    Sequence,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 from functools import partial
 from dmx.compressor.modeling.nn import *
 from dmx.compressor.fx.transform import substitute_transform, prepare_tracing_inputs
@@ -274,14 +283,32 @@ class DmxModel(DmxModelMixin):
         _model._output_cls = _output_cls
         _forward = (
             (
-                lambda *_args, **_kwargs: _output_cls(
-                    **(_model._gm.forward(*_args, **_kwargs))
+                lambda *_args, **_kwargs: DmxModel._wrap_output_cls(
+                    _model._gm.forward(*_args, **_kwargs), _output_cls
                 )
             )
             if _model._output_cls is not None
             else _model._gm.forward
         )
         return _forward
+
+    @staticmethod
+    def _wrap_output_cls(outputs, cls):
+        attribute_types = get_type_hints(cls)
+        for key, expected_type in attribute_types.items():
+            if key in outputs:
+                if (
+                    expected_type
+                    and isinstance(expected_type, type)
+                    and issubclass(
+                        expected_type, transformers.utils.generic.ModelOutput
+                    )
+                ):
+                    outputs[key] = DmxModel._wrap_output_cls(
+                        outputs[key], expected_type
+                    )  # Recursively wrap sub-objects
+
+        return cls(**outputs)
 
     @staticmethod
     def is_same_signature(_model, args, kwargs):
