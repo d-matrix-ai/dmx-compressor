@@ -60,9 +60,15 @@ class CastToDict(torch.nn.ModuleDict):
         self,
         x,
         *args,
+        output=False,
         **kwargs,
     ):
         keys = list(self.keys())
+        if output:
+            if isinstance(x, (tuple, list)):
+                return type(x)(self[keys[i]](a) for i, a in enumerate(x))
+            return self[keys[0]](x)
+
         i = 1
         new_args = []
         new_kwargs = {}
@@ -350,7 +356,7 @@ class NumericalCastMixin:
         self.input_casts = CastToDict(
             OrderedDict({"input_cast": CastTo(ch_axis=self.ch_axis)})
         )
-        self.output_cast = CastTo()
+        self.output_casts = CastToDict(OrderedDict({"output_cast": CastTo()}))
         # dynamic intermediate casts
         if isinstance(
             self,
@@ -456,8 +462,8 @@ class NumericalCastMixin:
         return self.weight_cast.get_precision()
 
     @property
-    def output_format(self):
-        return self.output_cast.format
+    def output_formats(self):
+        return {k: cast.format for k, cast in self.output_casts.items()}
 
     @property
     def accum_format(self):

@@ -105,7 +105,7 @@ class DmxModelMixin:
         Args:
             include_type (bool): include the type of modules in the print out if True
         """
-        from dmx.compressor.utils import print_model_tree
+        from dmx.compressor.utils.visualization import print_model_tree
 
         print_model_tree(self, include_type)
 
@@ -138,10 +138,12 @@ class DmxModelMixin:
         """
         from dmx.compressor import config_rules
 
-        return self.configure(
-            self.baseline_config,
-            *config_rules.BASIC,
-        )
+        if hasattr(self, "baseline_config"):
+            return self.configure(
+                self.baseline_config,
+                *config_rules.BASIC,
+            )
+        return self.configure(None, *config_rules.BASIC)
 
     @contextmanager
     def keep_dmx_config(self):

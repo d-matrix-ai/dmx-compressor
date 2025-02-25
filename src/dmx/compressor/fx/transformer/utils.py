@@ -5,6 +5,7 @@ import re
 import torch
 
 from dmx.compressor.modeling import nn as dmxnn
+import transformers
 
 dmx_aware_mapping = {
     "torch.nn.modules.sparse.Embedding": dmxnn.Embedding,
@@ -22,6 +23,9 @@ dmx_aware_mapping = {
     "torch.nn.modules.activation.SiLU": dmxnn.SiLU,
     "torch.nn.modules.activation.Tanh": dmxnn.Tanh,
     "torch.nn.modules.activation.GELU": dmxnn.GELU,
+}
+
+transformer_module_mapping = {
     "transformers.pytorch_utils.Conv1D": dmxnn.Linear,
     "transformers.activations.NewGELUActivation": dmxnn.NewGELU,
     "transformers.activations.GELUActivation": dmxnn.GELU,
@@ -29,7 +33,6 @@ dmx_aware_mapping = {
     "transformers.activations.QuickGELUActivation": dmxnn.QuickGELU,
     "transformers.activations.ClippedGELUActivation": dmxnn.ClippedGELU,
     "transformers.models.bloom.modeling_bloom.BloomGelu": dmxnn.BloomGELU,
-    "transformers.activations.SiLUActivation": dmxnn.SiLU,
     "transformers.models.t5.modeling_t5.T5LayerNorm": dmxnn.RMSNorm,
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmxnn.RMSNorm,
     "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmxnn.GemmaRMSNorm,
@@ -49,6 +52,15 @@ dmx_aware_functional_mappings = {
     "torch.baddbmm": dmxnn.BAddBMM,
     "torch.nn.functional.scaled_dot_product_attention": dmxnn.ScaledDotProductAttention,
 }
+
+transformer_function_mapping = {
+    "transformers.models.llama.modeling_llama.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
+    "transformers.models.gemma.modeling_gemma.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
+    "transformers.models.mistral.modeling_mistral.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
+}
+
+dmx_aware_mapping.update(transformer_module_mapping)
+dmx_aware_functional_mappings.update(transformer_function_mapping)
 for f_key in list(dmx_aware_functional_mappings.keys()):
     new_key = repr(eval(f_key))
     dmx_aware_functional_mappings[new_key] = dmx_aware_functional_mappings.pop(f_key)

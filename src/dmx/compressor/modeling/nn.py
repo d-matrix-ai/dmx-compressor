@@ -70,8 +70,8 @@ class DmxModule(
         # numerics transformation
         if "input_formats" in config:
             self.input_casts.set_format(format=config["input_formats"])
-        if "output_format" in config:
-            self.output_cast.set_format(format=config["output_format"])
+        if "output_formats" in config:
+            self.output_casts.set_format(format=config["output_formats"])
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_cast is not None and "weight_format" in config:
@@ -226,11 +226,15 @@ class DmxModule(
             self.obc.measure_hessian(_input)
         _input, args, kwags = self.align_device(_input, args, kwags, _device)
         _output = self._forward(_input, *args, **kwags)
-        output = self.output_cast(_output)
+        output = self.output_casts(_output, output=True)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
         if self.align_boundary_dtype:
-            output = output.to(_dtype)
+            output = (
+                type(output)(a.to(_dtype) for a in output)
+                if isinstance(output, (tuple, list))
+                else output.to(_dtype)
+            )
         return output
 
     def align_device(self, _input, args, kwags, _device):
@@ -290,10 +294,11 @@ class DmxModuleConfig(dict):
                 or not all(isinstance(f, Same) for f in module.input_formats.values())
             ):
                 cc.input_formats = module.input_formats
-            if module.output_format is not None and (
-                freeze or not isinstance(module.output_format, Same)
+            if module.output_formats is not None and (
+                freeze
+                or not all(isinstance(f, Same) for f in module.input_formats.values())
             ):
-                cc.output_format = module.output_format
+                cc.output_formats = module.output_formats
             if module.accum_format is not None and (
                 freeze or not isinstance(module.accum_format, Same)
             ):
@@ -2517,3 +2522,58 @@ class BloomGELU(GELUBase):
         super().__init__(
             transformers.models.bloom.modeling_bloom.BloomGelu, *args, **kwargs
         )
+
+
+class ApplyRotaryPosEmbBase(torch.nn.Module):
+    def rotate_half(self, x):
+        """Rotates half the hidden dims of the input."""
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def forward(self, q, k, cos, sin, unsqueeze_dim=1):
+        """Applies Rotary Position Embedding to the query and key tensors.
+
+        Args:
+            q (`torch.Tensor`): The query tensor.
+            k (`torch.Tensor`): The key tensor.
+            cos (`torch.Tensor`): The cosine part of the rotary embedding.
+            sin (`torch.Tensor`): The sine part of the rotary embedding.
+            unsqueeze_dim (`int`, *optional*, defaults to 1):
+                The 'unsqueeze_dim' argument specifies the dimension along which to unsqueeze cos[position_ids] and
+                sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note
+                that cos[position_ids] and sin[position_ids] have the shape [batch_size, seq_len, head_dim]. Then, if q and
+                k have the shape [batch_size, heads, seq_len, head_dim], then setting unsqueeze_dim=1 makes
+                cos[position_ids] and sin[position_ids] broadcastable to the shapes of q and k. Similarly, if q and k have
+                the shape [batch_size, seq_len, heads, head_dim], then set unsqueeze_dim=2.
+        Returns:
+            `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
+        """
+
+        cos = cos.unsqueeze(unsqueeze_dim)
+        sin = sin.unsqueeze(unsqueeze_dim)
+        q_embed = (q * cos) + (self.rotate_half(q) * sin)
+        k_embed = (k * cos) + (self.rotate_half(k) * sin)
+        return q_embed, k_embed
+
+
+class ApplyRotaryPosEmb(DmxModule, ApplyRotaryPosEmbBase):
+    def __init__(self) -> None:
+        super().__init__()
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "q_cast": CastTo(),
+                    "k_cast": CastTo(),
+                    "cos_cast": CastTo(),
+                    "sin_cast": CastTo(),
+                }
+            )
+        )
+        self.output_casts = CastToDict(
+            OrderedDict({"q_embed_cast": CastTo(), "k_embed_cast": CastTo()})
+        )
+
+    def _forward(self, q, k, cos, sin, unsqueeze_dim=1) -> Tensor:
+        _output = self.approx_forward((q, k, cos, sin, unsqueeze_dim))
+        return _output

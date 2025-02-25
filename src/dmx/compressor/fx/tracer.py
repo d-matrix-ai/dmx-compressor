@@ -7,6 +7,7 @@ from torch import fx
 from .. import numerical
 from .. import sparse
 from .. import modeling
+from .transformer.utils import transformer_function_mapping, transformer_module_mapping
 
 from torch.fx.node import Argument, Node, Target
 from typing import Any, Callable, Dict, Optional, Tuple, Type, List, Union
@@ -31,7 +32,7 @@ class DmxHFTracer(HFTracer):
     def __init__(
         self,
         autowrap_modules=(math,),
-        autowrap_functions=(),
+        autowrap_functions=tuple(eval(k) for k in transformer_function_mapping.keys()),
     ):
         super().__init__(
             autowrap_modules=autowrap_modules, autowrap_functions=autowrap_functions
@@ -63,11 +64,10 @@ class DmxHFTracer(HFTracer):
                 numerical.CastTo,
                 sparse.Sparsify,
                 transformers.pytorch_utils.Conv1D,
-                transformers.models.bloom.modeling_bloom.BloomGelu,
-                transformers.models.llama.modeling_llama.LlamaRMSNorm,
-                transformers.models.gemma.modeling_gemma.GemmaRMSNorm,
-                transformers.models.mistral.modeling_mistral.MistralRMSNorm,
             ),
+        )
+        is_leaf = is_leaf or (
+            isinstance(m, tuple(eval(k) for k in transformer_module_mapping.keys()))
         )
         is_leaf = is_leaf or (
             isinstance(m, modeling.nn.DmxModule) and not m.is_compound
