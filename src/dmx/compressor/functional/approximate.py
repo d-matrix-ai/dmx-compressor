@@ -58,9 +58,9 @@ class ApproximationFunction:
     def from_shorthand(sh: str):
         if sh.startswith("NONE"):
             return NoApproximation.from_shorthand(sh)
-        elif sh in torch_function_mapping:
+        elif sh.startswith((*torch_function_mapping.keys(),)):
             return TorchFunctionApproximation.from_shorthand(sh)
-        elif sh in custom_function_mapping:
+        elif sh.startswith((*custom_function_mapping.keys(),)):
             return CustomFunctionApproximation.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized approximation function shorthand: {sh}")
