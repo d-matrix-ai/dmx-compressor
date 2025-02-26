@@ -108,7 +108,7 @@ class TorchFunctionApproximation(ApproximationFunction):
         from dmx.compressor.utils.io import string_to_kwargs
 
         conf = parse("{func_ID:w}[{algorithm:w}]({extra_params:w})", sh)
-        _op = torch_function_mapping(conf["func_ID"])
+        _op = torch_function_mapping[conf["func_ID"]]
         _algo = conf["algorithm"]
         _extra_params = string_to_kwargs(conf["extra_params"])
         return cls(torch_functional=_op, algorithm=_algo, **_extra_params)
