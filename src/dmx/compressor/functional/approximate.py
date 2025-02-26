@@ -100,15 +100,17 @@ class TorchFunctionApproximation(ApproximationFunction):
         super().__init__()
         self.func_id = func_id
         self.torch_functional = torch_function_mapping[func_id]
+        self.func_name = self.torch_functional.__name__
         self.algorithm = algorithm
         self.extra_params = extra_params
 
     @classmethod
     def from_shorthand(cls, sh: str):
         from dmx.compressor.utils.io import string_to_kwargs
-
-        conf = parse("{func_ID:w}[{algorithm:w}]({extra_params})", sh)
-        _func_id = conf["func_ID"]
+        could_be_empty_str = lambda _s: _s
+        could_be_empty_str.pattern = r".*"
+        conf = parse("{func_id:w}[{algorithm:w}]({extra_params:z})", sh, {"z": could_be_empty_str})
+        _func_id = conf["func_id"]
         _algo = conf["algorithm"]
         _extra_params = string_to_kwargs(conf["extra_params"])
         return cls(func_id=_func_id, algorithm=_algo, **_extra_params)
@@ -116,11 +118,15 @@ class TorchFunctionApproximation(ApproximationFunction):
     def execute(self, *args, **kwargs):
         if self.algorithm == "vsimd":
             assert VSIMD_OP_REF_AVAILABLE, "SIMD op reference not available"
-            return vsimd.gelu(*args, **kwargs, **self.extra_params)
+            return eval(f"vsimd.{self.func_name}")(*args, **kwargs, **self.extra_params)
         elif self.algorithm in ["experimental"]:
-            return eval(self.algorithm).gelu(*args, **kwargs, **self.extra_params)
+            return eval(f"{self.algorithm}.{self.func_name}")(
+                *args, **kwargs, **self.extra_params
+            )
         else:
-            raise ValueError(f"unknown approximation algorithm {self.algorithm} for {self.func_id}")
+            raise ValueError(
+                f"unknown approximation algorithm {self.algorithm} for {self.func_id}"
+            )
 
     def __str__(self) -> str:
         return f"Approximated version of {self.torch_functional} with annotation: {self.__repr__()}"
@@ -128,7 +134,9 @@ class TorchFunctionApproximation(ApproximationFunction):
     def __repr__(self) -> str:
         from dmx.compressor.utils.io import kwargs_to_string
 
-        return f"{self.func_id}[{self.algorithm}]({kwargs_to_string(**self.extra_params)})"
+        return (
+            f"{self.func_id}[{self.algorithm}]({kwargs_to_string(**self.extra_params)})"
+        )
 
 
 class CustomFunctionApproximation(ApproximationFunction):

@@ -122,7 +122,12 @@ def string_to_kwargs(kwargs_string):
     if kwargs_string:
         for item in kwargs_string.split(","):
             key, value = item.split("=")
-            kwargs[key.strip()] = value.strip()
+            value = value.strip()
+            try:
+                _value = eval(value)
+            except:
+                _value = value 
+            kwargs[key.strip()] = _value
     return kwargs
 
 
