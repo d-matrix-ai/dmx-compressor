@@ -149,25 +149,17 @@ class DMXAwareTransformer(fx.Transformer):
         )
         curr_target, curr_type = self.node_name_to_scope[curr_name]
         if node_key == "<built-in function add>":
-            if (
-                isinstance(args[0], Proxy)
-                and isinstance(args[1], Proxy)
-                and args[0].node.op
-                in ["call_module", "call_function", "call_method", "placeholder"]
-                and args[1].node.op
-                in ["call_module", "call_function", "call_method", "placeholder"]
+            mod_args, mod_kwargs = self.nodeInputs[curr_name]
+            if isinstance(mod_args[0], torch.Tensor) and isinstance(
+                mod_args[1], torch.Tensor
             ):
                 cand_name = curr_target + ".resadd" if curr_target != "" else "resadd"
             else:
                 return super().call_function(target, args, kwargs)
         elif node_key in "<built-in function mul>":
-            if (
-                isinstance(args[0], Proxy)
-                and isinstance(args[1], Proxy)
-                and args[0].node.op
-                in ["call_module", "call_function", "call_method", "placeholder"]
-                and args[1].node.op
-                in ["call_module", "call_function", "call_method", "placeholder"]
+            mod_args, mod_kwargs = self.nodeInputs[curr_name]
+            if isinstance(mod_args[0], torch.Tensor) and isinstance(
+                mod_args[1], torch.Tensor
             ):
                 cand_name = curr_target + ".mul" if curr_target != "" else curr_name
             else:

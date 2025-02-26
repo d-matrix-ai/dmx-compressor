@@ -341,12 +341,6 @@ class ResAdd(DmxModule, torch.nn.Module):
             OrderedDict({"input_cast": CastTo(), "residual_cast": CastTo()})
         )
 
-    def forward(self, input, residual):
-        if isinstance(input, torch.Tensor) and isinstance(residual, torch.Tensor):
-            return DmxModule.forward(self, input, residual)
-        else:
-            return torch.add(input, residual)
-
     def _forward(self, _input: Tensor, _residual: Tensor) -> Tensor:
         """
         A forward pass of addition operation with quantization applied
@@ -401,15 +395,15 @@ class ResAdd(DmxModule, torch.nn.Module):
             _output = g.create_node(
                 "call_function", torch.add, (_input_dq, residual_dq), name="output"
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -430,12 +424,6 @@ class Mul(DmxModule):
                 }
             )
         )
-
-    def forward(self, input, multiplier):
-        if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
-            return DmxModule.forward(self, input, multiplier)
-        else:
-            return torch.mul(input, multiplier)
 
     def _forward(self, _input: Tensor, multiplier: Tensor) -> Tensor:
         return _input * multiplier
@@ -480,15 +468,15 @@ class Mul(DmxModule):
             _output = g.create_node(
                 "call_function", torch.mul, (_input_dq, multiplier_dq), name="output"
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -513,7 +501,7 @@ class ScaledDotProductAttention(DmxModule):
                 }
             )
         )
-        self.add = ResAdd()
+        self.resadd = ResAdd()
         self.matmul = ActActMatMul()
         self.softmax = Softmax(dim=-1)
         self.dropout = Dropout(p=dropout_p)
@@ -530,7 +518,7 @@ class ScaledDotProductAttention(DmxModule):
     ):
         L, S = query.size(-2), key.size(-2)
         scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
-        attn_bias = torch.zeros(L, S, dtype=query.dtype)
+        attn_bias = torch.zeros(L, S, dtype=query.dtype).to(query.device)
 
         if is_causal:
             assert attn_mask is None
@@ -542,14 +530,14 @@ class ScaledDotProductAttention(DmxModule):
             if attn_mask.dtype == torch.bool:
                 attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
             else:
-                attn_bias = self.add(attn_bias, attn_mask)
+                attn_bias = self.resadd(attn_bias, attn_mask)
 
         if enable_gqa:
             key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
             value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
         attn_weight = self.matmul(query, key.transpose(-2, -1) * scale_factor)
-        attn_weight = self.add(attn_weight, attn_bias)
+        attn_weight = self.resadd(attn_weight, attn_bias)
         attn_weight = self.softmax(attn_weight)
         attn_weight = self.dropout(attn_weight)
         return self.matmul(attn_weight, value)
@@ -659,15 +647,15 @@ class ScaledDotProductAttention(DmxModule):
                 ),
                 name="output",
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -688,12 +676,6 @@ class ActActMatMul(DmxModule, torch.nn.Module):
                 }
             )
         )
-
-    def forward(self, input, multiplier):
-        if isinstance(input, torch.Tensor) and isinstance(multiplier, torch.Tensor):
-            return DmxModule.forward(self, input, multiplier)
-        else:
-            return torch.matmul(input, multiplier)
 
     def _forward(self, _input: Tensor, _multiplier: Tensor) -> Tensor:
         _output = torch.matmul(_input, _multiplier)
@@ -739,15 +721,15 @@ class ActActMatMul(DmxModule, torch.nn.Module):
             _output = g.create_node(
                 "call_function", torch.matmul, (_input_dq, multiplier_dq), name="output"
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -860,10 +842,10 @@ class Linear(DmxModule, torch.nn.Linear):
             call_function  quantize_2                         dmx.quantize                       (_bias, bias_cast_scale, bias_cast_zero_point, 'SAME')                             {}
             call_function  dequantize_2                       dmx.dequantize                     (quantize_2, bias_cast_scale, bias_cast_zero_point)                                {}
             call_function  _output                            <built-in function linear>         (dequantize, dequantize_1, dequantize_2)                                           {}
-            get_attr       output_cast_scale                  output_cast.scale                  ()                                                                                 {}
-            get_attr       output_cast_zero_point             output_cast.zero_point             ()                                                                                 {}
-            call_function  quantize_3                         dmx.quantize                       (_output, output_cast_scale, output_cast_zero_point, 'SAME')                       {}
-            call_function  dequantize_3                       dmx.dequantize                     (quantize_3, output_cast_scale, output_cast_zero_point)                            {}
+            get_attr       output_casts_output_cast_scale     output_casts.output_cast.scale     ()                                                                                 {}
+            get_attr       output_casts_output_cast_zero_pointoutput_casts.utput_cast.zero_point ()                                                                                 {}
+            call_function  quantize_3                         dmx.quantize                       (_output, output_casts_output_cast_scale, output_casts_output_cast_zero_pointoutput_casts, 'SAME')  {}
+            call_function  dequantize_3                       dmx.dequantize                     (quantize_3, output_casts_output_cast_scale, output_casts_output_cast_zero_pointoutput_casts)       {}
             output         output                             output                             (dequantize_3,)                                                                    {}
 
         """
@@ -923,15 +905,15 @@ class Linear(DmxModule, torch.nn.Linear):
                     (_input_dq, _weight_dq, _bias_dq),
                     name="_output",
                 )
-                _output_scale = g.get_attr("output_cast.scale")
-                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_scale = g.get_attr("output_casts.output_cast.scale")
+                _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
                 _output_q = g.call_function(
                     torch.ops.dmx.quantize,
                     (
                         _output,
                         _output_scale,
                         _output_zero_point,
-                        repr(self.output_cast.format),
+                        repr(self.output_casts.output_cast.format),
                     ),
                 )
                 _output_dq = g.call_function(
@@ -946,15 +928,15 @@ class Linear(DmxModule, torch.nn.Linear):
                     (_input_dq, _weight_dq, None),
                     name="_output",
                 )
-                _output_scale = g.get_attr("output_cast.scale")
-                _output_zero_point = g.get_attr("output_cast.zero_point")
+                _output_scale = g.get_attr("output_casts.output_cast.scale")
+                _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
                 _output_q = g.call_function(
                     torch.ops.dmx.quantize,
                     (
                         _output,
                         _output_scale,
                         _output_zero_point,
-                        repr(self.output_cast.format),
+                        repr(self.output_casts.output_cast.format),
                     ),
                 )
                 _output_dq = g.call_function(
@@ -1539,15 +1521,15 @@ class Softmax(DmxModule, torch.nn.Softmax):
                 name="softmax",
             )
 
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -1657,15 +1639,15 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
             output = g.create_node(
                 "call_function", torch.nn.functional.layer_norm, args, name="ln"
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -1768,15 +1750,15 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
             output = g.create_node(
                 "call_function", torch.nn.functional.rms_norm, args, name="RMSNorm"
             )
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output_q = g.call_function(
                 torch.ops.dmx.quantize,
                 (
                     output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -1952,8 +1934,8 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
             eps = g.get_attr("eps")
 
             args = (_input, self.num_groups, _weight, _bias, self.eps)
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
             )
@@ -1963,7 +1945,7 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2033,8 +2015,8 @@ class GroupNorm(DmxModule, torch.nn.GroupNorm):
             eps = g.get_attr("eps")
 
             args = (_input, self.num_groups, _weight, _bias, self.eps)
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
             )
@@ -2044,7 +2026,7 @@ class GroupNorm(DmxModule, torch.nn.GroupNorm):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2116,8 +2098,8 @@ class Dropout(DmxModule, torch.nn.Dropout):
             inplace = g.get_attr("inplace")
 
             args = (_input_dq, p, training, inplace)
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.dropout, args, name="Dropout"
             )
@@ -2127,7 +2109,7 @@ class Dropout(DmxModule, torch.nn.Dropout):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2194,8 +2176,8 @@ class ReLU(DmxModule, torch.nn.ReLU):
             )
 
             args = (_input_dq,)
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.relu, args, name="ReLU"
             )
@@ -2205,7 +2187,7 @@ class ReLU(DmxModule, torch.nn.ReLU):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2271,8 +2253,8 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
             )
 
             args = _input_dq
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.relu6, args, name="relu6"
             )
@@ -2282,7 +2264,7 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2350,8 +2332,8 @@ class SiLU(DmxModule, torch.nn.SiLU):
 
             inplace = g.get_attr("inplace")
             args = (_input_dq, inplace)
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.silu, args, name="SiLU"
             )
@@ -2361,7 +2343,7 @@ class SiLU(DmxModule, torch.nn.SiLU):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(
@@ -2425,8 +2407,8 @@ class Tanh(DmxModule, torch.nn.Tanh):
             )
 
             args = _input_dq
-            _output_scale = g.get_attr("output_cast.scale")
-            _output_zero_point = g.get_attr("output_cast.zero_point")
+            _output_scale = g.get_attr("output_casts.output_cast.scale")
+            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
             _output = g.create_node(
                 "call_function", torch.nn.functional.tanh, args, name="tanh"
             )
@@ -2436,7 +2418,7 @@ class Tanh(DmxModule, torch.nn.Tanh):
                     _output,
                     _output_scale,
                     _output_zero_point,
-                    repr(self.output_cast.format),
+                    repr(self.output_casts.output_cast.format),
                 ),
             )
             _output_dq = g.call_function(

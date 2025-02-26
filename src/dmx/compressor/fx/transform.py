@@ -89,12 +89,10 @@ def qDq_transform(
     root: torch.fx.GraphModule,
 ):
     """
-    A function that transforms the model by substituting torch.nn.modules and activation functions to dmx.nn.modules.
+    A function that transforms the model by substituting CastTos with Q/dQ ops
 
     Args:
         root (torch.nn.Module): model/module to transform
-        concrete_args (Dict[str,Any], optional): concrete arguments to be used for tracer. Defaults to None.
-        hf (bool, optional): True if root is a huggingface model. Defaults to False
 
     Returns:
         transformed model

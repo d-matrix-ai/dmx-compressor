@@ -39,19 +39,32 @@ class RecordInputInterpreter(Interpreter):
             target = n.target
 
             # recording inputs
-            if (
-                str(target) in dmx_aware_functional_mappings
-                and dmx_aware_functional_mappings[str(target)].is_compound
+            if str(target) in dmx_aware_functional_mappings and (
+                dmx_aware_functional_mappings[str(target)].is_compound
+                or str(target)
+                in (
+                    "<built-in function mul>",
+                    "<built-in function add>",
+                )
             ):
                 self.nodeInputs[n.name] = (args, kwargs)
 
             device = None
-            if target in self.submodules and hasattr(self.submodules[target], "weight") and self.submodules[target].weight is not None :
+            if (
+                target in self.submodules
+                and hasattr(self.submodules[target], "weight")
+                and self.submodules[target].weight is not None
+            ):
                 device = self.submodules[target].weight.device
             for a in args:
                 if isinstance(a, torch.Tensor) and device is None:
                     device = a.device
             if device is not None:
-                args = tuple(a.to(device) if isinstance(a,torch.Tensor) else a for a in args)
-                kwargs = {k:v.to(device) if isinstance(v, torch.Tensor) else v for k,v in kwargs.items()} 
+                args = tuple(
+                    a.to(device) if isinstance(a, torch.Tensor) else a for a in args
+                )
+                kwargs = {
+                    k: v.to(device) if isinstance(v, torch.Tensor) else v
+                    for k, v in kwargs.items()
+                }
             return getattr(self, n.op)(n.target, args, kwargs)
