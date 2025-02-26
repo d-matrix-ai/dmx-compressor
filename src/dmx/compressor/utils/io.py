@@ -107,3 +107,25 @@ def save_config_file(config, config_file="configs/dmx.yaml"):
                 Dumper=get_dumper(),
             )
         )
+
+
+def string_to_kwargs(kwargs_string):
+    """Parses a string of keyword arguments into a dictionary.
+
+    Args:
+        kwargs_string: A string of keyword arguments in the format "key1=value1, key2=value2, ...".
+
+    Returns:
+        A dictionary containing the parsed keyword arguments.
+    """
+    kwargs = {}
+    if kwargs_string:
+        for item in kwargs_string.split(","):
+            key, value = item.split("=")
+            kwargs[key.strip()] = value.strip()
+    return kwargs
+
+
+def kwargs_to_string(**kwargs):
+    """Converts kwargs dictionary to a comma-separated string of key=value pairs."""
+    return ", ".join(f"{key}={value}" for key, value in kwargs.items())

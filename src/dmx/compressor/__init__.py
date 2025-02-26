@@ -11,6 +11,7 @@ from .sparse import Sparseness
 from .functional import ApproximationFunction
 from .modeling import (
     nn,
+    DmxModel,
     DmxConfigRule,
 )
 

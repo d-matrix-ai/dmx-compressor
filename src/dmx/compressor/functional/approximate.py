@@ -1,18 +1,39 @@
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 from parse import parse
+from bidict import bidict
 import torch
 import torch.nn as nn
-from . import vsimd, functions
+from .functions import *
+import transformers
 
+try:
+    from dmx.common.vsimd.ported.operator import functional as vsimd
+
+    VSIMD_OP_REF_AVAILABLE = True
+except ModuleNotFoundError:
+    VSIMD_OP_REF_AVAILABLE = False
+
+torch_function_mapping = bidict(
+    {
+        "GELU": torch.nn.functional.gelu,
+        "SILU": torch.nn.functional.silu,
+        "RMS_NORM": torch.nn.functional.rms_norm,
+        "LAYER_NORM": torch.nn.functional.layer_norm,
+        "SOFTMAX": torch.nn.functional.softmax,
+    }
+)
+
+custom_function_mapping = bidict(
+    {
+        "APPLY_LLAMA_ROPE": transformers.models.llama.modeling_llama.apply_rotary_pos_emb,
+    }
+)
 
 __ALL__ = [
     "ApproximationFunction",
     "ApproximationMixin",
     "NoApproximation",
-    "SoftmaxApproximation",
-    "GELUApproximation",
-    "LayerNormApproximation",
-    "HFDiffusersTimestepsApproximation",
+    "TorchFunctionApproximation",
     "Approximate",
     "Approximator",
 ]
@@ -37,14 +58,10 @@ class ApproximationFunction:
     def from_shorthand(sh: str):
         if sh.startswith("NONE"):
             return NoApproximation.from_shorthand(sh)
-        elif sh.startswith("SOFTMAX"):
-            return SoftmaxApproximation.from_shorthand(sh)
-        elif sh.startswith("GELU"):
-            return GELUApproximation.from_shorthand(sh)
-        elif sh.startswith("LAYERNORM"):
-            return LayerNormApproximation.from_shorthand(sh)
-        elif sh.startswith("HFDIFFUSERSTIMESTEPS"):
-            return HFDiffusersTimestepsApproximation.from_shorthand(sh)
+        elif sh in torch_function_mapping:
+            return TorchFunctionApproximation.from_shorthand(sh)
+        elif sh in custom_function_mapping:
+            return CustomFunctionApproximation.from_shorthand(sh)
         else:
             raise ValueError(f"unrecognized approximation function shorthand: {sh}")
 
@@ -71,240 +88,54 @@ class NoApproximation(ApproximationFunction):
         return "NONE"
 
 
-class Identity(ApproximationFunction):
+Identity = NoApproximation  # an alias, to be deprecated
+
+
+class TorchFunctionApproximation(ApproximationFunction):
     r"""
-    This is a identity function that does no approximation and just returns the original value
+    This class specifies an approximation function for a member of torch.nn.functional.
     """
 
-    def __init__(self, algorithm="identity"):
+    def __init__(self, func_id: None, algorithm: str = "vsimd", **extra_params):
         super().__init__()
+        self.func_id = func_id
+        self.torch_functional = torch_function_mapping[func_id]
         self.algorithm = algorithm
-
-    def execute(self, *args, **kwargs):
-        return args
+        self.extra_params = extra_params
 
     @classmethod
     def from_shorthand(cls, sh: str):
-        conf = parse("Identity({algorithm:w})", sh)
-        return cls(
-            algorithm=conf["algorithm"],
-        )
+        from dmx.compressor.utils.io import string_to_kwargs
 
-    def __str__(self) -> str:
-        return "Identity: return itself"
-
-    def __repr__(self) -> str:
-        return "Identity"
-
-
-class SoftmaxApproximation(ApproximationFunction):
-    r"""
-    This class specifies an approximation function for softmax.
-    """
-
-    def __init__(self, algorithm: str = "vsimd", nform: Optional[str] = None):
-        super().__init__()
-        # check validity of configuration
-        assert algorithm in (
-            "vsimd",
-            "poly2",
-            "base2",
-            "base2quake3",
-        ), f"unsupported softmax algorithm {algorithm}"
-        assert nform in (
-            "int",
-            "float32",
-            "float16",
-            "bfloat16",
-            None,
-        ), f"unsupported softmax intermediate numerical format {nform}"
-
-        self.algorithm = algorithm
-        self.nform = nform
+        conf = parse("{func_ID:w}[{algorithm:w}]({extra_params:w})", sh)
+        _op = torch_function_mapping(conf["func_ID"])
+        _algo = conf["algorithm"]
+        _extra_params = string_to_kwargs(conf["extra_params"])
+        return cls(torch_functional=_op, algorithm=_algo, **_extra_params)
 
     def execute(self, *args, **kwargs):
         if self.algorithm == "vsimd":
-            return vsimd.softmax(*args, **kwargs)
+            assert VSIMD_OP_REF_AVAILABLE, "SIMD op reference not available"
+            return vsimd.gelu(*args, **kwargs, **self.extra_params)
+        elif self.algorithm == "crazy":
+            return crazy.gelu(*args, **kwargs, **self.extra_params)
         else:
-            return eval(f"functions.{self.algorithm}softmax")(
-                *args, **dict(kwargs, nform=self.nform)
-            )
-
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        if sh == "SOFTMAX(vsimd)":
-            return cls(algorithm="vsimd", nform=None)
-        else:
-            conf = parse("SOFTMAX({algorithm:w},{nform:w})", sh)
-            return cls(
-                algorithm=conf["algorithm"],
-                nform=conf["nform"],
-            )
+            raise ValueError(f"unknown approximation algorithm {self.algorithm} for {self.func_id}")
 
     def __str__(self) -> str:
-        return f"Softmax approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
+        return f"Approximated version of {self.torch_functional} with annotation: {self.__repr__()}"
 
     def __repr__(self) -> str:
-        return (
-            "SOFTMAX(vsimd)"
-            if self.algorithm == "vsimd"
-            else f"SOFTMAX({self.algorithm},{self.nform})"
-        )
+        from dmx.compressor.utils.io import kwargs_to_string
+
+        return f"{self.func_id}[{self.algorithm}]({kwargs_to_string(**self.extra_params)})"
 
 
-class LayerNormApproximation(ApproximationFunction):
+class CustomFunctionApproximation(ApproximationFunction):
     r"""
-    This class specifies an approximation function for layer normalization.
+    This class specifies an approximation function for a custom written torch function.
     """
-
-    def __init__(
-        self,
-        algorithm: str = "vsimd",
-        norm: Optional[int] = None,
-        nform: Optional[str] = None,
-    ):
-        super().__init__()
-        assert algorithm in (
-            "vsimd",
-            "fallback",
-            "legacy",
-            "quake3",
-        ), f"unsupported layer_norm algorithm {algorithm}"
-        assert nform in (
-            "float16",
-            "float32",
-            None,
-        ), f"unsupported layer_norm numerical format {nform}"
-
-        self.algorithm = algorithm
-        self.nform = nform
-        self.norm = norm
-
-    def execute(self, *args, **kwargs):
-        if self.algorithm == "vsimd":
-            return vsimd.layer_norm(*args, **kwargs)
-        else:
-            return eval(f"functions.{self.algorithm}layer_norm")(
-                *args, **dict(kwargs, norm=self.norm, nform=self.nform)
-            )
-
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        if sh == "LAYERNORM(vsimd)":
-            return cls(algorithm="vsimd", norm=None, nform=None)
-        else:
-            conf = parse("LAYERNORM({algorithm:w},{norm},{nform:w})", sh)
-            return cls(
-                algorithm=conf["algorithm"],
-                norm=conf["norm"],
-                nform=conf["nform"],
-            )
-
-    def __str__(self) -> str:
-        return f"Layernorm approximation function: algorithm = {self.algorithm}, norm = {self.norm}, nform = {self.nform}"
-
-    def __repr__(self) -> str:
-        return (
-            "LAYERNORM(vsimd)"
-            if self.algorithm == "vsimd"
-            else f"LAYERNORM({self.algorithm},{self.norm},{self.nform})"
-        )
-
-
-class GELUApproximation(ApproximationFunction):
-    r"""
-    This class specifies an approximation function for gelu nonlinearity.
-    """
-
-    def __init__(self, algorithm: str = "vsimd", nform: Optional[str] = None):
-        super().__init__()
-        assert algorithm in (
-            "vsimd",
-            "poly2",
-        ), f"unsupported gelu algorithm {algorithm}"
-        assert nform in (
-            "float16",
-            None,
-        ), f"unsupported gelu numerical format {nform}"
-
-        self.algorithm = algorithm
-        self.nform = nform
-
-    def execute(self, *args, **kwargs):
-        if self.algorithm == "vsimd":
-            return vsimd.gelu(*args, **kwargs)
-        else:
-            return eval(f"functions.{self.algorithm}gelu")(
-                *args,
-                **dict(kwargs, nform=self.nform),
-            )
-
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        if sh == "GELU(vsimd)":
-            return cls(algorithm="vsimd", nform=None)
-        else:
-            conf = parse("GELU({algorithm:w},{nform:w})", sh)
-            return cls(
-                algorithm=conf["algorithm"],
-                nform=conf["nform"],
-            )
-
-    def __str__(self) -> str:
-        return f"GELU approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
-
-    def __repr__(self) -> str:
-        return (
-            "GELU(vsimd)"
-            if self.algorithm == "vsimd"
-            else f"GELU({self.algorithm},{self.nform})"
-        )
-
-
-class HFDiffusersTimestepsApproximation(ApproximationFunction):
-    r"""
-    This class specifies an approximation function for HFDiffusersTimesteps.
-    """
-
-    def __init__(self, algorithm: str = "vsimd", nform: Optional[str] = None):
-        super().__init__()
-        assert algorithm in (
-            "vsimd",
-        ), f"unsupported HF_DIFFUSERS_TIMESTEPS algorithm {algorithm}"
-        assert nform in (
-            "float16",
-            None,
-        ), f"unsupported HF_DIFFUSERS_TIMESTEPS numerical format {nform}"
-
-        self.algorithm = algorithm
-        self.nform = nform
-
-    def execute(self, *args, **kwargs):
-        if self.algorithm == "vsimd":
-            return vsimd.hf_diffusers_timesteps(*args, **kwargs)
-        else:
-            raise ValueError("unrecognized the algorithm")
-
-    @classmethod
-    def from_shorthand(cls, sh: str):
-        if sh == "HFDIFFUSERSTIMESTEPS(vsimd)":
-            return cls(algorithm="vsimd", nform=None)
-        else:
-            conf = parse("HFDIFFUSERSTIMESTEPS({algorithm:w},{nform:w})", sh)
-            return cls(
-                algorithm=conf["algorithm"],
-                nform=conf["nform"],
-            )
-
-    def __str__(self) -> str:
-        return f"HFDIFFUSERSTIMESTEPS approximation function: algorithm = {self.algorithm}, nform = {self.nform}"
-
-    def __repr__(self) -> str:
-        return (
-            "HFDIFFUSERSTIMESTEPS(vsimd)"
-            if self.algorithm == "vsimd"
-            else f"HFDIFFUSERSTIMESTEPS({self.algorithm},{self.nform})"
-        )
+    pass
 
 
 class Approximate(nn.Module):
@@ -330,7 +161,7 @@ class Approximate(nn.Module):
 
 class Approximator(nn.Module):
     r"""
-    A nn.Module subclass that mimics the behavior of ApproximationMixin
+    Encapsulates approximation forward logic of a module
     """
 
     def __init__(self, function=Identity()):
@@ -358,7 +189,7 @@ class Approximator(nn.Module):
 
 class ApproximationMixin:
     r"""
-    Mixin for modules with approximated forward logic
+    Mixin to equip modules with approximated forward logic through Approximator
     """
 
     def __init__(self, *args, **kwargs) -> None:
