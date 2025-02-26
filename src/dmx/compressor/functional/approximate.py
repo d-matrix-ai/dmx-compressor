@@ -117,8 +117,8 @@ class TorchFunctionApproximation(ApproximationFunction):
         if self.algorithm == "vsimd":
             assert VSIMD_OP_REF_AVAILABLE, "SIMD op reference not available"
             return vsimd.gelu(*args, **kwargs, **self.extra_params)
-        elif self.algorithm == "crazy":
-            return crazy.gelu(*args, **kwargs, **self.extra_params)
+        elif self.algorithm in ["experimental"]:
+            return eval(self.algorithm).gelu(*args, **kwargs, **self.extra_params)
         else:
             raise ValueError(f"unknown approximation algorithm {self.algorithm} for {self.func_id}")
 
