@@ -21,10 +21,13 @@ from dmx.compressor.fx.transformer import get_op_set_from
 from dmx.compressor.utils.fx.visualize_graph import visualize_graph
 import warnings
 from copy import deepcopy
+from dmx.compressor.functional import Approximate
 
 
 class DmxModelMixin:
     transformed: bool = False
+    curr_config: Dict = {}
+
     _dmx_configurations_to_be_applied: deque = (
         deque()
     )  # stores (config, rules) to be applied
@@ -69,7 +72,8 @@ class DmxModelMixin:
     @property
     def dmx_config(self):
         r""" "Returns the DmxConfig object for the model"""
-        return DmxConfig.from_model(self, freeze=True)
+        self.curr_config.update(DmxConfig.from_model(self, freeze=True))
+        return self.curr_config
 
     @property
     def dmx_module_names(self):
@@ -138,12 +142,17 @@ class DmxModelMixin:
         """
         from dmx.compressor import config_rules
 
-        if hasattr(self, "baseline_config"):
-            return self.configure(
-                self.baseline_config,
-                *config_rules.BASIC,
-            )
+        self.to_baseline_mode()
         return self.configure(None, *config_rules.BASIC)
+
+    def to_baseline_mode(self):
+        for _, m in self.named_modules():
+            if isinstance(m, CastTo):
+                m.set_format("SAME")
+            elif isinstance(m, LazySparsify):
+                m.configure(sparseness="DENSE")
+            elif isinstance(m, Approximate):
+                m.function = NoApproximation
 
     @contextmanager
     def keep_dmx_config(self):
@@ -469,7 +478,6 @@ class DmxModel(DmxModelMixin):
                     _m.configure(curr_cfg)
                 else:
                     _m.transformed = True
-                    _m.baseline_config = _m.dmx_config  # BASELINE config recorded
                     while len(_m._dmx_configurations_to_be_applied) != 0:
                         _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
                         _m.configure(_config, *_rules)
