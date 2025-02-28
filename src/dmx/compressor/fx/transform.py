@@ -105,6 +105,9 @@ def qDq_transform(
     return transformed
 
 
+make_compiler_graph = qDq_transform
+
+
 def cast_input_output_transform(
     root: torch.nn.Module,
     tracer: Union[QuantTracer, HFQuantTracer] = QuantTracer(),
