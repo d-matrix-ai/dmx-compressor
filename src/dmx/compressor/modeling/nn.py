@@ -271,7 +271,7 @@ class DmxModule(
         """
         Returns a compiler friendly graph
         """
-        pass
+        raise NotImplementedError("to_compiler_graph not implemented!")
 
 
 class DmxModuleConfig(dict):

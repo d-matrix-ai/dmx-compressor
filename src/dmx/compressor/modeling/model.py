@@ -152,7 +152,7 @@ class DmxModelMixin:
             elif isinstance(m, LazySparsify):
                 m.configure(sparseness="DENSE")
             elif isinstance(m, Approximate):
-                m.function = NoApproximation
+                m.set_function("NONE")
 
     @contextmanager
     def keep_dmx_config(self):
