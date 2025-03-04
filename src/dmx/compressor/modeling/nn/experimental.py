@@ -208,7 +208,7 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
         if self.bias_cast is not None:
             self.bias_cast.block_dim = -1
 
-    def forward(self, _input: torch.Tensor) -> torch.Tensor:
+    def _forward(self, _input: torch.Tensor) -> torch.Tensor:
         _, _, in_height, in_width = _input.shape
         _h_out = (in_height + 2 * self.padding[0] - (self.kernel_size[0] - 1) - 1) // self.stride[0] + 1
         _w_out = (in_width + 2 * self.padding[1] - (self.kernel_size[1] - 1) - 1) // self.stride[1] + 1
