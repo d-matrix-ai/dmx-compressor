@@ -11,6 +11,10 @@ import transformers.activations
 from dmx.compressor.numerical import Same, CastTo, CastToDict
 from . import DmxModule
 
+import dmir_compiler
+
+torch.ops.dmx_ops = torch.ops.dmx
+
 
 class ResAdd(DmxModule, torch.nn.Module):
     """
