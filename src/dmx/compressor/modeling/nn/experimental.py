@@ -1,9 +1,9 @@
 import torch
 from torch.fx import Graph
-from . import DmxModule
+from . import DmxModule, Conv1d as _Conv1d, Conv2d as _Conv2d
 
 
-class Conv1d(DmxModule, torch.nn.Conv1d):
+class Conv1d(_Conv1d):
     r"""
     This is an alternative version of the DmxModule .nn.Conv1d,
     without calling torch.nn.functional.conv1d(), but torch.nn.functional.unfold() and torch.matmul() instead.
@@ -191,7 +191,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
         return g
 
 
-class Conv2d(DmxModule, torch.nn.Conv2d):
+class Conv2d(_Conv2d):
     r"""
     This is an alternative version of the DmxModule.nn.Conv2d,
     without calling torch.nn.functional.conv2d(), but torch.nn.functional.unfold() and torch.matmul() instead.
