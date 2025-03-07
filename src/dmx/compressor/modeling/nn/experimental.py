@@ -55,31 +55,6 @@ class Conv1d(_Conv1d):
             _output = _convolution
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
-        """
-        Creates a new Conv1d object (DmxModule) from a given PyTorch Conv1d layer.
-
-        Args:
-            raw (torch.nn.Module): A PyTorch Conv1d layer to be converted.
-
-        Returns:
-            DmxModule: A Conv1d object that has the same configuration as the input PyTorch Conv1d layer.
-        """
-        initial_dmx = Conv1d(
-            raw.in_channels,
-            raw.out_channels,
-            raw.kernel_size,
-            stride=raw.stride,
-            padding=raw.padding,
-            dilation=raw.dilation,
-            groups=raw.groups,
-            bias=raw.bias is not None,
-            padding_mode=raw.padding_mode,
-        )
-        initial_dmx.update_params_with_raw(raw)
-        return initial_dmx
-
     def to_compiler_graph(self) -> Graph:
         """
         Returns a compiler friendly graph
@@ -249,31 +224,6 @@ class Conv2d(_Conv2d):
         else:
             _output = _convolution
         return torch.nn.functional.fold(_output, (_h_out, _w_out), (1, 1))
-
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
-        """
-        Creates a new Conv2d object (DmxModule) from a given PyTorch Conv2d layer.
-
-        Args:
-            raw (torch.nn.Module): A PyTorch Conv2d layer to be converted.
-
-        Returns:
-            DmxModule: A Conv2d object that has the same configuration as the input PyTorch Conv2d layer.
-        """
-        initial_dmx = Conv2d(
-            raw.in_channels,
-            raw.out_channels,
-            raw.kernel_size,
-            stride=raw.stride,
-            padding=raw.padding,
-            dilation=raw.dilation,
-            groups=raw.groups,
-            bias=raw.bias is not None,
-            padding_mode=raw.padding_mode,
-        )
-        initial_dmx.update_params_with_raw(raw)
-        return initial_dmx
 
     def to_compiler_graph(self) -> Graph:
         """
