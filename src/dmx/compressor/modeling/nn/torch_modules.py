@@ -11,7 +11,6 @@ import transformers.activations
 from dmx.compressor.numerical import Same, CastTo, CastToDict
 from . import DmxModule
 
-import dmir_compiler
 
 class ResAdd(DmxModule, torch.nn.Module):
     """
@@ -493,16 +492,16 @@ class Linear(DmxModule, torch.nn.Linear):
                 _output = _product
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         if isinstance(raw, transformers.pytorch_utils.Conv1D):
-            initial_dmx = Linear(
+            initial_dmx = cls(
                 raw.weight.shape[0], raw.weight.shape[1], bias=raw.bias is not None
             )
             initial_dmx.weight.data = raw.weight.data.t()
             initial_dmx.bias = raw.bias
         else:
-            initial_dmx = Linear(
+            initial_dmx = cls(
                 raw.in_features, raw.out_features, bias=raw.bias is not None
             )
             initial_dmx.update_params_with_raw(raw)
@@ -676,9 +675,9 @@ class Embedding(DmxModule, torch.nn.Embedding):
         )
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
-        initial_dmx = Embedding(
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = cls(
             num_embeddings=raw.num_embeddings,
             embedding_dim=raw.embedding_dim,
             padding_idx=raw.padding_idx,
@@ -774,8 +773,8 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
             _output = _convolution
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new Conv1d object (DmxModule) from a given PyTorch Conv1d layer.
 
@@ -785,7 +784,7 @@ class Conv1d(DmxModule, torch.nn.Conv1d):
         Returns:
             DmxModule: A Conv1d object that has the same configuration as the input PyTorch Conv1d layer.
         """
-        initial_dmx = Conv1d(
+        initial_dmx = cls(
             raw.in_channels,
             raw.out_channels,
             raw.kernel_size,
@@ -866,8 +865,8 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
             _output = _convolution
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new Conv2d object (DmxModule) from a given PyTorch Conv2d layer.
 
@@ -877,7 +876,7 @@ class Conv2d(DmxModule, torch.nn.Conv2d):
         Returns:
             DmxModule: A Conv2d object that has the same configuration as the input PyTorch Conv2d layer.
         """
-        initial_dmx = Conv2d(
+        initial_dmx = cls(
             raw.in_channels,
             raw.out_channels,
             raw.kernel_size,
@@ -988,9 +987,9 @@ class ConvTranspose2d(DmxModule, torch.nn.ConvTranspose2d):
             _output = _convolution
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
-        initial_dmx = ConvTranspose2d(
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = cls(
             raw.in_channels,
             raw.out_channels,
             raw.kernel_size,
@@ -1027,8 +1026,8 @@ class AdaptiveAvgPool2d(DmxModule, torch.nn.AdaptiveAvgPool2d):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new AdaptiveAvgPool2d object (DmxModule) from a given PyTorch AdaptiveAvgPool2d layer.
 
@@ -1038,7 +1037,7 @@ class AdaptiveAvgPool2d(DmxModule, torch.nn.AdaptiveAvgPool2d):
         Returns:
             DmxModule: An AdaptiveAvgPool2d object that has the same configuration as the input PyTorch AdaptiveAvgPool2d layer.
         """
-        initial_dmx = AdaptiveAvgPool2d(raw.output_size)
+        initial_dmx = cls(raw.output_size)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1065,8 +1064,8 @@ class AvgPool2d(DmxModule, torch.nn.AvgPool2d):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new AvgPool2d object (DmxModule) from a given PyTorch AvgPool2d layer.
 
@@ -1076,7 +1075,7 @@ class AvgPool2d(DmxModule, torch.nn.AvgPool2d):
         Returns:
             DmxModule: An AvgPool2d object that has the same configuration as the input PyTorch AvgPool2d layer.
         """
-        initial_dmx = AvgPool2d(raw.output_size)
+        initial_dmx = cls(raw.output_size)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1123,8 +1122,8 @@ class MaxPool2d(DmxModule, torch.nn.MaxPool2d):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new MaxPool2d object (DmxModule) from a given PyTorch MaxPool2d layer.
 
@@ -1134,7 +1133,7 @@ class MaxPool2d(DmxModule, torch.nn.MaxPool2d):
         Returns:
             DmxModule: A MaxPool2d object that has the same configuration as the input PyTorch MaxPool2d layer.
         """
-        initial_dmx = MaxPool2d(
+        initial_dmx = cls(
             raw.kernel_size,
             stride=raw.stride,
             padding=raw.padding,
@@ -1169,8 +1168,8 @@ class Softmax(DmxModule, torch.nn.Softmax):
         _output = self.approx_forward((_input,), dim=self.dim)
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a Softmax DmxModule instance from a raw torch.nn.Module instance.
 
@@ -1180,7 +1179,7 @@ class Softmax(DmxModule, torch.nn.Softmax):
         Returns:
             DmxModule: An initialized Softmax DmxModule instance with parameters copied from the raw instance.
         """
-        initial_dmx = Softmax(dim=raw.dim)
+        initial_dmx = cls(dim=raw.dim)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1269,8 +1268,8 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         )
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         """
         Creates a new LayerNorm object (DmxModule) from a given PyTorch LayerNorm layer.
 
@@ -1280,7 +1279,7 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         Returns:
             DmxModule: A LayerNorm object that has the same configuration as the input PyTorch LayerNorm layer.
         """
-        initial_dmx = LayerNorm(
+        initial_dmx = cls(
             raw.normalized_shape, eps=raw.eps, elementwise_affine=raw.elementwise_affine
         )
         initial_dmx.update_params_with_raw(raw)
@@ -1380,8 +1379,8 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
         )
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new RMSNorm object (DmxModule) from a given PyTorch RMSNorm layer.
 
@@ -1391,7 +1390,7 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
         Returns:
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
-        initial_dmx = RMSNorm(
+        initial_dmx = cls(
             normalized_shape=raw.weight.shape[0],
             eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
         )
@@ -1530,8 +1529,8 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
         )
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new BatchNorm2d object (DmxModule) from a given PyTorch BatchNorm2d layer.
 
@@ -1541,7 +1540,7 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
         Returns:
             DmxModule: A BatchNorm2d object that has the same configuration as the input PyTorch BatchNorm2d layer.
         """
-        initial_dmx = BatchNorm2d(
+        initial_dmx = cls(
             raw.num_features,
             eps=raw.eps,
             momentum=raw.momentum,
@@ -1703,8 +1702,8 @@ class Dropout(DmxModule, torch.nn.Dropout):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new Dropout object (DmxModule) from a given PyTorch Dropout layer.
 
@@ -1714,7 +1713,7 @@ class Dropout(DmxModule, torch.nn.Dropout):
         Returns:
             DmxModule: A Dropout object that has the same configuration as the input PyTorch Dropout layer.
         """
-        initial_dmx = Dropout(p=raw.p, inplace=raw.inplace)
+        initial_dmx = cls(p=raw.p, inplace=raw.inplace)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1787,8 +1786,8 @@ class ReLU(DmxModule, torch.nn.ReLU):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new ReLU object (DmxModule) from a given PyTorch ReLU layer.
 
@@ -1798,7 +1797,7 @@ class ReLU(DmxModule, torch.nn.ReLU):
         Returns:
             DmxModule: A ReLU object that has the same configuration as the input PyTorch ReLU layer.
         """
-        initial_dmx = ReLU(inplace=raw.inplace)
+        initial_dmx = cls(inplace=raw.inplace)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1867,8 +1866,8 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new ReLU6 object (DmxModule) from a given PyTorch ReLU6 layer.
 
@@ -1877,7 +1876,7 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
         Returns:
             DmxModule: A ReLU6 object that has the same configuration as the input PyTorch ReLU6 layer.
         """
-        initial_dmx = ReLU6(inplace=raw.inplace)
+        initial_dmx = cls(inplace=raw.inplace)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -1946,8 +1945,8 @@ class SiLU(DmxModule, torch.nn.SiLU):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new SiLU object (DmxModule) from a given PyTorch SiLU layer.
 
@@ -1957,7 +1956,7 @@ class SiLU(DmxModule, torch.nn.SiLU):
         Returns:
             DmxModule: A SiLU object that has the same configuration as the input PyTorch SiLU layer.
         """
-        initial_dmx = SiLU(inplace=raw.inplace)
+        initial_dmx = cls(inplace=raw.inplace)
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
@@ -2024,8 +2023,8 @@ class Tanh(DmxModule, torch.nn.Tanh):
         _output = self.approx_forward((_input,))
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new Tanh object (DmxModule) from a given PyTorch Tanh layer.
 
@@ -2035,7 +2034,7 @@ class Tanh(DmxModule, torch.nn.Tanh):
         Returns:
             DmxModule: A Tanh object that has the same configuration as the input PyTorch Tanh layer.
         """
-        initial_dmx = Tanh()
+        initial_dmx = cls()
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 

@@ -9,7 +9,7 @@ import transformers
 import transformers.activations
 
 from dmx.compressor.numerical import Same, CastTo, CastToDict
-from . import DmxModule 
+from . import DmxModule
 from .torch_modules import GELUBase
 
 
@@ -46,8 +46,8 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
         _output = self.approx_forward((_input,), self._weight, self.eps)
         return _output
 
-    @staticmethod
-    def from_raw(raw: torch.nn.Module) -> DmxModule:
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
         r"""
         Creates a new RMSNorm object (DmxModule) from a given PyTorch RMSNorm layer.
 
@@ -57,7 +57,7 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
         Returns:
             DmxModule: A RMSNorm object that has the same configuration as the input PyTorch RMSNorm layer.
         """
-        initial_dmx = GemmaRMSNorm(
+        initial_dmx = cls(
             dim=raw.weight.shape[0],
             eps=raw.variance_epsilon if hasattr(raw, "variance_epsilon") else raw.eps,
         )
