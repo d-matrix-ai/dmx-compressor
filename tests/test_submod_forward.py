@@ -1,7 +1,7 @@
 import torch
 import pytest
 
-from dmx.compressor.modeling import DmxModel, DmxConfigRule
+from dmx.compressor.modeling.model import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
 
 
