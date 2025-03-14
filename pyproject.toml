@@ -33,7 +33,7 @@ poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 
 [tool.poetry-dynamic-versioning]
 vcs = "git"
-style = "semver"
+style = "pep440"
 enable = true
 
 [build-system]
