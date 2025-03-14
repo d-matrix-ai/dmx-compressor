@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
-QdQ Transform (compiler export)
+
+## [v0.1.4]
+Support to export DMX modules as FXIR graphs
 
 ## [v0.1.2] (2023-11-08)
 
