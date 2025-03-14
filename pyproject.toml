@@ -2,6 +2,7 @@
 name = "dmx-compressor"
 version = "0.1.5"
 description = "d-Matrix Compressor"
+readme = "README.md"
 authors = ["Tristan Webb <twebb@d-matrix.ai>", "Xin Wang <xwang@d-matrix.ai>", "Michael Klachko <mklachko@d-matrix.ai>","Sayeh Sharify <sayehs@d-matrix.ai>", "Wanzin Yazar <wyazar@d-matrix.ai>", "Zifei Xu <xuzifei@d-matrix.ai>"]
 include = [{ path = "tests", format = "sdist" }]
 packages = [
