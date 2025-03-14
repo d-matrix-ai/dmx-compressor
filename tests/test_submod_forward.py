@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 from dmx.compressor.modeling import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
@@ -32,18 +33,21 @@ class Model(torch.nn.Module):
         return out
 
 
-model = DmxModel.from_torch(Model())
+@pytest.fixture
+def setup_model():
+    model = DmxModel.from_torch(Model())
+    inp = torch.rand((1, 160))
+    out_full_0 = model(inp)
+    
+    # creating transformed submod forward
+    DmxModel.create_submod_transform_forward(model, "sm1")
+    DmxModel.create_submod_transform_forward(model, "sm2")
+    
+    return model, inp, out_full_0
 
-inp = torch.rand((1, 160))
-out_full_0 = model(inp)
 
-
-# creating transformed submod forward
-DmxModel.create_submod_transform_forward(model, "sm1")
-DmxModel.create_submod_transform_forward(model, "sm2")
-
-
-def test_unquantized():
+def test_unquantized(setup_model):
+    model, inp, _ = setup_model
     out1 = model.sm1.transformed_forward(inp, inp)
     out0 = model.sm1.forward(inp, inp)
     # check sm1 output is same between original model and unquantized dmx model
@@ -52,7 +56,8 @@ def test_unquantized():
     ), "unquantized submodule produced different output from original submodule, should be same"
 
 
-def test_quantized():
+def test_quantized(setup_model):
+    model, inp, out_full_0 = setup_model
     bfp16 = "BFP[8|8]{64}(SN)"
     rules = (
         DmxConfigRule(
