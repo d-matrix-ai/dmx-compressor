@@ -17,6 +17,7 @@ from .modeling import (
 
 # Numerical format aliases
 format = SimpleNamespace(
+    SAME=Format.from_shorthand("SAME"),
     FLOAT32=Format.from_shorthand("FP[1|8|23,127](_N)"),
     FLOAT16=Format.from_shorthand("FP[1|5|10,15](FN)"),
     BFLOAT16=Format.from_shorthand("FP[1|8|7,127](FN)"),
@@ -115,11 +116,84 @@ default_approx = SimpleNamespace(
     RMSNORM=ApproximationFunction.from_shorthand("NONE"),
     LLAMAROTARYEMBEDDINGREFACTORED=ApproximationFunction.from_shorthand("NONE"),
     HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("NONE"),
+    NONE=ApproximationFunction.from_shorthand("NONE"),
 )
 
 # Automatic configuration rules
 config_rules = SimpleNamespace(
-    BASELINE=[],
+    BASELINE=[
+        DmxConfigRule(
+            module_types=(nn.Linear,),
+            module_config=dict(
+                input_formats=[format.SAME],
+                weight_format=format.SAME,
+                bias_format=format.SAME,
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.Conv1d,
+                nn.Conv2d,
+                nn.ConvTranspose2d,
+            ),
+            module_config=dict(
+                input_formats=[format.SAME],
+                weight_format=format.SAME,
+                bias_format=format.SAME,
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ResAdd,),
+            module_config=dict(
+                input_formats=[format.SAME, format.SAME],
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ActActMatMul,),
+            module_config=dict(
+                input_formats=[format.SAME, format.SAME],
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Embedding,),
+            module_config=dict(
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.MaxPool2d,
+                nn.AdaptiveAvgPool2d,
+                nn.AvgPool2d,
+            ),
+            module_config=dict(
+                input_formats=[format.SAME],
+                output_format=format.SAME,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.ReLU,
+                nn.ReLU6,
+                nn.GELUBase,
+                nn.SiLU,
+                nn.Tanh,
+                nn.Softmax,
+                nn.LayerNorm,
+                nn.BatchNorm2d,
+                nn.GroupNorm,
+            ),
+            module_config=dict(
+                input_formats=[format.SAME],
+                output_format=format.SAME,
+                approximation_function=default_approx.NONE,
+            ),
+        ),
+    ],
     BASIC=[
         DmxConfigRule(
             module_types=(nn.Linear,),

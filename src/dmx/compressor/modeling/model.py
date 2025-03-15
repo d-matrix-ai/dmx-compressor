@@ -1,9 +1,11 @@
 import torch
 import re
-from collections import deque, OrderedDict
+import warnings
+from collections import OrderedDict
 from inspect import signature, _empty
 from types import SimpleNamespace
 from contextlib import ExitStack, contextmanager
+from copy import deepcopy
 from typing import (
     Any,
     Dict,
@@ -23,17 +25,26 @@ from dmx.compressor.fx.transform import (
 )
 from dmx.compressor.fx.transformer import get_op_set_from
 from dmx.compressor.utils.fx.visualize_graph import visualize_graph
-from copy import deepcopy
-from dmx.compressor.functional import Approximate
 
 
 class DmxModelMixin:
-    transformed: bool = False
-    curr_config: Dict = {}
+    transformed: bool
+    additional_dmx_aware_mappings: Dict
+    _gm: Optional[torch.fx.GraphModule]  # current gm
+    _gms: Dict  # stores {sig: gm} pairs
+    _dmx_configuration_queue: List  # stores (config, rules) to be applied
 
-    _dmx_configurations_to_be_applied: deque = (
-        deque()
-    )  # stores (config, rules) to be applied
+    def _apply_config(self, config: Optional[Union[dict, str]], *rules):
+        if config is not None:
+            if isinstance(config, str):
+                config = DmxConfig.from_yaml(config)
+
+            for n, m in self.named_dmx_modules():
+                if n in config:
+                    m.configure(config[n])
+
+        for _r in rules:
+            _r.apply_to(self)
 
     def configure(self, config: Optional[Union[dict, str]], *rules):
         r"""
@@ -49,20 +60,9 @@ class DmxModelMixin:
             Returns the transformed model
 
         """
-        if not self.transformed:
-            self._dmx_configurations_to_be_applied.append((config, rules))
-        else:
-            if config is not None:
-                if isinstance(config, str):
-                    config = DmxConfig.from_yaml(config)
-
-                for n, m in self.named_dmx_modules():
-                    if n in config:
-                        m.configure(config[n])
-
-            for _r in rules:
-                _r.apply_to(self)
-
+        self._dmx_configuration_queue.append((config, rules))
+        if self.transformed:
+            self._apply_config(config, *rules)
         return self
 
     transform = configure  # NOTE: to be deprecated
@@ -75,8 +75,7 @@ class DmxModelMixin:
     @property
     def dmx_config(self):
         r""" "Returns the DmxConfig object for the model"""
-        self.curr_config.update(DmxConfig.from_model(self, freeze=True))
-        return self.curr_config
+        DmxConfig.from_model(self, freeze=True)
 
     @property
     def dmx_module_names(self):
@@ -149,19 +148,19 @@ class DmxModelMixin:
         return self.configure(None, *config_rules.BASIC)
 
     def to_baseline_mode(self):
-        for _, m in self.named_modules():
-            if isinstance(m, CastTo):
-                m.set_format("SAME")
-            elif isinstance(m, LazySparsify):
-                m.configure(sparseness="DENSE")
-            elif isinstance(m, Approximate):
-                m.set_function("NONE")
+        from dmx.compressor import config_rules
+
+        # we can clear the _dmx_configuration_queue as baseline config rule will overwrite everything
+        self._dmx_configuration_queue = []
+        self.configure(None, *config_rules.BASELINE)
 
     @contextmanager
     def keep_dmx_config(self):
-        _dmx_config = self.dmx_config
+        _old_dmx_config_queue = deepcopy(self._dmx_configuration_queue)
         yield self
-        self.configure(_dmx_config)
+        for _config, _rules in _old_dmx_config_queue:
+            self._apply_config(_config, *_rules)
+        self._dmx_configuration_queue = _old_dmx_config_queue
 
     @contextmanager
     def counting_flops(self, zero: bool = True):
@@ -259,7 +258,6 @@ class DmxModelMixin:
 
 
 class DmxModel(DmxModelMixin):
-
     @staticmethod
     def _add_transformed_gm(_model, args, kwargs):
         if hasattr(_model, "old_forward"):
@@ -421,7 +419,7 @@ class DmxModel(DmxModelMixin):
                     raise Exception(
                         "model forward needs to be called before submodule forward."
                     )
-                print("Submodule transformation triggered")
+                warnings.warn("Submodule transformation triggered")
                 _m.tracing_kwargs = (
                     DmxModel.deepcopy_args(_args),
                     DmxModel.deepcopy_args(_kwargs),
@@ -464,24 +462,25 @@ class DmxModel(DmxModelMixin):
             _cls = model.__class__
             model.class_for_deserialization = _cls
             model.__class__ = _cls.__class__("Dmx" + _cls.__name__, (_cls, cls), {})
-        model._gm = None
         model.additional_dmx_aware_mappings = additional_dmx_aware_mappings
         model.transformed = False
-        model._gms = dict()
+        model._gm = None
+        model._gms = {}
+        from dmx.compressor import config_rules
+
+        model._dmx_configuration_queue = [(None, config_rules.BASELINE)]
 
         def temp_forward(_m, *_args, **_kwargs):
             _is_training = _m.training
             sig_key = DmxModel.to_signature_key(_m, _args, _kwargs)
             if not _m.transformed or not DmxModel.is_same_signature(_m, _args, _kwargs):
-                if _m.transformed:
-                    curr_cfg = _m.dmx_config
-                print("Model transformation triggered")
+                warnings.warn("Model transformation triggered")
                 _m.tracing_kwargs = (
                     DmxModel.deepcopy_args(_args),
                     DmxModel.deepcopy_args(_kwargs),
                 )
                 if sig_key in _m._gms:
-                    print("Reusing graph module from past")
+                    warnings.warn("Reusing graph module from past")
                     _m._gm = _m._gms[sig_key]
                 else:
                     # because some args and kwargs are changed in place in forward, we need to keep a copy fo the _args and _kwargs
@@ -492,13 +491,11 @@ class DmxModel(DmxModelMixin):
                     _m._gms[sig_key] = _m._gm
 
                 _m._forward = DmxModel._get_transformed_forward(_m)
-                if _m.transformed:
-                    _m.configure(curr_cfg)
-                else:
-                    _m.transformed = True
-                    while len(_m._dmx_configurations_to_be_applied) != 0:
-                        _config, _rules = _m._dmx_configurations_to_be_applied.popleft()
-                        _m.configure(_config, *_rules)
+
+                _m.transformed = True
+                # configure the model
+                for _config, _rules in _m._dmx_configuration_queue:
+                    _m._apply_config(_config, *_rules)
                 _m.train(_is_training)
                 _m.forward = partial(temp_forward, _m)
 
