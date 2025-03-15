@@ -4,6 +4,11 @@ import pytest
 from dmx.compressor.modeling.model import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
 
+# Add parent directory to Python path
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+
 
 class Submod(torch.nn.Module):
     def __init__(self, indim, hiddim, outdim) -> None:
