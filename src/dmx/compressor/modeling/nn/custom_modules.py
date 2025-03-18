@@ -147,3 +147,66 @@ class ApplyRotaryPosEmb(DmxModule, ApplyRotaryPosEmbBase):
     def _forward(self, q, k, cos, sin, unsqueeze_dim=1) -> Tensor:
         _output = self.approx_forward((q, k, cos, sin, unsqueeze_dim))
         return _output
+
+    def to_compiler_graph(self):
+        # combine these two lines into one context manager
+        g = Graph()
+        with g.inserting_after():
+            # a function that insert placeholder nodes
+            placeholders = create_placeholders(g, ["q", "k", "cos", "sin"])
+            cast_names = [
+                "input_casts.q_cast",
+                "input_casts.k_cast",
+                "input_casts.cos_cast",
+                "input_casts.sin_cast",
+            ]
+            dq_q, dq_k, dq_cos, dq_sin = qdq_nodes(self, g, placeholders, cast_names)
+            q_emb = g.call_function(apply_rotary_embeddings, (dq_q, dq_cos, dq_sin))
+            k_emb = g.call_function(apply_rotary_embeddings, (dq_k, dq_cos, dq_sin))
+            output_cast_names = [
+                "output_casts.q_embed_cast",
+                "output_casts.k_embed_cast",
+            ]
+            q_res, k_res = qdq_nodes(self, g, [q_emb, k_emb], output_cast_names)
+            # output = g.call_function(tuple, (q_res, k_res))
+            g.output((q_res, k_res))
+        return g
+
+
+def apply_rotary_embeddings(x, cos_embedding, sin_embedding):
+    cos = cos_embedding.unsqueeze(1)
+    sin = sin_embedding.unsqueeze(1)
+    x_embed = (x * cos) + (ApplyRotaryPosEmbBase().rotate_half(x) * sin)
+    return x_embed
+
+
+def create_placeholders(g, names):
+    placeholder_nodes = []
+    for name in names:
+        _n = g.placeholder(name)
+        placeholder_nodes.append(_n)
+    return placeholder_nodes
+
+
+def qdq_nodes(m, g, nodes, cast_names):
+    from operator import attrgetter
+
+    dq_nodes = []
+    for node, cast_name in zip(nodes, cast_names):
+        _scale = g.get_attr(f"{cast_name}.scale")
+        _zero_point = g.get_attr(f"{cast_name}.zero_point")
+        _q = g.call_function(
+            torch.ops.dmx.quantize,
+            (
+                node,
+                _scale,
+                _zero_point,
+                repr(attrgetter(f"{cast_name}.format")(m)),
+            ),
+        )
+        _dq = g.call_function(
+            torch.ops.dmx.dequantize,
+            (_q, _scale, _zero_point),
+        )
+        dq_nodes.append(_dq)
+    return dq_nodes
