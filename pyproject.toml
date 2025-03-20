@@ -16,7 +16,7 @@ include = [{ path = "tests", format = "sdist" }]
 packages = [    { include = "dmx/compressor", from = "src" },
     { include = "mltools", from = "src" },
 ]
-version = "0.1.5"
+version = "0.1.6"
 
 [tool.poetry.dependencies]
 datasets = "^3.0"
@@ -40,7 +40,6 @@ accelerate = "^1.0"
 poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 
 [tool.poetry-dynamic-versioning]
-vcs = "git"
 style = "pep440"
 enable = true
 
