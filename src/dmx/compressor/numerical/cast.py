@@ -91,16 +91,15 @@ class CastToDict(torch.nn.ModuleDict):
             param = {
                 keys[i]: p if p is not None else "SAME" for i, p in enumerate(param)
             }
-        if isinstance(param, dict):
-            if len(param) != len(self):
-                warnings.warn(
-                    f"length of format to set is not equal to length of input_casts, some CastTos might not be set properly!\nlen({param}!={len(self)})"
-                )
-        else:
+        elif not isinstance(param, dict):
             raise ValueError("format needs to be a dict, tuple or list!")
+        if len(param) != len(self):
+            warnings.warn(
+                f"length of format to set is not equal to length of input_casts, some CastTos might not be set properly!\nlen({param}!={len(self)})"
+            )
         return param
 
-    def set_format(self, format: Union[Dict, str, torch.dtype, Format]):
+    def set_format(self, format: Union[Dict, tuple, list]):
         format = self.pack_to_dict(format)
         for k, f in format.items():
             if isinstance(f, str):

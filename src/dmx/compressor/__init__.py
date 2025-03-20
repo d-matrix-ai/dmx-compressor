@@ -128,7 +128,7 @@ config_rules = SimpleNamespace(
                 input_formats=[format.SAME],
                 weight_format=format.SAME,
                 bias_format=format.SAME,
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
@@ -141,27 +141,27 @@ config_rules = SimpleNamespace(
                 input_formats=[format.SAME],
                 weight_format=format.SAME,
                 bias_format=format.SAME,
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.ResAdd,),
             module_config=dict(
                 input_formats=[format.SAME, format.SAME],
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.ActActMatMul,),
             module_config=dict(
                 input_formats=[format.SAME, format.SAME],
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.Embedding,),
             module_config=dict(
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
@@ -172,7 +172,7 @@ config_rules = SimpleNamespace(
             ),
             module_config=dict(
                 input_formats=[format.SAME],
-                output_format=format.SAME,
+                output_formats=[format.SAME],
             ),
         ),
         DmxConfigRule(
@@ -189,7 +189,7 @@ config_rules = SimpleNamespace(
             ),
             module_config=dict(
                 input_formats=[format.SAME],
-                output_format=format.SAME,
+                output_formats=[format.SAME],
                 approximation_function=default_approx.NONE,
             ),
         ),
@@ -201,7 +201,7 @@ config_rules = SimpleNamespace(
                 input_formats=[format.BFP16_64],
                 weight_format=format.BFP16_64,
                 bias_format=format.BFP32_1,
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
@@ -214,27 +214,27 @@ config_rules = SimpleNamespace(
                 input_formats=[format.BFP16_64],
                 weight_format=format.BFP16_64,
                 bias_format=format.BFP32_1,
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.ResAdd,),
             module_config=dict(
                 input_formats=[format.FLOAT16, format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.ActActMatMul,),
             module_config=dict(
                 input_formats=[format.BFP16_64, format.BFP16_64],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.Embedding,),
             module_config=dict(
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
@@ -245,14 +245,14 @@ config_rules = SimpleNamespace(
             ),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
             ),
         ),
         DmxConfigRule(
             module_types=(nn.ReLU,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.RELU,
             ),
         ),
@@ -260,7 +260,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.ReLU6,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.RELU6,
             ),
         ),
@@ -268,7 +268,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.GELUBase,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.GELU,
             ),
         ),
@@ -276,7 +276,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.SiLU,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.SILU,
             ),
         ),
@@ -284,7 +284,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.Tanh,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.TANH,
             ),
         ),
@@ -292,7 +292,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.Softmax,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.SOFTMAX,
             ),
         ),
@@ -300,7 +300,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.LayerNorm,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.LAYERNORM,
             ),
         ),
@@ -308,7 +308,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.BatchNorm2d,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.BATCHNORM2D,
             ),
         ),
@@ -316,7 +316,7 @@ config_rules = SimpleNamespace(
             module_types=(nn.GroupNorm,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
-                output_format=format.FLOAT16,
+                output_formats=[format.FLOAT16],
                 approximation_function=default_approx.GROUPNORM,
             ),
         ),
