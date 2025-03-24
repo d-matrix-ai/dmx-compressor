@@ -270,6 +270,36 @@ class DmxModule(
         """
         raise NotImplementedError("to_compiler_graph not implemented!")
 
+    def create_placeholders(self, g, names):
+        placeholder_nodes = []
+        for name in names:
+            _n = g.placeholder(name)
+            placeholder_nodes.append(_n)
+        return placeholder_nodes
+
+    def qdq_nodes(self, g, nodes, cast_names):
+        from operator import attrgetter
+
+        dq_nodes = []
+        for node, cast_name in zip(nodes, cast_names):
+            _scale = g.get_attr(f"{cast_name}.scale")
+            _zero_point = g.get_attr(f"{cast_name}.zero_point")
+            _q = g.call_function(
+                torch.ops.dmx.quantize,
+                (
+                    node,
+                    _scale,
+                    _zero_point,
+                    repr(attrgetter(f"{cast_name}.format")(self)),
+                ),
+            )
+            _dq = g.call_function(
+                torch.ops.dmx.dequantize,
+                (_q, _scale, _zero_point),
+            )
+            dq_nodes.append(_dq)
+        return dq_nodes
+
 
 class DmxModuleConfig(dict):
     @classmethod

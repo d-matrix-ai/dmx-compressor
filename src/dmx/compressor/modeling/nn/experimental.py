@@ -62,20 +62,11 @@ class Conv1dUnfold(_Conv1d):
         g = torch.fx.Graph()
         with g.inserting_after():
             # PLACEHOLDERS
-            _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_casts.input_cast.scale")
-            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
-            _input_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _input,
-                    _input_scale,
-                    _input_zero_point,
-                    repr(self.input_casts.input_cast.format),
-                ),
-            )
-            _input_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input_dq = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                ["input_casts.input_cast"],
             )
 
             _unsqueeze = g.call_function(torch.unsqueeze, (_input_dq, -1))
@@ -93,51 +84,17 @@ class Conv1dUnfold(_Conv1d):
 
             # _weight
             _weight = g.get_attr("_weight")
-            _weight_scale = g.get_attr("weight_scale")
-            _weight_zero_point = g.get_attr("weight_zero_point")
-            _weight_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _weight,
-                    _weight_scale,
-                    _weight_zero_point,
-                    repr(self.weight_cast.format),
-                ),
-            )
-            _weight_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
-            )
+            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
 
             _reshape = g.call_function(
                 torch.reshape, (_weight_dq, (self.out_channels, -1))
             )
             matmul = g.call_function(torch.matmul, (_reshape, _unfold))
-            _matmul_scale = g.get_attr("accum_cast.scale")
-            _matmul_zero_point = g.get_attr("accum_cast.zero_point")
-            _matmul_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    matmul,
-                    _matmul_scale,
-                    _matmul_zero_point,
-                    repr(self.accum_cast.format),
-                ),
-            )
-            _matmul_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_matmul_q, _matmul_scale, _matmul_zero_point)
-            )
+            _matmul_dq = self.qdq_nodes(g, [matmul], ["accum_cast"])
 
             if self.bias is not None:
                 _bias = g.get_attr("_bias")
-                _bias_scale = g.get_attr("bias_cast.scale")
-                _bias_zero_point = g.get_attr("bias_cast.zero_point")
-                _bias_q = g.call_function(
-                    torch.ops.dmx.quantize,
-                    (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
-                )
-                _bias_dq = g.call_function(
-                    torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point)
-                )
+                _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
                 _bias_unsqueeze = g.call_function(torch.unsqueeze, (_bias_dq, -1))
 
                 _output = g.call_function(
@@ -147,21 +104,7 @@ class Conv1dUnfold(_Conv1d):
             else:
                 _output = _matmul_dq
 
-            _output_scale = g.get_attr("output_casts.output_cast.scale")
-            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
-            _output_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _output,
-                    _output_scale,
-                    _output_zero_point,
-                    repr(self.output_casts.output_cast.format),
-                ),
-            )
-            _output_dq = g.call_function(
-                torch.ops.dmx.dequantize,
-                (_output_q, _output_scale, _output_zero_point),
-            )
+            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -315,20 +258,11 @@ class Conv2d(_Conv2d):
         g = torch.fx.Graph()
         with g.inserting_after():
             # PLACEHOLDERS
-            _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_casts.input_cast.scale")
-            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
-            _input_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _input,
-                    _input_scale,
-                    _input_zero_point,
-                    repr(self.input_casts.input_cast.format),
-                ),
-            )
-            _input_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input_dq = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                ["input_casts.input_cast"],
             )
             getattr_1 = g.call_function(getattr, (_input_dq, "shape"), {})
             getitem_2 = g.call_function(operator.getitem, (getattr_1, 2), {})
@@ -346,20 +280,7 @@ class Conv2d(_Conv2d):
 
             # _weight
             _weight = g.get_attr("_weight")
-            _weight_scale = g.get_attr("weight_scale")
-            _weight_zero_point = g.get_attr("weight_zero_point")
-            _weight_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _weight,
-                    _weight_scale,
-                    _weight_zero_point,
-                    repr(self.weight_cast.format),
-                ),
-            )
-            _weight_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
-            )
+            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
 
             getattr_2 = g.call_function(getattr, (_weight, "device"), {})
             to = g.call_method("to", (_weight_dq, getattr_2), {})
@@ -377,34 +298,14 @@ class Conv2d(_Conv2d):
                 },
             )
             matmul = g.call_function(torch.matmul, (reshape, unfold), {})
-            _matmul_scale = g.get_attr("accum_cast.scale")
-            _matmul_zero_point = g.get_attr("accum_cast.zero_point")
-            _matmul_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    matmul,
-                    _matmul_scale,
-                    _matmul_zero_point,
-                    repr(self.accum_cast.format),
-                ),
-            )
-            _matmul_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_matmul_q, _matmul_scale, _matmul_zero_point)
-            )
+            _matmul_dq = self.qdq_nodes(g, [matmul], ["accum_cast"])
+
             clone_1 = g.call_method("clone", (_matmul_dq,), {})
             getattr_4 = g.call_function(getattr, (matmul, "dtype"), {})
             to_2 = g.call_method("to", (clone_1, getattr_4), {})
             if self.bias is not None:
                 _bias = g.get_attr("_bias")
-                _bias_scale = g.get_attr("bias_cast.scale")
-                _bias_zero_point = g.get_attr("bias_cast.zero_point")
-                _bias_q = g.call_function(
-                    torch.ops.dmx.quantize,
-                    (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
-                )
-                _bias_dq = g.call_function(
-                    torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point)
-                )
+                _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
                 clone_2 = g.call_method("clone", (_bias_dq,), {})
                 getattr_5 = g.call_function(getattr, (_bias, "dtype"), {})
                 to_3 = g.call_method("to", (clone_2, getattr_5), {})
@@ -417,20 +318,6 @@ class Conv2d(_Conv2d):
                 torch.nn.functional.fold,
                 (output, (add_1, add_3), (1, 1)),
             )
-            _output_scale = g.get_attr("output_casts.output_cast.scale")
-            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
-            _output_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    fold,
-                    _output_scale,
-                    _output_zero_point,
-                    repr(self.output_casts.output_cast.format),
-                ),
-            )
-            _output_dq = g.call_function(
-                torch.ops.dmx.dequantize,
-                (_output_q, _output_scale, _output_zero_point),
-            )
+            _output_dq = self.qdq_nodes(g, [fold], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
