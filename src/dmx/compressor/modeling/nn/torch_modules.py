@@ -168,37 +168,9 @@ class ScaledDotProductAttention(DmxModule):
         """
         Returns a compiler friendly graph
         """
-        import warnings
-
-        warnings.warn("SDPA is not decomposed, torch sdpa function is used.")
-        g = torch.fx.Graph()
-        with g.inserting_after():
-            placeholders = self.create_placeholders(
-                g, ["value", "query", "key", "mask"]
-            )
-            cast_names = [
-                "input_casts.value_states_cast",
-                "input_casts.query_states_cast",
-                "input_casts.key_states_cast",
-                "input_casts.attn_mask_cast",
-            ]
-            value_states_dq, query_states_dq, key_states_dq, mask_states_dq = (
-                self.qdq_nodes(g, placeholders, cast_names)
-            )
-            _output = g.create_node(
-                "call_function",
-                torch.nn.functional.scaled_dot_product_attention,
-                (
-                    value_states_dq,
-                    query_states_dq,
-                    key_states_dq,
-                    mask_states_dq,
-                ),
-                name="output",
-            )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
-            g.output(_output_dq)
-        return g
+        raise NotImplementedError(
+            "ScaledDotProductAttention is a compound module and does not support to_compiler_graph"
+        )
 
 
 class ActActMatMul(DmxModule, torch.nn.Module):
@@ -252,6 +224,31 @@ class BAddBMM(DmxModule):
 
     def _forward(self, input, batch1, batch2, **kwargs):
         return torch.baddbmm(input, batch1, batch2, **kwargs)
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            placeholder_nodes = self.create_placeholders(
+                g, ["_input", "batch1", "batch2"]
+            )
+            dqs = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                [
+                    "input_casts.input_cast",
+                    "input_casts.batch1_cast",
+                    "input_casts.batch2_cast",
+                ],
+            )
+            _output = g.create_node(
+                "call_function", torch.baddbmm, tuple(dqs), name="output"
+            )
+            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
+            g.output(_output_dq)
+        return g
 
 
 class Linear(DmxModule, torch.nn.Linear):
@@ -442,18 +439,32 @@ class Embedding(DmxModule, torch.nn.Embedding):
         """
         Returns a compiler friendly graph
         """
-        initial_dmx = torch.nn.Embedding(
-            num_embeddings=self.num_embeddings,
-            embedding_dim=self.embedding_dim,
-            padding_idx=self.padding_idx,
-            max_norm=self.max_norm,
-            norm_type=self.norm_type,
-            scale_grad_by_freq=self.scale_grad_by_freq,
-            sparse=self.sparse,
-        )
-        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
-        graph = self.initial_dmx_graph
-        return graph
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            # PLACEHOLDERS
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input = placeholder_nodes[0]
+
+            # _weight
+            _weight = g.get_attr("_weight")
+            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _output = g.create_node(
+                "call_function",
+                torch.nn.functional.embedding,
+                (
+                    _input,
+                    _weight_dq,
+                    self.padding_idx,
+                    self.max_norm,
+                    self.norm_type,
+                    self.scale_grad_by_freq,
+                    self.sparse,
+                ),
+                name="_output",
+            )
+            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
+            g.output(_output_dq)
+        return g
 
 
 class Conv1d(DmxModule, torch.nn.Conv1d):
@@ -1205,31 +1216,6 @@ class BatchNorm2d(DmxModule, torch.nn.BatchNorm2d):
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
-    def to_compiler_graph(self) -> Graph:
-        """
-        Returns a compiler friendly graph
-        """
-        g = torch.fx.Graph()
-        with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
-                ["input_casts.input_cast"],
-            )
-            _weight = g.get_attr("_weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
-            _bias = g.get_attr("_bias")
-            _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
-
-            args = (_input_dq, self.num_groups, _weight_dq, _bias_dq, self.eps)
-            _output = g.create_node(
-                "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
-            )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
-            g.output(_output_dq)
-        return g
-
 
 class GroupNorm(DmxModule, torch.nn.GroupNorm):
     r"""
@@ -1456,7 +1442,7 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
                 ["input_casts.input_cast"],
             )
 
-            args = _input_dq
+            args = (_input_dq,)
             _output = g.create_node(
                 "call_function", torch.nn.functional.relu6, args, name="relu6"
             )
@@ -1565,7 +1551,7 @@ class Tanh(DmxModule, torch.nn.Tanh):
                 placeholder_nodes,
                 ["input_casts.input_cast"],
             )
-            args = _input_dq
+            args = (_input_dq,)
 
             _output = g.create_node(
                 "call_function", torch.nn.functional.tanh, args, name="tanh"
@@ -1613,10 +1599,22 @@ class GELUBase(DmxModule):
         """
         Returns a compiler friendly graph
         """
-        initial_dmx = self.activation_cls()
-        self.initial_dmx_graph = symbolic_trace(initial_dmx).graph
-        graph = self.initial_dmx_graph
-        return graph
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input_dq = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                ["input_casts.input_cast"],
+            )
+            args = (_input_dq,)
+
+            _output = g.create_node(
+                "call_function", self.functional_forward, args, name="gelu"
+            )
+            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
+            g.output(_output_dq)
+        return g
 
 
 class GELU(GELUBase):

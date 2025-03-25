@@ -285,7 +285,7 @@ class DmxModule(
             _scale = g.get_attr(f"{cast_name}.scale")
             _zero_point = g.get_attr(f"{cast_name}.zero_point")
             _q = g.call_function(
-                torch.ops.dmx.quantize,
+                torch.ops.dmx_ops.quantize,
                 (
                     node,
                     _scale,
@@ -294,10 +294,12 @@ class DmxModule(
                 ),
             )
             _dq = g.call_function(
-                torch.ops.dmx.dequantize,
+                torch.ops.dmx_ops.dequantize,
                 (_q, _scale, _zero_point),
             )
             dq_nodes.append(_dq)
+        if len(dq_nodes) == 1:
+            return dq_nodes[0]
         return dq_nodes
 
 

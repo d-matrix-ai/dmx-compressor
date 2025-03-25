@@ -64,20 +64,55 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
         initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input_dq = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                ["input_casts.input_cast"],
+            )
+            _weight = g.get_attr("_weight")
+            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+
+            # Non Tensor Attributes (no need to quantize)
+            eps = g.get_attr("eps")
+
+            args = ((_input_dq), _weight_dq, eps)
+            output = g.create_node(
+                "call_function", self.functional_forward, args, name="GemmanRMSNorm"
+            )
+            _output_dq = self.qdq_nodes(g, [output], ["output_casts.output_cast"])
+            g.output(_output_dq)
+        return g
+
 
 class NewGELU(GELUBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(transformers.activations.NewGELUActivation, *args, **kwargs)
+
+    def functional_forward(self, x):
+        return transformers.activations.NewGELUActivation().forward(x)
 
 
 class FastGELU(GELUBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(transformers.activations.FastGELUActivation, *args, **kwargs)
 
+    def functional_forward(self, x):
+        return transformers.activations.FastGELUActivation().forward(x)
+
 
 class QuickGELU(GELUBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(transformers.activations.QuickGELUActivation, *args, **kwargs)
+
+    def functional_forward(self, x):
+        return transformers.activations.QuickGELUActivation().forward(x)
 
 
 class ClippedGELU(GELUBase):
@@ -86,12 +121,20 @@ class ClippedGELU(GELUBase):
             transformers.activations.ClippedGELUActivation, *args, **kwargs
         )
 
+    def functional_forward(self, x):
+        return transformers.activations.ClippedGELUActivation(
+            self.min, self.max
+        ).forward(x)
+
 
 class BloomGELU(GELUBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(
             transformers.models.bloom.modeling_bloom.BloomGelu, *args, **kwargs
         )
+
+    def functional_forward(self, x):
+        return transformers.models.bloom.modeling_bloom.BloomGelu().forward(x)
 
 
 class ApplyRotaryPosEmbBase(torch.nn.Module):
