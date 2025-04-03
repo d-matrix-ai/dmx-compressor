@@ -40,131 +40,49 @@ class Conv1d(_Conv1d):
             self.bias_cast.block_dim = -1
 
     def _forward(self, _input: torch.Tensor) -> torch.Tensor:
-        _weight = self._weight.reshape((self.out_channels, -1))
-        _input = torch.nn.functional.unfold(
-            _input.unsqueeze(-1),
-            kernel_size=self.kernel_size + (1,),
-            dilation=self.dilation + (1,),
-            padding=self.padding + (0,),
-            stride=self.stride + (1,),
+        _N, _, _l_in = _input.shape
+        _padded_l_in = _l_in + 2 * self.padding[0]
+        _l_out = (_padded_l_in - self.kernel_size[0]) // self.stride[0] + 1
+
+        # zero padded input
+        _matmul_input = _input.transpose(1, 2).unsqueeze(2)
+        _pad = _input.new_zeros(_N, self.padding[0], 1, self.in_channels)
+        _matmul_input =  torch.cat((_pad, _matmul_input, _pad), 1)
+
+        _matmul_weight = _input.new_zeros(
+            self.out_channels, _padded_l_in, self.in_channels, _l_out
         )
-        _convolution = self.accum_cast(torch.matmul(_weight, _input))
-        if self.bias is not None:
-            _output = torch.add(_convolution, self._bias.unsqueeze(-1))
-        else:
-            _output = _convolution
+
+        # Create a single weight matrix from all kernels
+        _weight_ref = self._weight.transpose(1, 2).unsqueeze(3).repeat(1, 1, 1, _l_out)
+
+        # Create scatter indices   
+        _indices = _input.new_ones(_l_out, dtype=torch.int64).cumsum(0) - 1
+        _indices = _indices * self.stride[0]
+        _offset = _input.new_ones(self.kernel_size[0], dtype=torch.int64).cumsum(0) - 1
+        _indices = _indices[:, None].repeat(1, self.kernel_size[0]) + _offset
+        _indices = _indices.t()
+        _indices = _indices.unsqueeze(0).unsqueeze(2).expand_as(_weight_ref)
+
+        # Copy the weight matrix to correct indices
+        _matmul_weight.scatter_(dim=1, index=_indices, src=_weight_ref)
+
+        _output = _input.new_zeros(_N, 0, _l_out)
+        # OUT_CH is the output_channel size, and is constant
+        for Cout in range(self.out_channels):
+            # matmul broadcast batch dim corresponds to input batch size, so Cout dim is covered manually
+            # torch.sum is reduction over padded sequence
+            _sum = torch.sum(torch.matmul(_matmul_input, _matmul_weight[Cout])[:, :, 0, :], dim=1)
+            if self.bias is not None:
+                _sum = torch.add(_sum, self._bias[Cout])
+            _output = torch.cat((_output, _sum.unsqueeze(1)), 1)
         return _output
 
     def to_compiler_graph(self) -> Graph:
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
-        with g.inserting_after():
-            # PLACEHOLDERS
-            _input = g.placeholder("_input")
-            _input_scale = g.get_attr("input_casts.input_cast.scale")
-            _input_zero_point = g.get_attr("input_casts.input_cast.zero_point")
-            _input_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _input,
-                    _input_scale,
-                    _input_zero_point,
-                    repr(self.input_casts.input_cast.format),
-                ),
-            )
-            _input_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_input_q, _input_scale, _input_zero_point)
-            )
-
-            _unsqueeze = g.call_function(torch.unsqueeze, (_input_dq, -1))
-            _unfold = g.create_node(
-                "call_function",
-                torch.nn.functional.unfold,
-                (_unsqueeze, self.kernel_size + (1,)),
-                dict(
-                    dilation=self.dilation + (1,),
-                    padding=self.padding + (0,),
-                    stride=self.stride + (1,),
-                ),
-                name="_unfold",
-            )
-
-            # _weight
-            _weight = g.get_attr("_weight")
-            _weight_scale = g.get_attr("weight_scale")
-            _weight_zero_point = g.get_attr("weight_zero_point")
-            _weight_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _weight,
-                    _weight_scale,
-                    _weight_zero_point,
-                    repr(self.weight_cast.format),
-                ),
-            )
-            _weight_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_weight_q, _weight_scale, _weight_zero_point)
-            )
-
-            _reshape = g.call_function(
-                torch.reshape, (_weight_dq, (self.out_channels, -1))
-            )
-            matmul = g.call_function(torch.matmul, (_reshape, _unfold))
-            _matmul_scale = g.get_attr("accum_cast.scale")
-            _matmul_zero_point = g.get_attr("accum_cast.zero_point")
-            _matmul_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    matmul,
-                    _matmul_scale,
-                    _matmul_zero_point,
-                    repr(self.accum_cast.format),
-                ),
-            )
-            _matmul_dq = g.call_function(
-                torch.ops.dmx.dequantize, (_matmul_q, _matmul_scale, _matmul_zero_point)
-            )
-
-            if self.bias is not None:
-                _bias = g.get_attr("_bias")
-                _bias_scale = g.get_attr("bias_cast.scale")
-                _bias_zero_point = g.get_attr("bias_cast.zero_point")
-                _bias_q = g.call_function(
-                    torch.ops.dmx.quantize,
-                    (_bias, _bias_scale, _bias_zero_point, repr(self.bias_cast.format)),
-                )
-                _bias_dq = g.call_function(
-                    torch.ops.dmx.dequantize, (_bias_q, _bias_scale, _bias_zero_point)
-                )
-                _bias_unsqueeze = g.call_function(torch.unsqueeze, (_bias_dq, -1))
-
-                _output = g.call_function(
-                    torch.add,
-                    (_matmul_dq, _bias_unsqueeze),
-                )
-            else:
-                _output = _matmul_dq
-
-            _output_scale = g.get_attr("output_casts.output_cast.scale")
-            _output_zero_point = g.get_attr("output_casts.output_cast.zero_point")
-            _output_q = g.call_function(
-                torch.ops.dmx.quantize,
-                (
-                    _output,
-                    _output_scale,
-                    _output_zero_point,
-                    repr(self.output_casts.output_cast.format),
-                ),
-            )
-            _output_dq = g.call_function(
-                torch.ops.dmx.dequantize,
-                (_output_q, _output_scale, _output_zero_point),
-            )
-            g.output(_output_dq)
-        return g
-
+        raise NotImplementedError("to_compiler_graph not implemented!")
 
 class Conv2d(_Conv2d):
     r"""
