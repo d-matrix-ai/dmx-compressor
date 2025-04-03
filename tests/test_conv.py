@@ -2,7 +2,7 @@ import pytest
 import torch
 from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor import format
-from dmx.compressor.modeling.nn.experimental import Conv1d as Conv1d_scatter
+from dmx.compressor.modeling.nn.experimental import Conv1dScatter, Conv1dUnfold
 
 
 RANDOM_SEED = 0
@@ -139,30 +139,40 @@ def test_conv1d_scatter(
     dmx_module = eval(f"dmxnn.Conv1d")(
         in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
     )
-    dmx_module_scatter = eval(f"Conv1d_scatter")(
+    dmx_module_scatter = eval(f"Conv1dScatter")(
+        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
+    )
+    dmx_module_unfold = eval(f"Conv1dUnfold")(
         in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
     )
     dmx_module.weight.data = torch_module.weight.data
     dmx_module_scatter.weight.data = torch_module.weight.data
+    dmx_module_unfold.weight.data = torch_module.weight.data
     if bias:
         dmx_module.bias.data = torch_module.bias.data
         dmx_module_scatter.bias.data = torch_module.bias.data
+        dmx_module_unfold.bias.data = torch_module.bias.data
     t_inp = torch.randn(
         batch_size, in_channels, image_size_1d, device=device
     ).requires_grad_()
     c_inp = t_inp.clone().detach().requires_grad_()
     c_inp_scatter = t_inp.clone().detach().requires_grad_()
+    c_inp_unfold = t_inp.clone().detach().requires_grad_()
     t_out = torch_module(t_inp)
     c_out = dmx_module(c_inp)
     c_out_scatter = dmx_module_scatter(c_inp_scatter)
+    c_out_unfold = dmx_module_unfold(c_inp_unfold)
     g_out = torch.randn_like(t_out)
     t_out.backward(g_out)
     c_out.backward(g_out)
     c_out_scatter.backward(g_out)
+    c_out_unfold.backward(g_out)
     assert torch.allclose(c_out.data, c_out_scatter.data, atol=1e-5)
     assert torch.allclose(t_out.data, c_out_scatter.data, atol=1e-5)
+    assert torch.allclose(t_out.data, c_out_unfold.data, atol=1e-5)
     assert torch.allclose(c_inp.grad, c_inp_scatter.grad, atol=1e-5)
     assert torch.allclose(t_inp.grad, c_inp_scatter.grad, atol=1e-5)
+    assert torch.allclose(t_inp.grad, c_inp_unfold.grad, atol=1e-5)
 
     # config rule corresponds to the Conv1d config in the BASIC mode
     config_rule=dict(
@@ -173,10 +183,15 @@ def test_conv1d_scatter(
     )
     dmx_module.configure(config_rule)
     dmx_module_scatter.configure(config_rule)
+    dmx_module_unfold.configure(config_rule)
     c_out = dmx_module(c_inp)
     c_out_scatter = dmx_module_scatter(c_inp_scatter)
+    c_out_unfold = dmx_module_unfold(c_inp_unfold)
     g_out = torch.randn_like(t_out)
     c_out.backward(g_out)
     c_out_scatter.backward(g_out)
+    c_out_unfold.backward(g_out)
     assert torch.allclose(c_out.data, c_out_scatter.data, atol=1e-5)
     assert torch.allclose(c_inp.grad, c_inp_scatter.grad, atol=1e-5)
+    assert torch.allclose(c_out.data, c_out_unfold.data, atol=1e-5)
+    assert torch.allclose(c_inp.grad, c_inp_unfold.grad, atol=1e-5)
