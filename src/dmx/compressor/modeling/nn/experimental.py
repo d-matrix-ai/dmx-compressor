@@ -3,7 +3,7 @@ from torch.fx import Graph
 from . import DmxModule, Conv1d as _Conv1d, Conv2d as _Conv2d
 
 
-class Conv1d(_Conv1d):
+class Conv1dUnfold(_Conv1d):
     r"""
     This is an alternative version of the DmxModule .nn.Conv1d,
     without calling torch.nn.functional.conv1d(), but torch.nn.functional.unfold() and torch.matmul() instead.
@@ -165,6 +165,87 @@ class Conv1d(_Conv1d):
             g.output(_output_dq)
         return g
 
+
+class Conv1dScatter(_Conv1d):
+    r"""
+    This is an alternative version of the DmxModule .nn.Conv1d,
+    without calling torch.nn.functional.conv1d(), but torch.scatter() and torch.matmul() instead.
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+            padding_mode=padding_mode,
+            **kwargs,
+        )
+        self.input_casts.input_cast.block_dim = 1
+        self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
+
+    def _forward(self, _input: torch.Tensor) -> torch.Tensor:
+        _N, _, _l_in = _input.shape
+        _padded_l_in = _l_in + 2 * self.padding[0]
+        _l_out = (_padded_l_in - self.kernel_size[0]) // self.stride[0] + 1
+
+        # zero padded input
+        _matmul_input = _input.transpose(1, 2).unsqueeze(2)
+        _pad = _input.new_zeros(_N, self.padding[0], 1, self.in_channels)
+        _matmul_input =  torch.cat((_pad, _matmul_input, _pad), 1)
+
+        _matmul_weight = _input.new_zeros(
+            self.out_channels, _padded_l_in, self.in_channels, _l_out
+        )
+
+        # Create a single weight matrix from all kernels
+        _weight_ref = self._weight.transpose(1, 2).unsqueeze(3).repeat(1, 1, 1, _l_out)
+
+        # Create scatter indices   
+        _indices = _input.new_ones(_l_out, dtype=torch.int64).cumsum(0) - 1
+        _indices = _indices * self.stride[0]
+        _offset = _input.new_ones(self.kernel_size[0], dtype=torch.int64).cumsum(0) - 1
+        _indices = _indices[:, None].repeat(1, self.kernel_size[0]) + _offset
+        _indices = _indices.t()
+        _indices = _indices.unsqueeze(0).unsqueeze(2).expand_as(_weight_ref)
+
+        # Copy the weight matrix to correct indices
+        _matmul_weight.scatter_(dim=1, index=_indices, src=_weight_ref)
+
+        _output = _input.new_zeros(_N, 0, _l_out)
+        # OUT_CH is the output_channel size, and is constant
+        for Cout in range(self.out_channels):
+            # matmul broadcast batch dim corresponds to input batch size, so Cout dim is covered manually
+            # torch.sum is reduction over padded sequence
+            _sum = torch.sum(torch.matmul(_matmul_input, _matmul_weight[Cout])[:, :, 0, :], dim=1)
+            if self.bias is not None:
+                _sum = torch.add(_sum, self._bias[Cout])
+            _output = torch.cat((_output, _sum.unsqueeze(1)), 1)
+        return _output
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        raise NotImplementedError("to_compiler_graph not implemented!")
 
 class Conv2d(_Conv2d):
     r"""
