@@ -75,7 +75,7 @@ class DmxModelMixin:
     @property
     def dmx_config(self):
         r""" "Returns the DmxConfig object for the model"""
-        DmxConfig.from_model(self, freeze=True)
+        return DmxConfig.from_model(self, freeze=True)
 
     @property
     def dmx_module_names(self):
@@ -646,7 +646,7 @@ class DmxConfigRule(SimpleNamespace):
             n
             for n in config.module_names
             if any(
-                issubclass(config[n]["instance"], mod_type)
+                issubclass(config[n]["instance_of"], mod_type)
                 for mod_type in self.module_types
             )
             and self.name_rule.match(n)
@@ -668,7 +668,7 @@ class DmxConfigRule(SimpleNamespace):
         else:
             config = model_or_config
             for n in target_module_names and any(
-                issubclass(config[n]["instance"], mod_type)
+                issubclass(config[n]["instance_of"], mod_type)
                 for mod_type in self.module_types
             ):
                 config[n].update(self.module_config)

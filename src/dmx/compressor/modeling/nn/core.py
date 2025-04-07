@@ -71,6 +71,8 @@ class DmxModule(
             self.output_casts.set_format(format=config["output_formats"])
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
+        if self.weight_storage_cast is not None and "weight_storage_format" in config:
+            self.weight_storage_cast.set_format(format=config["weight_storage_format"])
         if self.weight_cast is not None and "weight_format" in config:
             self.weight_cast.set_format(format=config["weight_format"])
         if self.bias_cast is not None and "bias_format" in config:
@@ -148,6 +150,10 @@ class DmxModule(
                 and self.smoothquant.fused_to_weight[0] == 0
             ):
                 self.smoothquant.fuse_to_weight(self.weight)
+            # weight storage cast
+            if self.weight_storage_cast is not None and not isinstance(self.weight_storage_cast, Same):
+                self.weight.data = self.weight_storage_cast(self.weight.data)
+                self.weight_storage_cast = CastTo(format=Same())
             # weight cast
             if self.weight_cast is not None and not isinstance(self.weight_cast, Same):
                 self.weight.data = self.weight_cast(self.weight.data)
@@ -167,6 +173,8 @@ class DmxModule(
                 and self.smoothquant.fused_to_weight[0] == 0
             ):
                 _w = self.smoothquant.scale_weight(_w)
+            if self.weight_storage_cast is not None:
+                _w = self.weight_storage_cast(_w)
             if self.weight_cast is not None:
                 _w = self.weight_cast(_w)
             return _w
@@ -179,20 +187,6 @@ class DmxModule(
         Returns the quantized weights of the module
         """
         return self.weight_hypernet(self.weight)
-
-    @property
-    def weight_scale(self):
-        """
-        Returns the quantization scale of the weight matrix
-        """
-        return self.weight_cast.scale.to(self.weight.device)
-
-    @property
-    def weight_zero_point(self):
-        """
-        Returns the quantization zero_point of the weight matrix
-        """
-        return self.weight_cast.zero_point.to(self.weight.device)
 
     @property
     def _bias(self):
@@ -316,7 +310,7 @@ class DmxModuleConfig(dict):
             A DmxModuleConfig object that stores state and ops format of the module in a DmxModuleConfig object
         """
         cc = SimpleNamespace()
-        cc.instance = module.__class__
+        cc.instance_of = module.__class__
         if isinstance(module, DmxModule):
             if module.input_formats is not None and (
                 freeze
@@ -336,6 +330,10 @@ class DmxModuleConfig(dict):
                 freeze or not isinstance(module.weight_format, Same)
             ):
                 cc.weight_format = module.weight_format
+            if module.weight_storage_format is not None and (
+                freeze or not isinstance(module.weight_storage_format, Same)
+            ):
+                cc.weight_storage_format = module.weight_storage_format
             if module.bias_format is not None and (
                 freeze or not isinstance(module.bias_format, Same)
             ):

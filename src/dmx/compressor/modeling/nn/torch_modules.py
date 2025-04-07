@@ -358,7 +358,8 @@ class Linear(DmxModule, torch.nn.Linear):
 
             # _weight
             _weight = g.get_attr("_weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
+            _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
 
             # _bias
             if self.bias is not None:

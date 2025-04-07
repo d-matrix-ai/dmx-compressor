@@ -371,6 +371,9 @@ class NumericalCastMixin:
             self.accum_cast = None
         # static parameter casts
         pnames = [n for n, _ in self.named_parameters()]
+        self.weight_storage_cast = (
+            CastTo(ch_axis=self.wout_ch_axis) if "weight" in pnames else None
+        )
         self.weight_cast = (
             CastTo(ch_axis=self.wout_ch_axis) if "weight" in pnames else None
         )
@@ -461,6 +464,26 @@ class NumericalCastMixin:
         return self.weight_cast.get_precision()
 
     @property
+    def weight_storage_precision(self):
+        return self.weight_storage_cast.get_precision()
+
+    @property
+    def weight_scale(self):
+        return self.weight_cast.scale.to(self.weight.device)
+
+    @property
+    def weight_zero_point(self):
+        return self.weight_cast.zero_point.to(self.weight.device)
+
+    @property
+    def weight_storage_scale(self):
+        return self.weight_storage_cast.scale.to(self.weight.device)
+
+    @property
+    def weight_storage_zero_point(self):
+        return self.weight_storage_cast.zero_point.to(self.weight.device)
+
+    @property
     def output_formats(self):
         return {k: cast.format for k, cast in self.output_casts.items()}
 
@@ -471,6 +494,14 @@ class NumericalCastMixin:
     @property
     def weight_format(self):
         return (self.weight_cast.format) if self.weight_cast is not None else None
+
+    @property
+    def weight_storage_format(self):
+        return (
+            (self.weight_storage_cast.format)
+            if self.weight_storage_cast is not None
+            else None
+        )
 
     @property
     def residual_format(self):
