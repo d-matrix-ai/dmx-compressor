@@ -3,6 +3,7 @@ import torch
 from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor import format
 from dmx.compressor.modeling.nn.experimental import Conv1dScatter, Conv1dUnfold
+import dmx.ops
 
 
 RANDOM_SEED = 0
@@ -128,30 +129,63 @@ def test_conv1d(
         (384, 384, 3, 2),
     ),
 )
-@pytest.mark.parametrize("batch_size", (1, ),)
-@pytest.mark.parametrize("image_size_1d", (30, ))
+@pytest.mark.parametrize(
+    "batch_size",
+    (1,),
+)
+@pytest.mark.parametrize("image_size_1d", (30,))
 def test_conv1d_scatter(
     batch_size, image_size_1d, in_channels, out_channels, kernel_size, stride, bias
 ):
     torch_module = eval(f"torch.nn.Conv1d")(
-        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=stride,
+        bias=bias,
+        device=device,
     )
     dmx_module = eval(f"dmxnn.Conv1d")(
-        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=stride,
+        bias=bias,
+        device=device,
     )
     dmx_module_scatter = eval(f"Conv1dScatter")(
-        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=stride,
+        bias=bias,
+        device=device,
     )
     dmx_module_unfold = eval(f"Conv1dUnfold")(
-        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device, 
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=stride,
+        bias=bias,
+        device=device,
     )
     dmx_module.weight.data = torch_module.weight.data
     dmx_module_scatter.weight.data = torch_module.weight.data
     dmx_module_unfold.weight.data = torch_module.weight.data
+
     if bias:
         dmx_module.bias.data = torch_module.bias.data
         dmx_module_scatter.bias.data = torch_module.bias.data
         dmx_module_unfold.bias.data = torch_module.bias.data
+
+    ### testing to_compiler_graph
+    scatter_qdq = torch.fx.GraphModule(
+        dmx_module_scatter, dmx_module_scatter.to_compiler_graph()
+    )
+    unfold_qdq = torch.fx.GraphModule(
+        dmx_module_unfold, dmx_module_unfold.to_compiler_graph()
+    )
+
     t_inp = torch.randn(
         batch_size, in_channels, image_size_1d, device=device
     ).requires_grad_()
@@ -162,6 +196,9 @@ def test_conv1d_scatter(
     c_out = dmx_module(c_inp)
     c_out_scatter = dmx_module_scatter(c_inp_scatter)
     c_out_unfold = dmx_module_unfold(c_inp_unfold)
+    c_out_qdq_scatter = scatter_qdq(c_inp_scatter.clone().detach())
+    c_out_qdq_unfold = unfold_qdq(c_inp_unfold.clone().detach())
+
     g_out = torch.randn_like(t_out)
     t_out.backward(g_out)
     c_out.backward(g_out)
@@ -170,12 +207,15 @@ def test_conv1d_scatter(
     assert torch.allclose(c_out.data, c_out_scatter.data, atol=1e-5)
     assert torch.allclose(t_out.data, c_out_scatter.data, atol=1e-5)
     assert torch.allclose(t_out.data, c_out_unfold.data, atol=1e-5)
+    assert torch.allclose(c_out_qdq_unfold.data, c_out_unfold.data, atol=1e-5)
+    assert torch.allclose(c_out_qdq_scatter.data, c_out_scatter.data, atol=1e-5)
+
     assert torch.allclose(c_inp.grad, c_inp_scatter.grad, atol=1e-5)
     assert torch.allclose(t_inp.grad, c_inp_scatter.grad, atol=1e-5)
     assert torch.allclose(t_inp.grad, c_inp_unfold.grad, atol=1e-5)
 
     # config rule corresponds to the Conv1d config in the BASIC mode
-    config_rule=dict(
+    config_rule = dict(
         input_formats=[format.BFP16_64],
         weight_format=format.BFP16_64,
         bias_format=format.BFP32_1,
