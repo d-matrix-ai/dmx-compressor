@@ -1621,3 +1621,6 @@ class GELUBase(DmxModule):
 class GELU(GELUBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(torch.nn.GELU, *args, **kwargs)
+
+    def functional_forward(self, x):
+        return F.gelu(x)

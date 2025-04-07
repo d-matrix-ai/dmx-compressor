@@ -119,6 +119,7 @@ def test_clippedgelu():
         "FastGELU",
         "QuickGELU",
         "BloomGELU",
+        "GELU",
     ),
 )
 def test_activations(module_type):
