@@ -390,7 +390,9 @@ class DmxModel(DmxModelMixin):
         for node in node_list:
             if i >= len(placeholders_needed):
                 break
-            while i < len(placeholders_needed) and node.name != placeholders_needed[i]:
+            while (
+                i < len(placeholders_needed) and node.target != placeholders_needed[i]
+            ):
                 with _model._gm.graph.inserting_before(node):
                     _model._gm.graph.placeholder(placeholders_needed[i])
                     i += 1
