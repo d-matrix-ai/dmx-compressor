@@ -120,7 +120,9 @@ default_approx = SimpleNamespace(
     ),
     TANH=ApproximationFunction.from_shorthand("NONE"),
     BATCH_NORM_2D=ApproximationFunction.from_shorthand("NONE"),
-    LAYER_NORM=ApproximationFunction.from_shorthand("NONE"),
+    LAYER_NORM=ApproximationFunction.from_shorthand(
+        "LAYER_NORM[vsimd](norm=0.03125)" if VSIMD_OP_REF_AVAILABLE else "NONE"
+    ),
     GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
     RMS_NORM=ApproximationFunction.from_shorthand("NONE"),
     NONE=ApproximationFunction.from_shorthand("NONE"),
