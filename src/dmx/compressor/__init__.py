@@ -109,7 +109,11 @@ default_approx = SimpleNamespace(
     SILU=ApproximationFunction.from_shorthand(
         "SILU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
-    SOFTMAX=ApproximationFunction.from_shorthand("NONE"),
+    SOFTMAX=ApproximationFunction.from_shorthand(
+        "SOFTMAX[vsimd](max_adjust=0.1141, rvecs=2)"
+        if VSIMD_OP_REF_AVAILABLE
+        else "NONE"
+    ),
     GELU=ApproximationFunction.from_shorthand("NONE"),
     QUICK_GELU=ApproximationFunction.from_shorthand(
         "QUICK_GELU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
