@@ -8,7 +8,7 @@ torch.nn.Module.load_state_dict = partialmethod(
 
 from .numerical import Format
 from .sparse import Sparseness
-from .functional import ApproximationFunction
+from .functional import ApproximationFunction, VSIMD_OP_REF_AVAILABLE
 from .modeling import (
     nn,
     DmxModel,
@@ -106,16 +106,19 @@ sparseness = SimpleNamespace(
 default_approx = SimpleNamespace(
     RELU=ApproximationFunction.from_shorthand("NONE"),
     RELU6=ApproximationFunction.from_shorthand("NONE"),
-    SILU=ApproximationFunction.from_shorthand("NONE"),
+    SILU=ApproximationFunction.from_shorthand(
+        "SILU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+    ),
     SOFTMAX=ApproximationFunction.from_shorthand("NONE"),
     GELU=ApproximationFunction.from_shorthand("NONE"),
+    QUICK_GELU=ApproximationFunction.from_shorthand(
+        "QUICK_GELU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+    ),
     TANH=ApproximationFunction.from_shorthand("NONE"),
-    BATCHNORM2D=ApproximationFunction.from_shorthand("NONE"),
-    LAYERNORM=ApproximationFunction.from_shorthand("NONE"),
-    GROUPNORM=ApproximationFunction.from_shorthand("NONE"),
-    RMSNORM=ApproximationFunction.from_shorthand("NONE"),
-    LLAMAROTARYEMBEDDINGREFACTORED=ApproximationFunction.from_shorthand("NONE"),
-    HFDIFFUSERSTIMESTEPS=ApproximationFunction.from_shorthand("NONE"),
+    BATCH_NORM_2D=ApproximationFunction.from_shorthand("NONE"),
+    LAYER_NORM=ApproximationFunction.from_shorthand("NONE"),
+    GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
+    RMS_NORM=ApproximationFunction.from_shorthand("NONE"),
     NONE=ApproximationFunction.from_shorthand("NONE"),
 )
 
@@ -273,6 +276,14 @@ config_rules = SimpleNamespace(
             ),
         ),
         DmxConfigRule(
+            module_types=(nn.QuickGELU,),
+            module_config=dict(
+                input_formats=[format.FLOAT16],
+                output_formats=[format.FLOAT16],
+                approximation_function=default_approx.QUICK_GELU,
+            ),
+        ),
+        DmxConfigRule(
             module_types=(nn.SiLU,),
             module_config=dict(
                 input_formats=[format.FLOAT16],
@@ -301,7 +312,7 @@ config_rules = SimpleNamespace(
             module_config=dict(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
-                approximation_function=default_approx.LAYERNORM,
+                approximation_function=default_approx.LAYER_NORM,
             ),
         ),
         DmxConfigRule(
@@ -309,7 +320,7 @@ config_rules = SimpleNamespace(
             module_config=dict(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
-                approximation_function=default_approx.BATCHNORM2D,
+                approximation_function=default_approx.BATCH_NORM_2D,
             ),
         ),
         DmxConfigRule(
@@ -317,7 +328,7 @@ config_rules = SimpleNamespace(
             module_config=dict(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
-                approximation_function=default_approx.GROUPNORM,
+                approximation_function=default_approx.GROUP_NORM,
             ),
         ),
     ],
