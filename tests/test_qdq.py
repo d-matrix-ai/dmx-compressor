@@ -43,6 +43,15 @@ def test_actactmatmul():
     assert torch.allclose(out0, out1, atol=1e-5)
 
 
+def test_exp():
+    _exp = nn.Exp()
+    gm = torch.fx.GraphModule(_exp, _exp.to_compiler_graph())
+    inp1 = torch.rand((1, 64))
+    out0 = _exp(inp1)
+    out1 = gm(inp1)
+    assert torch.allclose(out0, out1, atol=1e-5)
+
+
 def test_baddbmm():
     baddbmm = nn.BAddBMM()
     gm = torch.fx.GraphModule(baddbmm, baddbmm.to_compiler_graph())

@@ -48,6 +48,7 @@ dmx_aware_functional_mappings = {
     "torch.nn.functional.softmax": dmxnn.Softmax,
     "torch.nn.functional.dropout": dmxnn.Dropout,
     "torch.matmul": dmxnn.ActActMatMul,
+    "torch.exp": dmxnn.Exp,
     "torch.bmm": dmxnn.ActActMatMul,
     "torch.baddbmm": dmxnn.BAddBMM,
     "torch.nn.functional.scaled_dot_product_attention": dmxnn.ScaledDotProductAttention,
@@ -57,6 +58,15 @@ transformer_function_mapping = {
     "transformers.models.llama.modeling_llama.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
     "transformers.models.gemma.modeling_gemma.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
     "transformers.models.mistral.modeling_mistral.apply_rotary_pos_emb": dmxnn.ApplyRotaryPosEmb,
+}
+
+dmx_aware_method_mapping = {
+    "matmul": dmxnn.ActActMatMul,
+    "baddbmm": dmxnn.BAddBMM,
+    "exp": dmxnn.Exp,
+    "bmm": dmxnn.ActActMatMul,
+    "add": dmxnn.ResAdd,
+    "mul": dmxnn.Mul,
 }
 
 dmx_aware_mapping.update(transformer_module_mapping)

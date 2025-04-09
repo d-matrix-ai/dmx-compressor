@@ -79,7 +79,7 @@ class DMXAwareTransformer(fx.Transformer):
     def call_method(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
-        if target == "baddbmm":
+        if target in dmx_aware_method_mapping.keys():
             candidate = target
             curr_name = get_name_for_func_nodes(
                 target,
@@ -93,9 +93,8 @@ class DMXAwareTransformer(fx.Transformer):
             # otherwise next call_method will use the same candidate. (create_name is also called in create_node)
             if new_name != candidate:
                 self.new_graph._graph_namespace.create_name(candidate, None)
-            from dmx.compressor.modeling.nn import BAddBMM
 
-            self.add_submod(new_name, BAddBMM())
+            self.add_submod(new_name, dmx_aware_method_mapping[target]())
             new_node = self.new_graph.create_node(
                 "call_module",
                 new_name,

@@ -209,6 +209,34 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         return g
 
 
+class Exp(DmxModule, torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _forward(self, _input: Tensor) -> Tensor:
+        _output = torch.exp(_input)
+        return _output
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        g = torch.fx.Graph()
+        with g.inserting_after():
+            placeholder_nodes = self.create_placeholders(g, ["_input"])
+            _input_dq = self.qdq_nodes(
+                g,
+                placeholder_nodes,
+                ["input_casts.input_cast"],
+            )
+            _output = g.create_node(
+                "call_function", torch.exp, (_input_dq,), name="output"
+            )
+            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
+            g.output(_output_dq)
+        return g
+
+
 class BAddBMM(DmxModule):
     def __init__(self) -> None:
         super().__init__()
