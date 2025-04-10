@@ -1,9 +1,10 @@
 [project]
 name = "dmx-compressor"
-version = "0.1.7"
+version = "0.1.8"
 description = "d-Matrix Compressor"
 readme = "README.md"
-authors =[{name="Tristan Webb", email= "twebb@d-matrix.ai"},
+authors = [
+        {name="Tristan Webb", email= "twebb@d-matrix.ai"},
         {name="Xin Wang", email= "xwang@d-matrix.ai"},
         {name="Michael Klachko", email= "mklachko@d-matrix.ai"},
         {name="Sayeh Sharify", email= "sayehs@d-matrix.ai"},
@@ -13,7 +14,8 @@ authors =[{name="Tristan Webb", email= "twebb@d-matrix.ai"},
 
 [tool.poetry]
 include = [{ path = "tests", format = "sdist" }]
-packages = [    { include = "dmx/compressor", from = "src" },
+packages = [
+    { include = "dmx/compressor", from = "src" },
     { include = "mltools", from = "src" },
 ]
 
