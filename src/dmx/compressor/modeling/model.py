@@ -70,7 +70,7 @@ class DmxModelMixin:
     @property
     def op_set(self):
         r"Returns a set of unique ops present in the model"
-        return get_op_set_from(self._gm)
+        return set.union(*[get_op_set_from(_m) for _m in self._gms.values()])
 
     @property
     def dmx_config(self):
@@ -788,4 +788,4 @@ class Model(DmxSimplePipeline):
     @property
     def op_set(self):
         r"Returns a set of unique ops present in the model"
-        return get_op_set_from(self.body._gm)
+        return set.union(*[get_op_set_from(_m) for _m in self._gms.values()])
