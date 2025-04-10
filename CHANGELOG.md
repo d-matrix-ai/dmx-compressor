@@ -5,10 +5,13 @@ This file documents fixes/features added to dmx.compressor
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [v0.1.8]
+ - Change pyproject.toml config to better support public release on PyPI.
+ - Add support for experimental DMXModules
+ - Improve tracing
 
 ## [v0.1.4]
-Support to export DMX modules as FXIR graphs
+- Support to export DMX modules as FXIR graphs
 
 ## [v0.1.2] (2023-11-08)
 
