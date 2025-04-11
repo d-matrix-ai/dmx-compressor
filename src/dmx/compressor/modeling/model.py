@@ -33,6 +33,7 @@ class DmxModelMixin:
     _gm: Optional[torch.fx.GraphModule]  # current gm
     _gms: Dict  # stores {sig: gm} pairs
     _dmx_configuration_queue: List  # stores (config, rules) to be applied
+    _monitoring_records: Optional[Dict]  # stored monitored submodule inputs/outputs
 
     def _apply_config(self, config: Optional[Union[dict, str]], *rules):
         if config is not None:
@@ -178,6 +179,29 @@ class DmxModelMixin:
         if save_checkpoint_to is not None:
             for _, m in specific_layers:
                 m.save_state_dict_and_register_url(parent_dir=save_checkpoint_to)
+
+    @contextmanager
+    def monitoring(
+        self,
+        submodules_to_monitor: List[str] = [],
+        save_checkpoint_to: Optional[str] = None,
+    ):
+        self._monitoring_records = {_sm: [] for _sm in submodules_to_monitor}
+        with ExitStack() as stack:
+            yield [
+                stack.enter_context(
+                    self._gm.get_submodule(_sm).monitoring(
+                        self._monitoring_records[_sm]
+                    ),
+                )
+                for _sm in submodules_to_monitor
+            ]
+
+    def get_monitoring_records(self, submodules_to_monitor: List[str] = []):
+        _rec = self._monitoring_records
+        self._monitoring_records = None
+
+        return _rec
 
     @contextmanager
     def calibrating_weights(
@@ -468,6 +492,7 @@ class DmxModel(DmxModelMixin):
         model.transformed = False
         model._gm = None
         model._gms = {}
+        model._monitoring_records = None
         from dmx.compressor import config_rules
 
         model._dmx_configuration_queue = [(None, config_rules.BASELINE)]

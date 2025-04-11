@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import Optional
+from contextlib import contextmanager
 from types import SimpleNamespace
 import torch
 from torch import Tensor
@@ -151,7 +152,9 @@ class DmxModule(
             ):
                 self.smoothquant.fuse_to_weight(self.weight)
             # weight storage cast
-            if self.weight_storage_cast is not None and not isinstance(self.weight_storage_cast, Same):
+            if self.weight_storage_cast is not None and not isinstance(
+                self.weight_storage_cast, Same
+            ):
                 self.weight.data = self.weight_storage_cast(self.weight.data)
                 self.weight_storage_cast = CastTo(format=Same())
             # weight cast
@@ -256,6 +259,23 @@ class DmxModule(
         self.training = raw.training
         if hasattr(raw, "dtype"):
             self.dtype = raw.dtype
+
+    @contextmanager
+    def monitoring(self, _records: list):
+        """
+        Context manager for monitoring input/output to/from the DmxModule
+        """
+        def recorder(_mod, _inp, _out) -> None:
+            _records.append(
+                dict(
+                    input=_inp,
+                    output=_out,
+                )
+            )
+
+        _h = self.register_forward_hook(recorder)
+        yield self
+        _h.remove()
 
     @abstractmethod
     def to_compiler_graph(self) -> Graph:
