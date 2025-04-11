@@ -73,7 +73,7 @@ def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
         return f"{_n}:{type(_m).__name__}" if include_type else _n
 
     is_leaf_node = dmx.compressor.nn.is_configurable
-    m_root = pptree.Node(node_str("model", model))
+    m_root = pptree.Node(node_str("_gm", model._gm))
 
     def get_tree(mod, root):
         for n, m in mod.named_children():
@@ -81,5 +81,5 @@ def print_model_tree(model: torch.nn.Module, include_type=False) -> str:
             if not is_leaf_node(m):
                 get_tree(m, n_)
 
-    get_tree(model, m_root)
+    get_tree(model._gm, m_root)
     pptree.print_tree(m_root)
