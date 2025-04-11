@@ -107,19 +107,19 @@ default_approx = SimpleNamespace(
     RELU=ApproximationFunction.from_shorthand("NONE"),
     RELU6=ApproximationFunction.from_shorthand("NONE"),
     SILU=ApproximationFunction.from_shorthand(
-        "SILU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "SILU[vsimd]()" if not VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     SOFTMAX=ApproximationFunction.from_shorthand(
-        "SOFTMAX[vsimd](max_adjust=0.1141)" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "SOFTMAX[vsimd](max_adjust=0.1141)" if not VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     GELU=ApproximationFunction.from_shorthand("NONE"),
     QUICK_GELU=ApproximationFunction.from_shorthand(
-        "QUICK_GELU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "QUICK_GELU[vsimd]()" if not VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     TANH=ApproximationFunction.from_shorthand("NONE"),
     BATCH_NORM_2D=ApproximationFunction.from_shorthand("NONE"),
     LAYER_NORM=ApproximationFunction.from_shorthand(
-        "LAYER_NORM[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "LAYER_NORM[vsimd]()" if not VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
     RMS_NORM=ApproximationFunction.from_shorthand("NONE"),

@@ -180,6 +180,17 @@ class DmxModelMixin:
                 m.save_state_dict_and_register_url(parent_dir=save_checkpoint_to)
 
     @contextmanager
+    def monitoring(
+        self,
+        submodules_to_monitor: List[str] = [],
+        save_checkpoint_to: Optional[str] = None,
+    ):
+        yield self
+
+    def get_monitoring_records(self, submodules_to_monitor: List[str] = []):
+        return dict()
+
+    @contextmanager
     def calibrating_weights(
         self,
         specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
