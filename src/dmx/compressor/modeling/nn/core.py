@@ -265,15 +265,16 @@ class DmxModule(
         """
         Context manager for monitoring input/output to/from the DmxModule
         """
-        def recorder(_mod, _inp, _out) -> None:
+
+        def recorder(_mod, _inp, _input_kwargs, _out) -> None:
             _records.append(
                 dict(
-                    input=_inp,
+                    input=(_inp, _input_kwargs),
                     output=_out,
                 )
             )
 
-        _h = self.register_forward_hook(recorder)
+        _h = self.register_forward_hook(recorder, with_kwargs=True)
         yield self
         _h.remove()
 
