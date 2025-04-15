@@ -289,7 +289,7 @@ class Conv1dScatter(_Conv1d):
         return g
 
 
-class Conv2d(_Conv2d):
+class Conv2dUnfold(_Conv2d):
     r"""
     This is an alternative version of the DmxModule.nn.Conv2d,
     without calling torch.nn.functional.conv2d(), but torch.nn.functional.unfold() and torch.matmul() instead.
@@ -420,3 +420,93 @@ class Conv2d(_Conv2d):
             _output_dq = self.qdq_nodes(g, [fold], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
+
+
+class Conv2dGather(_Conv2d):
+    r"""
+    This is an alternative version of the DmxModule.nn.Conv2d,
+    without calling torch.nn.functional.conv2d(), but torch.gather() and torch.matmul() instead.
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+            padding_mode=padding_mode,
+            **kwargs,
+        )
+        self.input_casts.input_cast.block_dim = 1
+        self.weight_cast.block_dim = 1
+        if self.bias_cast is not None:
+            self.bias_cast.block_dim = -1
+
+    def _forward(self, _input: torch.Tensor) -> torch.Tensor:
+        _N, _, in_height, in_width = _input.shape
+        _h_out = (
+            in_height + 2 * self.padding[0] - (self.kernel_size[0] - 1) - 1
+        ) // self.stride[0] + 1
+        _w_out = (
+            in_width + 2 * self.padding[1] - (self.kernel_size[1] - 1) - 1
+        ) // self.stride[1] + 1
+
+        # zero padded input
+        _pad_h = _input.new_zeros(_N, self.in_channels, self.padding[0], in_width)
+        _padded_input = torch.cat((_pad_h, _input, _pad_h), 2)
+        _pad_w = _input.new_zeros(_N, self.in_channels, in_height + 2 * self.padding[0], self.padding[1])
+        _padded_input = torch.cat((_pad_w, _padded_input, _pad_w), 3)
+        _input_ref = _padded_input.unsqueeze(1).unsqueeze(2).repeat(1, _h_out, _w_out, 1, 1, 1)
+
+        # Create gather indices for Height dim
+        _indices_h = _input.new_ones(_h_out, dtype=torch.int64).cumsum(0) - 1
+        _indices_h = _indices_h * self.stride[0]
+        _offset_h = _input.new_ones(self.kernel_size[0], dtype=torch.int64).cumsum(0) - 1
+        _indices_h = _indices_h[:, None].repeat(1, self.kernel_size[0]) + _offset_h
+        _indices_h = _indices_h.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
+        _indices_h = _indices_h.unsqueeze(2).unsqueeze(5).repeat(1, 1, _w_out, 1, 1, in_width + 2 * self.padding[1])
+ 
+        # Create gather indices for Width dim
+        _indices_w = _input.new_ones(_w_out, dtype=torch.int64).cumsum(0) - 1
+        _indices_w = _indices_w * self.stride[1]
+        _offset_w = _input.new_ones(self.kernel_size[1], dtype=torch.int64).cumsum(0) - 1
+        _indices_w = _indices_w[:, None].repeat(1, self.kernel_size[1]) + _offset_w
+        _indices_w = _indices_w.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
+        _indices_w = _indices_w.unsqueeze(1).unsqueeze(4).repeat(1, _h_out, 1, 1, self.kernel_size[0], 1)
+
+        # Gather Matmul inputs
+        _matmul_input = _input_ref.gather(dim=4, index=_indices_h)
+        _matmul_input = _matmul_input.gather(dim=5, index=_indices_w)
+        _matmul_input = _matmul_input.view(-1, _matmul_input.size(3) * _matmul_input.size(4) * _matmul_input.size(5))
+
+        # Create matmul weight from original weights
+        _matmul_weight = self._weight.reshape(-1, self._weight.size(1) * self._weight.size(2) * self._weight.size(3)).transpose(0, 1)
+
+        # Matmul calculation
+        _output = torch.matmul(_matmul_input, _matmul_weight).view(_N, _h_out, _w_out, -1).transpose(2, 3).transpose(1, 2)
+        if self.bias is not None:
+            _output = torch.add(_output, self._bias.unsqueeze(0).unsqueeze(2).unsqueeze(3))
+
+        return _output
+
+    def to_compiler_graph(self) -> Graph:
+        """
+        Returns a compiler friendly graph
+        """
+        raise NotImplementedError("to_compiler_graph not implemented!")
