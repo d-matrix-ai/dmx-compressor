@@ -34,7 +34,7 @@ class DmxModelMixin:
     _gms: Dict  # stores {sig: gm} pairs
     _dmx_configuration_queue: List  # stores (config, rules) to be applied
     _monitoring_records: Optional[Dict]  # stored monitored submodule inputs/outputs
-
+    _runtime_records : Optional[Dict]# stored monitored submodule run times
     def _apply_config(self, config: Optional[Union[dict, str]], *rules):
         if config is not None:
             if isinstance(config, str):
@@ -203,6 +203,29 @@ class DmxModelMixin:
 
         return _rec
 
+
+    @contextmanager
+    def measure_runtimes(
+        self,
+        device,
+        submodules_to_measure: List[str] = []):
+        self._runtime_records = {_sm: [] for _sm in submodules_to_measure}
+        with ExitStack() as stack:
+            yield [
+                stack.enter_context(
+                    self._gm.get_submodule(_sm).measuring_runtime(
+                        self._runtime_records[_sm],device
+                    ),
+                )
+                for _sm in submodules_to_measure
+            ]
+
+    def get_runtime_records(self):
+        _rec = self._runtime_records
+        self._runtime_records = None
+
+        return _rec
+            
     @contextmanager
     def calibrating_weights(
         self,
@@ -493,6 +516,7 @@ class DmxModel(DmxModelMixin):
         model._gm = None
         model._gms = {}
         model._monitoring_records = None
+        model._runtime_records = None        
         from dmx.compressor import config_rules
 
         model._dmx_configuration_queue = [(None, config_rules.BASELINE)]
