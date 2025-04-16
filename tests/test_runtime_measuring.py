@@ -1,7 +1,3 @@
-import sys
-import torch
-sys.path.insert(0,'/home/coder/nervana_git/dmx-compressor-internal/src/')
-
 import pytest
 import torch
 from dmx.compressor.modeling import DmxModel
