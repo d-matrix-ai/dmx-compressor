@@ -473,6 +473,7 @@ class Conv2dGather(_Conv2d):
         _pad_w = _input.new_zeros(_N, self.in_channels, in_height + 2 * self.padding[0], self.padding[1])
         _padded_input = torch.cat((_pad_w, _padded_input, _pad_w), 3)
         _input_ref = _padded_input.unsqueeze(1).unsqueeze(2).repeat(1, _h_out, _w_out, 1, 1, 1)
+        del _pad_h, _pad_w, _padded_input
 
         # Create gather indices for Height dim
         _indices_h = _input.new_ones(_h_out, dtype=torch.int64).cumsum(0) - 1
@@ -481,6 +482,10 @@ class Conv2dGather(_Conv2d):
         _indices_h = _indices_h[:, None].repeat(1, self.kernel_size[0]) + _offset_h
         _indices_h = _indices_h.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
         _indices_h = _indices_h.unsqueeze(2).unsqueeze(5).repeat(1, 1, _w_out, 1, 1, in_width + 2 * self.padding[1])
+
+        # Gather Matmul inputs in Height dim
+        _matmul_input = _input_ref.gather(dim=4, index=_indices_h)
+        del _indices_h, _offset_h, _input_ref
  
         # Create gather indices for Width dim
         _indices_w = _input.new_ones(_w_out, dtype=torch.int64).cumsum(0) - 1
@@ -490,9 +495,9 @@ class Conv2dGather(_Conv2d):
         _indices_w = _indices_w.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
         _indices_w = _indices_w.unsqueeze(1).unsqueeze(4).repeat(1, _h_out, 1, 1, self.kernel_size[0], 1)
 
-        # Gather Matmul inputs
-        _matmul_input = _input_ref.gather(dim=4, index=_indices_h)
+        # Gather Matmul inputs in Width dim
         _matmul_input = _matmul_input.gather(dim=5, index=_indices_w)
+        del _indices_w, _offset_w
         _matmul_input = _matmul_input.view(-1, _matmul_input.size(3) * _matmul_input.size(4) * _matmul_input.size(5))
 
         # Create matmul weight from original weights
