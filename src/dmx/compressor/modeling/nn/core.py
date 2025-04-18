@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import time
 from typing import Optional
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -278,6 +279,46 @@ class DmxModule(
         yield self
         _h.remove()
 
+
+    @contextmanager
+    def measuring_runtime(self, _records: list,device : torch.device):
+        """
+        Context manager for monitoring runtime of DmxModule
+        """
+        def tick(_mod,_inp):
+            assert len(_records) == 0 or not isinstance(_records[-1],list), \
+                f'multiple tick calls without tock in between: {_records}'
+            if device.type == 'cuda':
+                start_t = torch.cuda.Event(enable_timing=True)
+                start_t.record()
+            else:
+                start_t = time.perf_counter()
+            _records.append([start_t])
+
+        def tock(_mod,_inp,_out):
+            assert len(_records) >0 and isinstance(_records[-1],list),\
+                f'tock called without preceding tick : {_records}'
+            #start_t can be float(time) or cuda event
+            start_t = _records.pop()[0]
+            if device.type == 'cuda':
+                end_t = torch.cuda.Event(enable_timing=True)
+                end_t.record()
+                #The synchronization slows things down. We might need to wait till
+                #the model finishes running to synchronize and gather the event deltas
+                torch.cuda.synchronize()
+                _records.append(start_t.elapsed_time(end_t) / 1000)
+                
+            else:
+                end_t = time.perf_counter()
+                _records.append(end_t - start_t)
+
+
+        _h_pre = self.register_forward_pre_hook(tick)
+        _h_post = self.register_forward_hook(tock)        
+        yield self
+        _h_pre.remove()
+        _h_post.remove()        
+        
     @abstractmethod
     def to_compiler_graph(self) -> Graph:
         """
