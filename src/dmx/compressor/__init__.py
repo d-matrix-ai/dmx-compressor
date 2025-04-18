@@ -123,6 +123,11 @@ default_approx = SimpleNamespace(
     ),
     GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
     RMS_NORM=ApproximationFunction.from_shorthand("NONE"),
+    EXP=ApproximationFunction.from_shorthand(
+        "EXP[vsimd](knorm=0,kmax=15,use_exp_large=True)"
+        if VSIMD_OP_REF_AVAILABLE
+        else "NONE"
+    ),
     NONE=ApproximationFunction.from_shorthand("NONE"),
 )
 
@@ -193,6 +198,7 @@ config_rules = SimpleNamespace(
                 nn.LayerNorm,
                 nn.BatchNorm2d,
                 nn.GroupNorm,
+                nn.Exp,
             ),
             module_config=dict(
                 input_formats=[format.SAME],
@@ -333,6 +339,14 @@ config_rules = SimpleNamespace(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
                 approximation_function=default_approx.GROUP_NORM,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Exp,),
+            module_config=dict(
+                input_formats=[format.FLOAT16],
+                output_formats=[format.FLOAT16],
+                approximation_function=default_approx.EXP,
             ),
         ),
     ],

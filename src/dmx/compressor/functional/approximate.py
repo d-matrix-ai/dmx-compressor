@@ -20,6 +20,7 @@ torch_function_mapping = bidict(
         "RMS_NORM": torch.nn.functional.rms_norm,
         "LAYER_NORM": torch.nn.functional.layer_norm,
         "SOFTMAX": torch.nn.functional.softmax,
+        "EXP": torch.exp,
     }
 )
 
