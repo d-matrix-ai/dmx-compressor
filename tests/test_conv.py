@@ -2,7 +2,7 @@ import pytest
 import torch
 from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor import format
-from dmx.compressor.modeling.nn.experimental import Conv1dScatter, Conv1dUnfold
+from dmx.compressor.modeling.nn.experimental import Conv1dScatter, Conv1dUnfold, Conv2dGather, Conv2dUnfold
 import dmx.ops
 
 
@@ -233,5 +233,103 @@ def test_conv1d_scatter(
     c_out_unfold.backward(g_out)
     assert torch.allclose(c_out.data, c_out_scatter.data, atol=1e-5)
     assert torch.allclose(c_inp.grad, c_inp_scatter.grad, atol=1e-5)
+    assert torch.allclose(c_out.data, c_out_unfold.data, atol=1e-5)
+    assert torch.allclose(c_inp.grad, c_inp_unfold.grad, atol=1e-5)
+
+
+@pytest.mark.parametrize("bias", (False, ))
+@pytest.mark.parametrize(
+    "in_channels,out_channels,kernel_size,stride",
+    (
+        (3, 768, 16, 16),
+        (3, 768, 32, 32),
+        (3, 1024, 14, 14),
+    ),
+)
+@pytest.mark.parametrize(
+    "image_size",
+    (
+        (224, 224),
+    ),
+)
+@pytest.mark.parametrize(
+    "batch_size",
+    (
+        1,
+    ),
+)
+def test_conv2d_gather(
+    batch_size,
+    image_size,
+    in_channels,
+    out_channels,
+    kernel_size,
+    stride,
+    bias,
+):
+    torch_module = eval(f"torch.nn.Conv2d")(
+        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
+    )
+    dmx_module = eval(f"dmxnn.Conv2d")(
+        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
+    )
+    dmx_module_gather = eval(f"Conv2dGather")(
+        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
+    )
+    dmx_module_unfold = eval(f"Conv2dUnfold")(
+        in_channels, out_channels, kernel_size, stride=stride, bias=bias, device=device
+    )
+    dmx_module.weight.data = torch_module.weight.data
+    dmx_module_gather.weight.data = torch_module.weight.data
+    dmx_module_unfold.weight.data = torch_module.weight.data
+
+    if bias:
+        dmx_module.bias.data = torch_module.bias.data
+        dmx_module_gather.bias.data = torch_module.bias.data
+        dmx_module_unfold.bias.data = torch_module.bias.data
+
+    t_inp = torch.randn(
+        batch_size, in_channels, *image_size, device=device
+    ).requires_grad_()
+    c_inp = t_inp.clone().detach().requires_grad_()
+    c_inp_gather = t_inp.clone().detach().requires_grad_()
+    c_inp_unfold = t_inp.clone().detach().requires_grad_()
+    t_out = torch_module(t_inp)
+    c_out = dmx_module(c_inp)
+    c_out_gather = dmx_module_gather(c_inp_gather)
+    c_out_unfold = dmx_module_unfold(c_inp_unfold)
+
+    g_out = torch.randn_like(t_out)
+    t_out.backward(g_out)
+    c_out.backward(g_out)
+    c_out_gather.backward(g_out)
+    c_out_unfold.backward(g_out)
+    assert torch.allclose(c_out.data, c_out_gather.data, atol=1e-5)
+    assert torch.allclose(t_out.data, c_out_gather.data, atol=1e-5)
+    assert torch.allclose(t_out.data, c_out_unfold.data, atol=1e-5)
+
+    assert torch.allclose(c_inp.grad, c_inp_gather.grad, atol=1e-5)
+    assert torch.allclose(t_inp.grad, c_inp_gather.grad, atol=1e-5)
+    assert torch.allclose(t_inp.grad, c_inp_unfold.grad, atol=1e-5)
+
+    # config rule corresponds to the Conv2d config in the BASIC mode
+    config_rule = dict(
+        input_formats=[format.BFP16_64],
+        weight_format=format.BFP16_64,
+        bias_format=format.BFP32_1,
+        output_formats=[format.FLOAT16],
+    )
+    dmx_module.configure(config_rule)
+    dmx_module_gather.configure(config_rule)
+    dmx_module_unfold.configure(config_rule)
+    c_out = dmx_module(c_inp)
+    c_out_gather = dmx_module_gather(c_inp_gather)
+    c_out_unfold = dmx_module_unfold(c_inp_unfold)
+    g_out = torch.randn_like(t_out)
+    c_out.backward(g_out)
+    c_out_gather.backward(g_out)
+    c_out_unfold.backward(g_out)
+    assert torch.allclose(c_out.data, c_out_gather.data, atol=1e-5)
+    assert torch.allclose(c_inp.grad, c_inp_gather.grad, atol=1e-5)
     assert torch.allclose(c_out.data, c_out_unfold.data, atol=1e-5)
     assert torch.allclose(c_inp.grad, c_inp_unfold.grad, atol=1e-5)
