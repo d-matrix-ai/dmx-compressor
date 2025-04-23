@@ -121,6 +121,9 @@ default_approx = SimpleNamespace(
     LAYER_NORM=ApproximationFunction.from_shorthand(
         "LAYER_NORM[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
+    RMS_NORM=ApproximationFunction.from_shorthand(
+        "RMS_NORM[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+    ),
     GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
     RMS_NORM=ApproximationFunction.from_shorthand("NONE"),
     EXP=ApproximationFunction.from_shorthand(
@@ -323,6 +326,14 @@ config_rules = SimpleNamespace(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
                 approximation_function=default_approx.LAYER_NORM,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.RMSNorm,),
+            module_config=dict(
+                input_formats=[format.FLOAT16],
+                output_formats=[format.FLOAT16],
+                approximation_function=default_approx.RMS_NORM,
             ),
         ),
         DmxConfigRule(
