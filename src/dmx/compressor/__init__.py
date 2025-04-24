@@ -130,6 +130,12 @@ default_approx = SimpleNamespace(
         if VSIMD_OP_REF_AVAILABLE
         else "NONE"
     ),
+    APPLY_LLAMA_ROPE=ApproximationFunction.from_shorthand(
+    "APPLY_LLAMA_ROPE[vsimd]()"
+    if VSIMD_OP_REF_AVAILABLE
+    else "NONE"
+    ),
+
     NONE=ApproximationFunction.from_shorthand("NONE"),
 )
 
@@ -359,5 +365,14 @@ config_rules = SimpleNamespace(
                 approximation_function=default_approx.EXP,
             ),
         ),
+        DmxConfigRule(
+            module_types=(nn.ApplyRotaryPosEmb,),
+            module_config=dict(
+                input_formats=[format.FLOAT16,format.FLOAT16,format.FLOAT16,format.FLOAT16],
+                output_formats=[format.FLOAT16,format.FLOAT16],
+                approximation_function=default_approx.APPLY_LLAMA_ROPE,
+            ),
+        ),
+        
     ],
 )

@@ -279,8 +279,15 @@ class ApproximationMixin:
         ):
             with torch.no_grad():
                 _approx = self.approximator(*inputs, *args, **kwargs)
-                self.approximation_error = _approx - _output.data
-                _output.data = _approx
+                if isinstance(_approx,tuple): #for modules that return multiple values
+                    assert isinstance(_output,tuple), \
+                        'module and its approximation should both return a tuple'
+                    self.approximation_error = [x - y.data for x,y in zip(_approx,_output)]
+                    for x,y in zip(_approx,_output):
+                        y.data = x
+                else:
+                    self.approximation_error = _approx - _output.data
+                    _output.data = _approx
         return _output
 
     @property
