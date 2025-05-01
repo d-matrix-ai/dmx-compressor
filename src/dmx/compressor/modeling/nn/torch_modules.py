@@ -112,6 +112,7 @@ class ScaledDotProductAttention(DmxModule):
         self.matmul = ActActMatMul()
         self.softmax = Softmax(dim=-1)
         self.dropout = Dropout(p=dropout_p)
+        self.mul = Mul()
 
     def forward(
         self,
@@ -143,7 +144,7 @@ class ScaledDotProductAttention(DmxModule):
             key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
             value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
-        attn_weight = self.matmul(query, key.transpose(-2, -1) * scale_factor)
+        attn_weight = self.matmul(query, self.mul(key.transpose(-2, -1), scale_factor))
         attn_weight = self.resadd(attn_weight, attn_bias)
         attn_weight = self.softmax(attn_weight)
         attn_weight = self.dropout(attn_weight)
