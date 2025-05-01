@@ -40,10 +40,10 @@ def test_distilgpt2():
     m, x = get_workload_graphmodule(wl)
     qdqm = qDq_transform(m)
     prog = torch.export.export(qdqm, (x,))
-    import dmir_compiler
-    from dmir_compiler import DMIRCompilerConfigs
+    import dmx_compiler
+    from dmx_compiler import DMXCompilerConfigs
 
-    config = DMIRCompilerConfigs["stablehlo-dmir"]()
+    config = DMXCompilerConfigs["stablehlo-dmir"]()
     config.use_fx_importer = True
     config.use_tracing = True
     config.use_sharding = False
@@ -54,7 +54,7 @@ def test_distilgpt2():
         torch.ops.aten.t,
     ]
 
-    module = dmir_compiler.compile(qdqm, x, "distilgpt2", config)
+    module = dmx_compiler.compile(qdqm, x, "distilgpt2", config)
 
     return module
 
