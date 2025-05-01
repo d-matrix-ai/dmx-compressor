@@ -2,8 +2,6 @@ import sys
 import time
 import torch
 from collections import defaultdict
-sys.path.insert(0,'/home/coder/nervana_git/dmx-compressor-internal/src/')
-sys.path.insert(0,'/home/coder/nervana_git/common/python')
 from dmx.compressor.modeling import DmxModel
 import time
 from dmx.compressor.functional import NoApproximation
