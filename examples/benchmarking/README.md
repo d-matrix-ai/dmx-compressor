@@ -7,4 +7,4 @@ All the core functionality is in benchmark.py. There are 3 evaluation functions
 
 Their first argument is a `model_maker` callable that returns the tuple: `(model,model_runner,model_evaluator,device)`.  `model_runner` is a callable that takes a single argument (the model) and runs it on a sample input. `model_evaluator` is a callable that evaluates the model accuracy and return a dictionary with accuracy metrics. See `benchmark_clip.py` and `benchmark_llama.py` for usage examples.
 
-The evaluation functions do not return any values. They only print tables to stdout with the various measure metrics. These tables are compatible with Github's markdown and they can be pasted on Github issues or Readmes. 
+The evaluation functions do not return any values. They only print tables to stdout with the various measured metrics. These tables are compatible with Github's markdown and they can be pasted on Github issues or Readmes. 
