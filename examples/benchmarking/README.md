@@ -1,7 +1,7 @@
 ## Runtime, error, and accuracy measurements for DMX models
 
 All the core functionality is in benchmark.py. There are 3 evaluation functions
-1. `measure_model_error(model_maker,active_modes,reference_model)`
+1. `measure_model_error(model_maker,active_modes,reference_mode)`
 2. `measure_model_accuracy(model_maker,active_modes)`
 3. `measure_model_runtime(model_maker,active_modes)`
 
