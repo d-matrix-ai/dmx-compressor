@@ -3,6 +3,7 @@ from typing import Any, Optional
 from parse import parse
 from bidict import bidict
 import torch
+
 try:
     from ..quant import fixed_point_quantize, block_quantize, float_quantize
 except ImportError as error:
@@ -383,12 +384,26 @@ class ScaledBlockFloatingPoint(Format):
             torch.abs(chunk), dim=-1, keepdim=True
         )[0]
 
+        self.scaler_format_exponent_bias_determined = False
+
+    def determine_scaler_exponent_bias_from(self, x: torch.Tensor) -> None:
+        r"""
+        Determines scaler_format.bias based on the value of the quantized tensor
+        as a side-effect
+        """
+        self.scaler_format.bias = (
+            10  # TODO: implement the logic to determine scaler exp bias from x values
+        )
+
     @property
     def bfp_id(self):
         name = f"DMX_SBFP_{self.block_format.precision+8}_{self.block_size}_{self.scaler_format.bias}"
         return BFPTypeEnum[name].value
 
     def cast(self, x: torch.Tensor, block_dim: int) -> torch.Tensor:
+        if not self.scaler_format_exponent_bias_determined:
+            self.determine_scaler_exponent_bias_from(x)
+            self.scaler_format_exponent_bias_determined = True
         _x = x.float().transpose(block_dim, -1)  # dim swap
         xshape = _x.shape  # remember shape
         _xs = torch.split(

@@ -34,7 +34,8 @@ class DmxModelMixin:
     _gms: Dict  # stores {sig: gm} pairs
     _dmx_configuration_queue: List  # stores (config, rules) to be applied
     _monitoring_records: Optional[Dict]  # stored monitored submodule inputs/outputs
-    _runtime_records : Optional[Dict]# stored monitored submodule run times
+    _runtime_records: Optional[Dict]  # stored monitored submodule run times
+
     def _apply_config(self, config: Optional[Union[dict, str]], *rules):
         if config is not None:
             if isinstance(config, str):
@@ -135,10 +136,9 @@ class DmxModelMixin:
             for _, m in self.named_dmx_modules()
         )
 
-    def to_basic_mode(self):
+    def to_basic_mode(self, sbfp_weight_storage=False):
         """
         Configures a transformed DmxModel to the BASIC mode on dmx hardware.
-
 
         Returns:
             The configured model.
@@ -146,7 +146,10 @@ class DmxModelMixin:
         from dmx.compressor import config_rules
 
         self.to_baseline_mode()
-        return self.configure(None, *config_rules.BASIC)
+        self.configure(None, *config_rules.BASIC)
+        if sbfp_weight_storage:
+            self.configure(None, *config_rules.SBFP_WEIGHT_STORAGE)
+            self.call_weight_hypernets()
 
     def to_baseline_mode(self):
         from dmx.compressor import config_rules
@@ -203,18 +206,14 @@ class DmxModelMixin:
 
         return _rec
 
-
     @contextmanager
-    def measure_runtimes(
-        self,
-        device,
-        submodules_to_measure: List[str] = []):
+    def measure_runtimes(self, device, submodules_to_measure: List[str] = []):
         self._runtime_records = {_sm: [] for _sm in submodules_to_measure}
         with ExitStack() as stack:
             yield [
                 stack.enter_context(
                     self._gm.get_submodule(_sm).measuring_runtime(
-                        self._runtime_records[_sm],device
+                        self._runtime_records[_sm], device
                     ),
                 )
                 for _sm in submodules_to_measure
@@ -225,7 +224,7 @@ class DmxModelMixin:
         self._runtime_records = None
 
         return _rec
-            
+
     @contextmanager
     def calibrating_weights(
         self,
@@ -408,6 +407,11 @@ class DmxModel(DmxModelMixin):
                 return False
         return True
 
+    def call_weight_hypernets(self):
+        for _, _m in self.named_dmx_modules():
+            if hasattr(_m, "weight"):
+                _ = _m._weight
+
     @staticmethod
     def deepcopy_args(args):
         def deepcopy_element(element):
@@ -516,7 +520,7 @@ class DmxModel(DmxModelMixin):
         model._gm = None
         model._gms = {}
         model._monitoring_records = None
-        model._runtime_records = None        
+        model._runtime_records = None
         from dmx.compressor import config_rules
 
         model._dmx_configuration_queue = [(None, config_rules.BASELINE)]

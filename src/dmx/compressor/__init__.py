@@ -53,6 +53,7 @@ format = SimpleNamespace(
     BFP12A_64=Format.from_shorthand("BFP[4|8]{64}(_N)"),
     BFP12A_32=Format.from_shorthand("BFP[4|8]{32}(_N)"),
     BFP12A_16=Format.from_shorthand("BFP[4|8]{16}(_N)"),
+    SBFP12_16=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[0|4|4,7](FN)>{16}"),
     SBFP12_16_4=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[0|4|4,4](FN)>{16}"),
     SBFP12_16_5=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[0|4|4,5](FN)>{16}"),
     SBFP12_16_6=Format.from_shorthand("SBFP<XP[4,0](CSN)><FP[0|4|4,6](FN)>{16}"),
@@ -357,6 +358,19 @@ config_rules = SimpleNamespace(
                 input_formats=[format.FLOAT16],
                 output_formats=[format.FLOAT16],
                 approximation_function=default_approx.EXP,
+            ),
+        ),
+    ],
+    SBFP_WEIGHT_STORAGE=[
+        DmxConfigRule(
+            module_types=(
+                nn.Linear,
+                nn.Conv1d,
+                nn.Conv2d,
+                nn.ConvTranspose2d,
+            ),
+            module_config=dict(
+                weight_storage_format=format.SBFP12_16,
             ),
         ),
     ],
