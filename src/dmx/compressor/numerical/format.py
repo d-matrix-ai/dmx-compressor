@@ -10,6 +10,16 @@ except ImportError as error:
     print("Error importing Block Quantize CUDA kernels")
 from .onnx import BFPTypeEnum
 
+try:
+    from dmx.common.numerics.utils import (
+        determine_sbfp_scaler_exponent_bias_from_tensor_values,
+    )
+
+    NUMERICS_UTILS_AVAILABLE = True
+except ModuleNotFoundError:
+    NUMERICS_UTILS_AVAILABLE = False
+
+
 ROUNDING_MODE = bidict(
     {
         "U": "up",
@@ -391,9 +401,10 @@ class ScaledBlockFloatingPoint(Format):
         Determines scaler_format.bias based on the value of the quantized tensor
         as a side-effect
         """
-        self.scaler_format.bias = (
-            10  # TODO: implement the logic to determine scaler exp bias from x values
-        )
+        if NUMERICS_UTILS_AVAILABLE:
+            self.scaler_format.bias = (
+                determine_sbfp_scaler_exponent_bias_from_tensor_values(x)
+            )
 
     @property
     def bfp_id(self):
