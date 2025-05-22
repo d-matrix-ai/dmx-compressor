@@ -5,6 +5,14 @@ This file documents fixes/features added to dmx.compressor
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v0.1.9]
+  - SBFP weight storage option
+  - updating dmir_compiler to dmx_compiler
+  - VSIMD approximate functions in basic config
+  - performance monitoring function
+  - Input/output monitoring for dmxModules
+
+
 ## [v0.1.8]
  - Change pyproject.toml config to better support public release on PyPI.
  - Add support for experimental DMXModules

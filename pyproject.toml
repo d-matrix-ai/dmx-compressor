@@ -1,6 +1,6 @@
 [project]
 name = "dmx-compressor"
-version = "0.1.8"
+version = "0.1.9"
 description = "d-Matrix Compressor"
 readme = "README.md"
 authors = [
@@ -9,7 +9,8 @@ authors = [
         {name="Michael Klachko", email= "mklachko@d-matrix.ai"},
         {name="Sayeh Sharify", email= "sayehs@d-matrix.ai"},
         {name="Wanzin Yazar", email="wyazar@d-matrix.ai"},
-        {name="Zifei Xu", email="xuzifei@d-matrix.ai"}]
+        {name="Zifei Xu", email="xuzifei@d-matrix.ai"},
+        {name="Hesham Mostafa",email="hmostafa@d-matrix.ai"}]
 
 
 [tool.poetry]
