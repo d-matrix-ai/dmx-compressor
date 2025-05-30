@@ -386,13 +386,13 @@ class Linear(DmxModule, torch.nn.Linear):
             # ATTRIBUTES
 
             # _weight
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
             _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
 
             # _bias
             if self.bias is not None:
-                _bias = g.get_attr("_bias")
+                _bias = g.get_attr("bias")
                 _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
                 _output = g.create_node(
                     "call_function",
@@ -476,7 +476,7 @@ class Embedding(DmxModule, torch.nn.Embedding):
             _input = placeholder_nodes[0]
 
             # _weight
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
             _output = g.create_node(
                 "call_function",
@@ -1066,10 +1066,10 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
 
             # Tensor Attributes
 
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
 
-            _bias = g.get_attr("_bias")
+            _bias = g.get_attr("bias")
             _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
 
             # Non Tensor Attributes (no need to quantize)
@@ -1143,7 +1143,7 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
                 placeholder_nodes,
                 ["input_casts.input_cast"],
             )
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
 
             # Non Tensor Attributes (no need to quantize)
@@ -1294,9 +1294,9 @@ class GroupNorm(DmxModule, torch.nn.GroupNorm):
                 ["input_casts.input_cast"],
             )
 
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
-            _bias = g.get_attr("_bias")
+            _bias = g.get_attr("bias")
             _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
 
             args = (_input_dq, self.num_groups, _weight_dq, _bias_dq, self.eps)

@@ -84,8 +84,9 @@ class Conv1dUnfold(_Conv1d):
             )
 
             # _weight
-            _weight = g.get_attr("_weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight = g.get_attr("weight")
+            _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
+            _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
 
             _reshape = g.call_function(
                 torch.reshape, (_weight_dq, (self.out_channels, -1))
@@ -94,7 +95,7 @@ class Conv1dUnfold(_Conv1d):
             _matmul_dq = self.qdq_nodes(g, [matmul], ["accum_cast"])
 
             if self.bias is not None:
-                _bias = g.get_attr("_bias")
+                _bias = g.get_attr("bias")
                 _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
                 _bias_unsqueeze = g.call_function(torch.unsqueeze, (_bias_dq, -1))
 
@@ -225,7 +226,8 @@ class Conv1dScatter(_Conv1d):
 
             # _weight
             _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
+            _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
             transpose_1 = g.call_method("transpose", (_weight_dq, 1, 2), {})
             unsqueeze_1 = g.call_method("unsqueeze", (transpose_1, 3), {})
             repeat = g.call_method("repeat", (unsqueeze_1, 1, 1, 1, add_1), {})
@@ -378,8 +380,9 @@ class Conv2dUnfold(_Conv2d):
             add_3 = g.call_function(operator.add, (floordiv_1, 1), {})
 
             # _weight
-            _weight = g.get_attr("_weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight = g.get_attr("weight")
+            _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
+            _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
 
             getattr_2 = g.call_function(getattr, (_weight, "device"), {})
             to = g.call_method("to", (_weight_dq, getattr_2), {})
@@ -403,7 +406,7 @@ class Conv2dUnfold(_Conv2d):
             getattr_4 = g.call_function(getattr, (matmul, "dtype"), {})
             to_2 = g.call_method("to", (clone_1, getattr_4), {})
             if self.bias is not None:
-                _bias = g.get_attr("_bias")
+                _bias = g.get_attr("bias")
                 _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
                 clone_2 = g.call_method("clone", (_bias_dq,), {})
                 getattr_5 = g.call_function(getattr, (_bias, "dtype"), {})
@@ -470,43 +473,74 @@ class Conv2dGather(_Conv2d):
         # zero padded input
         _pad_h = _input.new_zeros(_N, self.in_channels, self.padding[0], in_width)
         _padded_input = torch.cat((_pad_h, _input, _pad_h), 2)
-        _pad_w = _input.new_zeros(_N, self.in_channels, in_height + 2 * self.padding[0], self.padding[1])
+        _pad_w = _input.new_zeros(
+            _N, self.in_channels, in_height + 2 * self.padding[0], self.padding[1]
+        )
         _padded_input = torch.cat((_pad_w, _padded_input, _pad_w), 3)
-        _input_ref = _padded_input.unsqueeze(1).unsqueeze(2).repeat(1, _h_out, _w_out, 1, 1, 1)
+        _input_ref = (
+            _padded_input.unsqueeze(1).unsqueeze(2).repeat(1, _h_out, _w_out, 1, 1, 1)
+        )
         del _pad_h, _pad_w, _padded_input
 
         # Create gather indices for Height dim
         _indices_h = _input.new_ones(_h_out, dtype=torch.int64).cumsum(0) - 1
         _indices_h = _indices_h * self.stride[0]
-        _offset_h = _input.new_ones(self.kernel_size[0], dtype=torch.int64).cumsum(0) - 1
+        _offset_h = (
+            _input.new_ones(self.kernel_size[0], dtype=torch.int64).cumsum(0) - 1
+        )
         _indices_h = _indices_h[:, None].repeat(1, self.kernel_size[0]) + _offset_h
-        _indices_h = _indices_h.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
-        _indices_h = _indices_h.unsqueeze(2).unsqueeze(5).repeat(1, 1, _w_out, 1, 1, in_width + 2 * self.padding[1])
+        _indices_h = (
+            _indices_h.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
+        )
+        _indices_h = (
+            _indices_h.unsqueeze(2)
+            .unsqueeze(5)
+            .repeat(1, 1, _w_out, 1, 1, in_width + 2 * self.padding[1])
+        )
 
         # Gather Matmul inputs in Height dim
         _matmul_input = _input_ref.gather(dim=4, index=_indices_h)
         del _indices_h, _offset_h, _input_ref
- 
+
         # Create gather indices for Width dim
         _indices_w = _input.new_ones(_w_out, dtype=torch.int64).cumsum(0) - 1
         _indices_w = _indices_w * self.stride[1]
-        _offset_w = _input.new_ones(self.kernel_size[1], dtype=torch.int64).cumsum(0) - 1
+        _offset_w = (
+            _input.new_ones(self.kernel_size[1], dtype=torch.int64).cumsum(0) - 1
+        )
         _indices_w = _indices_w[:, None].repeat(1, self.kernel_size[1]) + _offset_w
-        _indices_w = _indices_w.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
-        _indices_w = _indices_w.unsqueeze(1).unsqueeze(4).repeat(1, _h_out, 1, 1, self.kernel_size[0], 1)
+        _indices_w = (
+            _indices_w.unsqueeze(0).unsqueeze(2).repeat(_N, 1, self.in_channels, 1)
+        )
+        _indices_w = (
+            _indices_w.unsqueeze(1)
+            .unsqueeze(4)
+            .repeat(1, _h_out, 1, 1, self.kernel_size[0], 1)
+        )
 
         # Gather Matmul inputs in Width dim
         _matmul_input = _matmul_input.gather(dim=5, index=_indices_w)
         del _indices_w, _offset_w
-        _matmul_input = _matmul_input.view(-1, _matmul_input.size(3) * _matmul_input.size(4) * _matmul_input.size(5))
+        _matmul_input = _matmul_input.view(
+            -1, _matmul_input.size(3) * _matmul_input.size(4) * _matmul_input.size(5)
+        )
 
         # Create matmul weight from original weights
-        _matmul_weight = self._weight.reshape(-1, self._weight.size(1) * self._weight.size(2) * self._weight.size(3)).transpose(0, 1)
+        _matmul_weight = self._weight.reshape(
+            -1, self._weight.size(1) * self._weight.size(2) * self._weight.size(3)
+        ).transpose(0, 1)
 
         # Matmul calculation
-        _output = torch.matmul(_matmul_input, _matmul_weight).view(_N, _h_out, _w_out, -1).transpose(2, 3).transpose(1, 2)
+        _output = (
+            torch.matmul(_matmul_input, _matmul_weight)
+            .view(_N, _h_out, _w_out, -1)
+            .transpose(2, 3)
+            .transpose(1, 2)
+        )
         if self.bias is not None:
-            _output = torch.add(_output, self._bias.unsqueeze(0).unsqueeze(2).unsqueeze(3))
+            _output = torch.add(
+                _output, self._bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
+            )
 
         return _output
 

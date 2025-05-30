@@ -76,7 +76,7 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
                 placeholder_nodes,
                 ["input_casts.input_cast"],
             )
-            _weight = g.get_attr("_weight")
+            _weight = g.get_attr("weight")
             _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
 
             # Non Tensor Attributes (no need to quantize)
