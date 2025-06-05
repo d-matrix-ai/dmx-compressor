@@ -4,7 +4,8 @@ from collections import OrderedDict
 import torch
 from torch import Tensor, Size
 import torch.nn.functional as F
-from torch.fx import Graph, symbolic_trace
+from .core import DmxGraph
+from torch.fx import Graph
 import transformers
 import transformers.activations
 
@@ -343,7 +344,7 @@ class Linear(DmxModule, torch.nn.Linear):
             initial_dmx.update_params_with_raw(raw)
         return initial_dmx
 
-    def to_compiler_graph(self) -> Graph:
+    def to_compiler_graph(self) -> DmxGraph:
         """
         Returns a compiler friendly graph
 
@@ -373,44 +374,40 @@ class Linear(DmxModule, torch.nn.Linear):
             output         output                             output                             (dequantize_3,)                                                                    {}
 
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
             # PLACEHOLDERS
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
 
-            # ATTRIBUTES
-
             # _weight
-            _weight = g.get_attr("weight")
-            _weight_storage_dq = self.qdq_nodes(g, [_weight], ["weight_storage_cast"])
-            _weight_dq = self.qdq_nodes(g, [_weight_storage_dq], ["weight_cast"])
+            _weight_storage_dq = g.get_attr(
+                "weight", "weight_storage_cast", repr(self.weight_storage_cast.format)
+            )
+            _weight_dq = g.qdq_node(
+                _weight_storage_dq, "weight_cast", repr(self.weight_cast.format)
+            )
 
             # _bias
-            if self.bias is not None:
-                _bias = g.get_attr("bias")
-                _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
-                _output = g.create_node(
-                    "call_function",
-                    torch.nn.functional.linear,
-                    (_input_dq, _weight_dq, _bias_dq),
-                    name="_output",
-                )
-                _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
-                g.output(_output_dq)
-            else:
-                _output = g.create_node(
-                    "call_function",
-                    torch.nn.functional.linear,
-                    (_input_dq, _weight_dq, None),
-                    name="_output",
-                )
-                _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
-                g.output(_output_dq)
+            _bias_dq = g.get_attr(
+                "bias",
+                "bias_cast",
+                repr(getattr(self.bias_cast, "format", None)),
+                optional_arg=self.bias,
+            )
+
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.linear,
+                (_input_dq, _weight_dq, _bias_dq),
+                name="_output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
+            )
+            g.output(_output_dq)
         return g
 
 

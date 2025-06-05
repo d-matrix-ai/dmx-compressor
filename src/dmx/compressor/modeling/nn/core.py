@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import torch
 from torch import Tensor
 from torch.fx import Graph
+import inspect
 
 from dmx.compressor.numerical import NumericalCastMixin, Same, CastTo
 from dmx.compressor.sparse import (
@@ -327,38 +328,6 @@ class DmxModule(
         """
         raise NotImplementedError("to_compiler_graph not implemented!")
 
-    def create_placeholders(self, g, names):
-        placeholder_nodes = []
-        for name in names:
-            _n = g.placeholder(name)
-            placeholder_nodes.append(_n)
-        return placeholder_nodes
-
-    def qdq_nodes(self, g, nodes, cast_names):
-        from operator import attrgetter
-
-        dq_nodes = []
-        for node, cast_name in zip(nodes, cast_names):
-            _scale = g.get_attr(f"{cast_name}.scale")
-            _zero_point = g.get_attr(f"{cast_name}.zero_point")
-            _q = g.call_function(
-                torch.ops.dmx_ops.quantize,
-                (
-                    node,
-                    _scale,
-                    _zero_point,
-                    repr(attrgetter(f"{cast_name}.format")(self)),
-                ),
-            )
-            _dq = g.call_function(
-                torch.ops.dmx_ops.dequantize,
-                (_q, _scale, _zero_point),
-            )
-            dq_nodes.append(_dq)
-        if len(dq_nodes) == 1:
-            return dq_nodes[0]
-        return dq_nodes
-
 
 class DmxModuleConfig(dict):
     @classmethod
@@ -418,3 +387,117 @@ class DmxModuleConfig(dict):
 
 def is_configurable(m):
     return isinstance(m, DmxModule)
+
+
+class DmxGraph(Graph):
+    def __init__(self, owning_module=None, tracer_cls=None, tracer_extras=None):
+        super().__init__(owning_module, tracer_cls, tracer_extras)
+
+    def qdq_node(self, node, cast_name, cast_format):
+        from operator import attrgetter
+
+        if node is None or cast_name is None:
+            return node
+
+        _scale = self.get_attr(f"{cast_name}.scale")
+        _zero_point = self.get_attr(f"{cast_name}.zero_point")
+        _q = self.call_function(
+            torch.ops.dmx_ops.quantize,
+            (
+                node,
+                _scale,
+                _zero_point,
+                cast_format,
+            ),
+        )
+        dq_node = self.call_function(
+            torch.ops.dmx_ops.dequantize,
+            (_q, _scale, _zero_point),
+        )
+        return dq_node
+
+    def create_placeholders(self, names, cast_names=None, cast_formats=None):
+        placeholder_nodes = []
+        if cast_names is None:
+            cast_names = [None] * len(names)
+            cast_formats = [None] * len(names)
+        assert len(cast_names) == len(
+            names
+        ), "List of placeholder names and cast names shuold have same length!"
+        for name, c_name, c_format in zip(names, cast_names, cast_formats):
+            _n = self.placeholder(name, c_name, c_format)
+            placeholder_nodes.append(_n)
+        if len(placeholder_nodes) == 1:
+            return placeholder_nodes[0]
+        return placeholder_nodes
+
+    def placeholder(
+        self,
+        name,
+        cast_name=None,
+        cast_format=None,
+        type_expr=None,
+        default_value=inspect.Signature.empty,
+    ):
+        node = super().placeholder(name, type_expr, default_value)
+        node = self.qdq_node(node, cast_name, cast_format)
+        return node
+
+    def get_attr(
+        self,
+        qualified_name,
+        cast_name=None,
+        cast_format=None,
+        optional_arg=True,
+        type_expr=None,
+    ):
+        """
+        optional_arg: controlling whether None will be returned instead of a Node. e.g. optional_arg = linear_mod.bias will return None when the module does not have a bias term.
+                      Defaults to True.
+        """
+        if optional_arg is None:
+            return None
+        node = super().get_attr(qualified_name, type_expr)
+        node = self.qdq_node(node, cast_name, cast_format)
+        return node
+
+    def create_node(
+        self,
+        op,
+        target,
+        args=None,
+        kwargs=None,
+        name=None,
+        type_expr=None,
+        cast_name=None,
+        cast_format=None,
+    ):
+        node = super().create_node(op, target, args, kwargs, name, type_expr)
+        node = self.qdq_node(node, cast_name, cast_format)
+        return node
+
+    def call_function(
+        self,
+        the_function,
+        args=None,
+        kwargs=None,
+        type_expr=None,
+        cast_name=None,
+        cast_format=None,
+    ):
+        node = super().call_function(the_function, args, kwargs, type_expr)
+        node = self.qdq_node(node, cast_name, cast_format)
+        return node
+
+    def call_method(
+        self,
+        method_name,
+        args=None,
+        kwargs=None,
+        type_expr=None,
+        cast_name=None,
+        cast_format=None,
+    ):
+        node = super().call_method(method_name, args, kwargs, type_expr)
+        node = self.qdq_node(node, cast_name, cast_format)
+        return node
