@@ -11,7 +11,7 @@ except ImportError as error:
 from .onnx import BFPTypeEnum
 
 try:
-    from dmx.common.numerics.utils import (
+    from numerics import (
         determine_sbfp_scaler_exponent_bias_from_tensor_values,
     )
 
