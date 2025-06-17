@@ -21,6 +21,7 @@ from dmx.compressor.functional import (
 from dmx.compressor.perf_proxy import PerformanceProxyMixin
 from dmx.compressor.layer_reconstruction import LayerReconstructionMixin
 
+import warnings
 
 __ALL__ = ["DmxModuleType", "DmxModule", "DmxModuleConfig", "is_configurable"]
 
@@ -392,6 +393,38 @@ def is_configurable(m):
 class DmxGraph(Graph):
     def __init__(self, owning_module=None, tracer_cls=None, tracer_extras=None):
         super().__init__(owning_module, tracer_cls, tracer_extras)
+        try:
+            import dmx.ops
+        except:
+            warnings.warn("Falling back to dummy q/dq torch ops")
+
+            @torch.library.custom_op("dmx_ops::quantize.Scalar", mutates_args=[])
+            def quantize(
+                t: float, scale: float, zero_point: float, format: str
+            ) -> torch.Tensor:
+                return torch.Tensor([t])
+
+            @torch.library.custom_op("dmx_ops::quantize.Tensor", mutates_args=[])
+            def quantize(
+                t: torch.Tensor, scale: float, zero_point: float, format: str
+            ) -> torch.Tensor:
+                return t.clone()
+
+            @quantize.register_fake
+            def _(
+                t: torch.Tensor, scale: float, zero_point: float, format: str
+            ) -> torch.Tensor:
+                return torch.empty_like(t)
+
+            @torch.library.custom_op("dmx_ops::dequantize.Tensor", mutates_args=[])
+            def dequantize(
+                t: torch.Tensor, scale: float, zero_point: float
+            ) -> torch.Tensor:
+                return t.clone()
+
+            @dequantize.register_fake
+            def _(t: torch.Tensor, scale: float, zero_point: float) -> torch.Tensor:
+                return torch.empty_like(t)
 
     def qdq_node(self, node, cast_name, cast_format):
         from operator import attrgetter
