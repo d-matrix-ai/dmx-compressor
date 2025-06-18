@@ -1,9 +1,6 @@
-import math
-from typing import Union, List, Optional
 from collections import OrderedDict
 import torch
 from torch import Tensor, Size
-import torch.nn.functional as F
 from torch.fx import Graph, symbolic_trace
 import transformers
 import transformers.activations
@@ -11,6 +8,7 @@ import transformers.activations
 from dmx.compressor.numerical import Same, CastTo, CastToDict
 from . import DmxModule
 from .torch_modules import GELUBase
+from .core import DmxGraph
 
 
 class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSNorm):
@@ -68,25 +66,29 @@ class GemmaRMSNorm(DmxModule, transformers.models.gemma.modeling_gemma.GemmaRMSN
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
-            _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight_dq = g.get_attr(
+                "weight", "weight_cast", repr(self.weight_cast.format)
+            )
 
             # Non Tensor Attributes (no need to quantize)
             eps = g.get_attr("eps")
 
             args = ((_input_dq), _weight_dq, eps)
-            output = g.create_node(
-                "call_function", self.functional_forward, args, name="GemmanRMSNorm"
+            _output_dq = g.create_node(
+                "call_function",
+                self.functional_forward,
+                args,
+                name="GemmanRMSNorm",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -193,25 +195,37 @@ class ApplyRotaryPosEmb(DmxModule, ApplyRotaryPosEmbBase):
 
     def to_compiler_graph(self):
         # combine these two lines into one context manager
-        g = Graph()
+        g = DmxGraph()
         with g.inserting_after():
             # a function that insert placeholder nodes
-            placeholders = self.create_placeholders(g, ["q", "k", "cos", "sin"])
-            cast_names = [
-                "input_casts.q_cast",
-                "input_casts.k_cast",
-                "input_casts.cos_cast",
-                "input_casts.sin_cast",
-            ]
-            dq_q, dq_k, dq_cos, dq_sin = self.qdq_nodes(g, placeholders, cast_names)
-            q_emb = g.call_function(apply_rotary_embeddings, (dq_q, dq_cos, dq_sin))
-            k_emb = g.call_function(apply_rotary_embeddings, (dq_k, dq_cos, dq_sin))
-            output_cast_names = [
-                "output_casts.q_embed_cast",
-                "output_casts.k_embed_cast",
-            ]
-            q_res, k_res = self.qdq_nodes(g, [q_emb, k_emb], output_cast_names)
-            # output = g.call_function(tuple, (q_res, k_res))
+            dq_q, dq_k, dq_cos, dq_sin = g.create_placeholders(
+                ["q", "k", "cos", "sin"],
+                [
+                    "input_casts.q_cast",
+                    "input_casts.k_cast",
+                    "input_casts.cos_cast",
+                    "input_casts.sin_cast",
+                ],
+                [
+                    repr(self.input_casts.q_cast.format),
+                    repr(self.input_casts.k_cast.format),
+                    repr(self.input_casts.cos_cast.format),
+                    repr(self.input_casts.sin_cast.format),
+                ],
+            )
+            q_res = g.call_function(
+                apply_rotary_embeddings,
+                (dq_q, dq_cos, dq_sin),
+                cast_name="output_casts.q_embed_cast",
+                cast_format=repr(self.output_casts.q_embed_cast.format),
+            )
+            k_res = g.call_function(
+                apply_rotary_embeddings,
+                (dq_k, dq_cos, dq_sin),
+                cast_name="output_casts.k_embed_cast",
+                cast_format=repr(self.output_casts.k_embed_cast.format),
+            )
+
             g.output((q_res, k_res))
         return g
 

@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from .core import DmxGraph
 from torch.fx import Graph
 import transformers
-import transformers.activations
 
 from dmx.compressor.numerical import Same, CastTo, CastToDict
 from . import DmxModule
@@ -42,19 +41,25 @@ class ResAdd(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input", "residual"])
-            input_dq, residual_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            input_dq, residual_dq = g.create_placeholders(
+                ["_input", "residual"],
                 ["input_casts.input_cast", "input_casts.residual_cast"],
+                [
+                    repr(self.input_casts.input_cast.format),
+                    repr(self.input_casts.residual_cast.format),
+                ],
             )
 
-            _output = g.create_node(
-                "call_function", torch.add, (input_dq, residual_dq), name="output"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.add,
+                (input_dq, residual_dq),
+                name="output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -78,18 +83,24 @@ class Mul(DmxModule):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input", "multiplier"])
-            _input_dq, multiplier_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq, multiplier_dq = g.create_placeholders(
+                ["_input", "multiplier"],
                 ["input_casts.input_cast", "input_casts.multiplier_cast"],
+                [
+                    repr(self.input_casts.input_cast.format),
+                    repr(self.input_casts.multiplier_cast.format),
+                ],
             )
-            _output = g.create_node(
-                "call_function", torch.mul, (_input_dq, multiplier_dq), name="output"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.mul,
+                (_input_dq, multiplier_dq),
+                name="output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -195,18 +206,24 @@ class ActActMatMul(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input", "multiplier"])
-            _input_dq, multiplier_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq, multiplier_dq = g.create_placeholders(
+                ["_input", "multiplier"],
                 ["input_casts.input_cast", "input_casts.multiplier_cast"],
+                [
+                    repr(self.input_casts.input_cast.format),
+                    repr(self.input_casts.multiplier_cast.format),
+                ],
             )
-            _output = g.create_node(
-                "call_function", torch.matmul, (_input_dq, multiplier_dq), name="output"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.matmul,
+                (_input_dq, multiplier_dq),
+                name="output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -223,18 +240,21 @@ class Exp(DmxModule, torch.nn.Module):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
-            _output = g.create_node(
-                "call_function", torch.exp, (_input_dq,), name="output"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.exp,
+                (_input_dq,),
+                name="output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -259,24 +279,29 @@ class BAddBMM(DmxModule):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(
-                g, ["_input", "batch1", "batch2"]
-            )
-            dqs = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            dqs = g.create_placeholders(
+                ["_input", "batch1", "batch2"],
                 [
                     "input_casts.input_cast",
                     "input_casts.batch1_cast",
                     "input_casts.batch2_cast",
                 ],
+                [
+                    repr(self.input_casts.input_cast.format),
+                    repr(self.input_casts.batch1_cast.format),
+                    repr(self.input_casts.batch2_cast.format),
+                ],
             )
-            _output = g.create_node(
-                "call_function", torch.baddbmm, tuple(dqs), name="output"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.baddbmm,
+                tuple(dqs),
+                name="output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -466,20 +491,24 @@ class Embedding(DmxModule, torch.nn.Embedding):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
             # PLACEHOLDERS
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input = placeholder_nodes[0]
+            _input_dq = g.create_placeholders(
+                ["_input"],
+                ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
+            )
 
             # _weight
-            _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
-            _output = g.create_node(
+            _weight_dq = g.get_attr(
+                "weight", "weight_cast", repr(self.weight_cast.format)
+            )
+            _output_dq = g.create_node(
                 "call_function",
                 torch.nn.functional.embedding,
                 (
-                    _input,
+                    _input_dq,
                     _weight_dq,
                     self.padding_idx,
                     self.max_norm,
@@ -488,8 +517,9 @@ class Embedding(DmxModule, torch.nn.Embedding):
                     self.sparse,
                 ),
                 name="_output",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -974,22 +1004,22 @@ class Softmax(DmxModule, torch.nn.Softmax):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
             dim = g.get_attr("dim")
-            _output = g.create_node(
+            _output_dq = g.create_node(
                 "call_function",
                 torch.nn.functional.softmax,
                 (_input_dq, dim),
                 name="softmax",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1052,32 +1082,40 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
 
             # Tensor Attributes
 
-            _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight_dq = g.get_attr(
+                "weight", "weight_cast", repr(self.weight_cast.format)
+            )
 
-            _bias = g.get_attr("bias")
-            _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
+            _bias_dq = g.get_attr(
+                "bias",
+                "bias_cast",
+                repr(getattr(self.bias_cast, "format", None)),
+                optional_arg=self.bias,
+            )
 
             # Non Tensor Attributes (no need to quantize)
             normalized_shape = g.get_attr("normalized_shape")
             eps = g.get_attr("eps")
 
-            args = ((_input_dq), normalized_shape, _weight_dq, _bias_dq)
-            output = g.create_node(
-                "call_function", torch.nn.functional.layer_norm, args, name="ln"
+            args = ((_input_dq), normalized_shape, _weight_dq, _bias_dq, eps)
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.layer_norm,
+                args,
+                name="ln",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1132,26 +1170,30 @@ class RMSNorm(DmxModule, torch.nn.RMSNorm):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
-            _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
+            _weight_dq = g.get_attr(
+                "weight", "weight_cast", repr(self.weight_cast.format)
+            )
 
             # Non Tensor Attributes (no need to quantize)
             normalized_shape = g.get_attr("normalized_shape")
             eps = g.get_attr("eps")
 
             args = ((_input_dq), normalized_shape, _weight_dq, eps)
-            output = g.create_node(
-                "call_function", torch.nn.functional.rms_norm, args, name="RMSNorm"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.rms_norm,
+                args,
+                name="RMSNorm",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1282,26 +1324,33 @@ class GroupNorm(DmxModule, torch.nn.GroupNorm):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
-
-            _weight = g.get_attr("weight")
-            _weight_dq = self.qdq_nodes(g, [_weight], ["weight_cast"])
-            _bias = g.get_attr("bias")
-            _bias_dq = self.qdq_nodes(g, [_bias], ["bias_cast"])
+            _weight_dq = g.get_attr(
+                "weight", "weight_cast", repr(self.weight_cast.format)
+            )
+            _bias_dq = g.get_attr(
+                "bias",
+                "bias_cast",
+                repr(getattr(self.bias_cast, "format", None)),
+                optional_arg=self.bias,
+            )
 
             args = (_input_dq, self.num_groups, _weight_dq, _bias_dq, self.eps)
 
-            _output = g.create_node(
-                "call_function", torch.nn.functional.group_norm, args, name="GroupNorm"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.group_norm,
+                args,
+                name="GroupNorm",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1345,24 +1394,26 @@ class Dropout(DmxModule, torch.nn.Dropout):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
-
             p = g.get_attr("p")
             training = g.get_attr("training")
             inplace = g.get_attr("inplace")
 
             args = (_input_dq, p, training, inplace)
-            _output = g.create_node(
-                "call_function", torch.nn.functional.dropout, args, name="Dropout"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.dropout,
+                args,
+                name="Dropout",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1405,20 +1456,23 @@ class ReLU(DmxModule, torch.nn.ReLU):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
 
             args = (_input_dq,)
-            _output = g.create_node(
-                "call_function", torch.nn.functional.relu, args, name="ReLU"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.relu,
+                args,
+                name="ReLU",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1460,20 +1514,23 @@ class ReLU6(DmxModule, torch.nn.ReLU6):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
 
             args = (_input_dq,)
-            _output = g.create_node(
-                "call_function", torch.nn.functional.relu6, args, name="relu6"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.relu6,
+                args,
+                name="relu6",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1516,21 +1573,24 @@ class SiLU(DmxModule, torch.nn.SiLU):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
 
             inplace = g.get_attr("inplace")
             args = (_input_dq, inplace)
-            _output = g.create_node(
-                "call_function", torch.nn.functional.silu, args, name="SiLU"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.silu,
+                args,
+                name="SiLU",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1570,20 +1630,23 @@ class Tanh(DmxModule, torch.nn.Tanh):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
             args = (_input_dq,)
 
-            _output = g.create_node(
-                "call_function", torch.nn.functional.tanh, args, name="tanh"
+            _output_dq = g.create_node(
+                "call_function",
+                torch.nn.functional.tanh,
+                args,
+                name="tanh",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 
@@ -1626,20 +1689,23 @@ class GELUBase(DmxModule):
         """
         Returns a compiler friendly graph
         """
-        g = torch.fx.Graph()
+        g = DmxGraph()
         with g.inserting_after():
-            placeholder_nodes = self.create_placeholders(g, ["_input"])
-            _input_dq = self.qdq_nodes(
-                g,
-                placeholder_nodes,
+            _input_dq = g.create_placeholders(
+                ["_input"],
                 ["input_casts.input_cast"],
+                [repr(self.input_casts.input_cast.format)],
             )
             args = (_input_dq,)
 
-            _output = g.create_node(
-                "call_function", self.functional_forward, args, name="gelu"
+            _output_dq = g.create_node(
+                "call_function",
+                self.functional_forward,
+                args,
+                name="gelu",
+                cast_name="output_casts.output_cast",
+                cast_format=repr(self.output_casts.output_cast.format),
             )
-            _output_dq = self.qdq_nodes(g, [_output], ["output_casts.output_cast"])
             g.output(_output_dq)
         return g
 

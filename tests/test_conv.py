@@ -2,8 +2,12 @@ import pytest
 import torch
 from dmx.compressor.modeling import nn as dmxnn
 from dmx.compressor import format
-from dmx.compressor.modeling.nn.experimental import Conv1dScatter, Conv1dUnfold, Conv2dGather, Conv2dUnfold
-import dmx.ops
+from dmx.compressor.modeling.nn.experimental import (
+    Conv1dScatter,
+    Conv1dUnfold,
+    Conv2dGather,
+    Conv2dUnfold,
+)
 
 
 RANDOM_SEED = 0
@@ -237,7 +241,7 @@ def test_conv1d_scatter(
     assert torch.allclose(c_inp.grad, c_inp_unfold.grad, atol=1e-5)
 
 
-@pytest.mark.parametrize("bias", (False, ))
+@pytest.mark.parametrize("bias", (False,))
 @pytest.mark.parametrize(
     "in_channels,out_channels,kernel_size,stride",
     (
@@ -248,15 +252,11 @@ def test_conv1d_scatter(
 )
 @pytest.mark.parametrize(
     "image_size",
-    (
-        (224, 224),
-    ),
+    ((224, 224),),
 )
 @pytest.mark.parametrize(
     "batch_size",
-    (
-        1,
-    ),
+    (1,),
 )
 def test_conv2d_gather(
     batch_size,

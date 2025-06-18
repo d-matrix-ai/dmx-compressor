@@ -1,6 +1,5 @@
 import torch
 from dmx.compressor import nn
-import dmx.ops
 import pytest
 
 torch.manual_seed(0)
