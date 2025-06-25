@@ -129,33 +129,33 @@ def get_name_for_func_nodes(
         used_names (Set[str]): A Set of names already used for nodes
         base_count (Dict[str, int]): A dict counting number of names sharing the same candidate base
     """
-    illegal_char_regex = re.compile("[^0-9a-zA-Z_]+")
-    name_suffix_regex = re.compile(r"(.*)_(\d+)$")
+    _illegal_char_regex = re.compile("[^0-9a-zA-Z_]+")
+    _name_regex = re.compile(r"^([a-zA-Z_][0-9a-zA-Z_]*?)(?:_(\d+))?$")
 
-    candidate = illegal_char_regex.sub("_", candidate)
-    if not candidate:
-        candidate = "_unnamed"
-
-    if candidate[0].isdigit():
-        candidate = f"_{candidate}"
-
-    match = name_suffix_regex.match(candidate)
+    match = _name_regex.match(candidate)
     if match is None:
-        base = candidate
-        num = None
+        # delete all characters that are illegal in a Python identifier
+        candidate = _illegal_char_regex.sub("_", candidate)
+
+        if not candidate:
+            candidate = "_unnamed"
+
+        if candidate[0].isdigit():
+            candidate = f"_{candidate}"
+
+        match = _name_regex.match(candidate)
+        assert match is not None
+
+    base, num = match.group(1, 2)
+    if num is None or candidate in used_names:
+        num = base_count.get(candidate, 0)
     else:
-        base, num_str = match.group(1, 2)
-        num = int(num_str)
+        num = int(num)
 
-    candidate = base if num is None else f"{base}_{num}"
-    if not num:
-        num = base_count[base]
-
-    while candidate in used_names or fx.graph._Namespace()._is_illegal_name(
-        candidate, None
-    ):
+    while candidate in used_names:
         num += 1
         candidate = f"{base}_{num}"
+
     return candidate
 
 
