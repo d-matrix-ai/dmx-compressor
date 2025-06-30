@@ -2,6 +2,11 @@
 import torch
 from dmx.compressor.modeling import DmxModel, DmxConfigRule
 from dmx.compressor.modeling import nn as dmxnn
+from dmx.compressor.advanced_recipe import (
+    DmxQuantizerCalibrationHyperparams,
+    DmxModuleQuantizerCalibrationHyperparams,
+    DmxQuantizerCalibrationRecipe,
+)
 from copy import deepcopy
 
 torch.manual_seed(0)
@@ -53,9 +58,15 @@ def test_retransformation_after_calib():
     target_layers = {
         n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmxnn.Linear,))
     }
-    with model.calibrating_activations(
-        target_layers.items()
-    ), torch.no_grad(), model.calibrating_weights(target_layers.items()):
+    hp_gen = lambda _model: {
+        _m: DmxModuleQuantizerCalibrationHyperparams(
+            inputs={"input_cast": DmxQuantizerCalibrationHyperparams()},
+            weight=DmxQuantizerCalibrationHyperparams(),
+        )
+        for _, _m in _model.named_dmx_modules()
+        if isinstance(_m, dmxnn.Linear)
+    } 
+    with DmxQuantizerCalibrationRecipe(hp_gen).applied_to(model), torch.no_grad():
         model(x)
         target_layers_copy = {n: deepcopy(m) for n, m in target_layers.items()}
     model(y, y)
@@ -108,9 +119,15 @@ def test_retransformation_during_calib():
     target_layers = {
         n: m for n, m in model.named_dmx_modules() if isinstance(m, (dmxnn.Linear,))
     }
-    with model.calibrating_activations(
-        target_layers.items()
-    ), torch.no_grad(), model.calibrating_weights(target_layers.items()):
+    hp_gen = lambda _model: {
+        _m: DmxModuleQuantizerCalibrationHyperparams(
+            inputs={"input_cast": DmxQuantizerCalibrationHyperparams()},
+            weight=DmxQuantizerCalibrationHyperparams(),
+        )
+        for _, _m in _model.named_dmx_modules()
+        if isinstance(_m, dmxnn.Linear)
+    } 
+    with DmxQuantizerCalibrationRecipe(hp_gen).applied_to(model), torch.no_grad():
         model(x)
         target_layers_copy = {n: deepcopy(m) for n, m in target_layers.items()}
         model(y, y)

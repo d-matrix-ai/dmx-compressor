@@ -136,6 +136,13 @@ class DmxModelMixin:
             for _, m in self.named_dmx_modules()
         )
 
+    def to_baseline_mode(self):
+        from dmx.compressor import config_rules
+
+        # we can clear the _dmx_configuration_queue as baseline config rule will overwrite everything
+        self._dmx_configuration_queue = []
+        self.configure(None, *config_rules.BASELINE)
+
     def to_basic_mode(self, sbfp_weight_storage=False):
         """
         Configures a transformed DmxModel to the BASIC mode on dmx hardware.
@@ -149,14 +156,7 @@ class DmxModelMixin:
         self.configure(None, *config_rules.BASIC)
         if sbfp_weight_storage:
             self.configure(None, *config_rules.SBFP_WEIGHT_STORAGE)
-            self.call_weight_hypernets()
-
-    def to_baseline_mode(self):
-        from dmx.compressor import config_rules
-
-        # we can clear the _dmx_configuration_queue as baseline config rule will overwrite everything
-        self._dmx_configuration_queue = []
-        self.configure(None, *config_rules.BASELINE)
+            self.forward_weight_hypernets()
 
     @contextmanager
     def keep_dmx_config(self):
@@ -176,12 +176,12 @@ class DmxModelMixin:
 
     @staticmethod
     def _save_specific_layers_state_dict_and_register_urls(
-        specific_layers: Dict[str, Sequence[DmxModule]],
+        specific_layers: Sequence[DmxModule],
         save_checkpoint_to: Optional[str],
     ):
         if save_checkpoint_to is not None:
-            for _, m in specific_layers:
-                m.save_state_dict_and_register_url(parent_dir=save_checkpoint_to)
+            for _m in specific_layers:
+                _m.save_state_dict_and_register_url(parent_dir=save_checkpoint_to)
 
     @contextmanager
     def monitoring(
@@ -225,85 +225,6 @@ class DmxModelMixin:
 
         return _rec
 
-    @contextmanager
-    def calibrating_weights(
-        self,
-        specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
-        save_checkpoint_to: Optional[str] = None,
-        **hyperparams,
-    ):
-        if specific_layers is None:
-            specific_layers = self.named_dmx_modules()
-        for _, _m in specific_layers:
-            _m.set_weight_calibrator(**hyperparams)
-        with torch.no_grad(), ExitStack() as stack:
-            yield [
-                stack.enter_context(m.calibrating_weight()) for _, m in specific_layers
-            ]
-        self._save_specific_layers_state_dict_and_register_urls(
-            specific_layers, save_checkpoint_to
-        )
-
-    @contextmanager
-    def calibrating_activations(
-        self,
-        specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
-        hyperparams: Optional[Dict[str, Dict]] = None,
-        save_checkpoint_to: Optional[str] = None,
-    ):
-        if specific_layers is None:
-            specific_layers = self.named_dmx_modules()
-        for _, _m in specific_layers:
-            _m.set_activation_calibrator(hyperparams)
-        with torch.no_grad(), ExitStack() as stack:
-            yield [
-                stack.enter_context(m.calibrating_activation())
-                for _, m in specific_layers
-            ]
-        self._save_specific_layers_state_dict_and_register_urls(
-            specific_layers, save_checkpoint_to
-        )
-
-    @contextmanager
-    def calibrating_smoothquant(
-        self,
-        specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
-        save_checkpoint_to: Optional[str] = None,
-        **hyperparams,
-    ):
-        if specific_layers is None:
-            specific_layers = self.named_dmx_modules()
-        for _, _m in specific_layers:
-            _m.set_smoothquant_params(**hyperparams)
-        with torch.no_grad(), ExitStack() as stack:
-            yield [
-                stack.enter_context(m.calibrating_smoothquant())
-                for _, m in specific_layers
-            ]
-        self._save_specific_layers_state_dict_and_register_urls(
-            specific_layers, save_checkpoint_to
-        )
-
-    @contextmanager
-    def optimal_brain_compressing(
-        self,
-        specific_layers: Optional[Dict[str, Sequence[DmxModule]]] = None,
-        save_checkpoint_to: Optional[str] = None,
-        **hyperparams,
-    ):
-        if specific_layers is None:
-            specific_layers = self.named_dmx_modules()
-        with torch.no_grad(), ExitStack() as stack:
-            yield [
-                stack.enter_context(m.optimal_brain_compressing(**hyperparams))
-                for _, m in specific_layers
-            ]
-        self._save_specific_layers_state_dict_and_register_urls(
-            specific_layers, save_checkpoint_to
-        )
-
-
-class DmxModel(DmxModelMixin):
     @staticmethod
     def _add_transformed_gm(_model, args, kwargs):
         if hasattr(_model, "old_forward"):
@@ -407,7 +328,7 @@ class DmxModel(DmxModelMixin):
                 return False
         return True
 
-    def call_weight_hypernets(self):
+    def forward_weight_hypernets(self):
         for _, _m in self.named_dmx_modules():
             if hasattr(_m, "weight"):
                 _ = _m._weight
@@ -507,6 +428,26 @@ class DmxModel(DmxModelMixin):
         submod.old_forward = submod.forward
         submod.transformed_forward = partial(temp_forward, submod)
 
+    @staticmethod
+    def to_signature_key(_m, _args, _kwargs):
+        sig = signature(_m.old_forward)
+        inputs = signature(_m.old_forward).bind(*_args, **_kwargs).arguments
+        sig_key = tuple()
+        for k, v in sig.parameters.items():
+            if k not in inputs:
+                value = v.default
+            else:
+                value = inputs[k]
+            if isinstance(value, bool) or value is None:
+                sig_key += (value,)
+            elif isinstance(value, transformers.DynamicCache) and len(value) == 0:
+                sig_key += (None,)
+            else:
+                sig_key += (repr(type(value)),)
+        return sig_key
+
+
+class DmxModel(DmxModelMixin):
     @classmethod
     def from_torch(
         cls, model: torch.nn.Module, additional_dmx_aware_mappings=None
@@ -562,24 +503,6 @@ class DmxModel(DmxModelMixin):
         model.forward = partial(temp_forward, model)
 
         return model
-
-    @staticmethod
-    def to_signature_key(_m, _args, _kwargs):
-        sig = signature(_m.old_forward)
-        inputs = signature(_m.old_forward).bind(*_args, **_kwargs).arguments
-        sig_key = tuple()
-        for k, v in sig.parameters.items():
-            if k not in inputs:
-                value = v.default
-            else:
-                value = inputs[k]
-            if isinstance(value, bool) or value is None:
-                sig_key += (value,)
-            elif isinstance(value, transformers.DynamicCache) and len(value) == 0:
-                sig_key += (None,)
-            else:
-                sig_key += (repr(type(value)),)
-        return sig_key
 
     def visualize_graph(self, out_file="graph"):
         if not self.transformed:

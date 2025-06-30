@@ -202,7 +202,7 @@ class DmxModule(
 
         return self.bias_cast(self.bias) if self.bias_cast is not None else None
 
-    def forward(self, input: Tensor, *args, **kwags) -> Tensor:
+    def forward(self, input: Tensor, *args, **kwargs) -> Tensor:
         """
         Forward pass of the module with quantization ops applied.
 
@@ -218,11 +218,13 @@ class DmxModule(
             if self.smoothquant.dynamic[0] == 1 or self.smoothquant.calibrating:
                 self.update_smoothquant_scale(input)
             input = self.smoothquant.scale_input(input)
-        _input, args, kwags = self.input_casts(input, *args, **kwags)
+        _input, args, kwargs = self.input_casts(input, *args, **kwargs)
         if self.obc is not None:
             self.obc.measure_hessian(_input)
-        _input, args, kwags = self.align_device(_input, args, kwags, _device)
-        _output = self._forward(_input, *args, **kwags)
+        _input, args, kwargs = self.align_device(_input, args, kwargs, _device)
+        if self.aft is not None:
+            self.aft.optimize(_input, *args, **kwargs)
+        _output = self._forward(_input, *args, **kwargs)
         output = self.output_casts(_output, output=True)
         if self.flop_counter_enabled:
             self.count_flops(input, output)
@@ -234,16 +236,16 @@ class DmxModule(
             )
         return output
 
-    def align_device(self, _input, args, kwags, _device):
+    def align_device(self, _input, args, kwargs, _device):
         _input = _input.to(_device) if _input.device != _device else _input
         args = tuple(
             x.to(_device) if isinstance(x, torch.Tensor) and x.device != _device else x
             for x in args
         )
-        for k in kwags.keys():
-            if isinstance(kwags[k], Tensor) and kwags[k].device != _device:
-                kwags[k] = kwags[k].to(_device)
-        return _input, args, kwags
+        for k in kwargs.keys():
+            if isinstance(kwargs[k], Tensor) and kwargs[k].device != _device:
+                kwargs[k] = kwargs[k].to(_device)
+        return _input, args, kwargs
 
     def update_params_with_raw(self, raw: torch.nn.Module) -> None:
         """

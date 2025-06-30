@@ -2,6 +2,8 @@ import pytest
 import torch
 import torch.nn as nn
 from dmx.compressor.modeling import nn as dmxnn
+from dmx.compressor.advanced_recipe import DmxModuleSmoothQuantHyperparams
+
 
 RANDOM_SEED = 0
 
@@ -58,9 +60,7 @@ def _create_test_input(module: torch.nn.Module, scaler: float):
 )
 @pytest.mark.parametrize("dynamic", (True, False))
 @pytest.mark.parametrize("migration_strength", (0.5, 0.0, 1.0))
-@pytest.mark.parametrize(
-    "scale_format", ("SAME", "FP[0|8|0,127](FN)")
-)
+@pytest.mark.parametrize("scale_format", ("SAME", "FP[0|8|0,127](FN)"))
 @pytest.mark.parametrize("perturbation_scaler", (1.0, 1e-6, 1e6))
 def test_smoothquant(
     module_cls, dynamic, migration_strength, scale_format, perturbation_scaler
@@ -84,7 +84,9 @@ def test_smoothquant(
     module.zero_grad()
     module.smoothquant.enable()
     if not dynamic:  # static mode needs calibration
-        with module.calibrating_smoothquant():
+        with module.calibrating_smoothquant(
+            DmxModuleSmoothQuantHyperparams(migration_strength=migration_strength)
+        ):
             module(x)
 
     y = module(x)

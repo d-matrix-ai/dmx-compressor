@@ -7,6 +7,10 @@ from dmx.compressor import nn as dmxnn
 from dmx.compressor.modeling import DmxModel, DmxConfigRule, DmxModuleConfig
 from dmx.compressor.numerical.format import Same
 from dmx.compressor.sparse import Dense, Sparseness
+from dmx.compressor.advanced_recipe import (
+    DmxModuleSmoothQuantHyperparams,
+    DmxSmoothQuantRecipe,
+)
 
 RANDOM_SEED = 0
 
@@ -84,7 +88,12 @@ def _create_model(transformations):
     fc_quantize_input.apply_to(_model)
     for tr in transformations:
         tr.apply_to(_model)
-    with _model.calibrating_smoothquant(), torch.no_grad():
+    hp_gen = lambda __model: {
+        _m: DmxModuleSmoothQuantHyperparams()
+        for _, _m in _model.named_dmx_modules()
+        if isinstance(_m, (nn.Linear, nn.Conv2d))
+    }
+    with DmxSmoothQuantRecipe(hp_gen).applied_to(_model), torch.no_grad():
         _model(_create_input(batch_size=128))
     _model.eval()
     return _model

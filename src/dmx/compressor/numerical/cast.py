@@ -12,7 +12,7 @@ from .format import (
     BlockFloatingPoint,
 )
 from .smoothquant import ActivationWeightSmoothQuant
-from .observer import DummyObserver
+from .observer import ObserverBase, DummyObserver, HistogramObserver
 import math
 from collections import OrderedDict
 
@@ -254,6 +254,41 @@ class CastTo(FakeQuantize):
             else:  # torch.dtype
                 x = super().forward(x)
         return x.to(self.physical_dtype)
+
+    def enable_calibration(
+        self,
+        state: bool = True,
+        observer_cls: ObserverBase = HistogramObserver,
+        qscheme_to_overload: Optional[torch.qscheme] = None,
+        group_size: int = None,
+        ch_axis: int = None,
+    ) -> None:
+        if state: 
+            if ch_axis is not None:
+                self.ch_axis = (
+                    self.activation_post_process.ch_axis
+                ) = ch_axis
+            if qscheme_to_overload is not None:
+                self.qscheme = qscheme_to_overload
+                self.is_per_channel = (
+                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
+                )
+            self.group_size = group_size if group_size else None
+            if self.group_size:
+                assert torch.ao.quantization.utils.is_per_tensor(
+                    qscheme_to_overload
+                ), "group quantization is to be used with per tensor quantization"
+            self.activation_post_process = observer_cls(
+                dtype=self.format,
+                qscheme=self.qscheme,
+                ch_axis=self.ch_axis,
+            )
+            self.disable_fake_quant()
+            self.enable_observer()
+        else:
+            self.enable_fake_quant()
+            self.disable_observer()
+
 
     def get_precision(self) -> Optional[int]:
         if isinstance(self.format, (Same, torch.dtype)):

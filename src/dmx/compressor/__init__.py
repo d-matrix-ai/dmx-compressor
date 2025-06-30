@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from dmx.compressor.modeling.nn.core import DmxModule
 import torch
 from functools import partialmethod
 
@@ -6,7 +7,7 @@ torch.nn.Module.load_state_dict = partialmethod(
     torch.nn.Module.load_state_dict, strict=False
 )
 
-from .numerical import Format
+from .numerical import Format, NUMERICS_UTILS_AVAILABLE
 from .sparse import Sparseness
 from .functional import ApproximationFunction, VSIMD_OP_REF_AVAILABLE
 from .modeling import (
@@ -132,11 +133,8 @@ default_approx = SimpleNamespace(
         else "NONE"
     ),
     APPLY_LLAMA_ROPE=ApproximationFunction.from_shorthand(
-    "APPLY_LLAMA_ROPE[vsimd]()"
-    if VSIMD_OP_REF_AVAILABLE
-    else "NONE"
+        "APPLY_LLAMA_ROPE[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
-
     NONE=ApproximationFunction.from_shorthand("NONE"),
 )
 
@@ -369,12 +367,16 @@ config_rules = SimpleNamespace(
         DmxConfigRule(
             module_types=(nn.ApplyRotaryPosEmb,),
             module_config=dict(
-                input_formats=[format.FLOAT16,format.FLOAT16,format.FLOAT16,format.FLOAT16],
-                output_formats=[format.FLOAT16,format.FLOAT16],
+                input_formats=[
+                    format.FLOAT16,
+                    format.FLOAT16,
+                    format.FLOAT16,
+                    format.FLOAT16,
+                ],
+                output_formats=[format.FLOAT16, format.FLOAT16],
                 approximation_function=default_approx.APPLY_LLAMA_ROPE,
             ),
         ),
-        
     ],
     SBFP_WEIGHT_STORAGE=[
         DmxConfigRule(

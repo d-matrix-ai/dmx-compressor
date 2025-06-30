@@ -1,9 +1,14 @@
 import math
 from typing import Optional, Dict, Any
 import torch
+import skopt
+from skopt import gp_minimize
+import copy
+from functools import partial
 import warnings
 from contextlib import contextmanager
 from dmx.compressor.numerical.observer import HistogramObserver
+from dmx.compressor.functional.approximate import NoApproximation
 
 
 class LayerReconstructionMixin:
@@ -18,180 +23,51 @@ class LayerReconstructionMixin:
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.aft = None
         self.obc = None
 
     def _has_weight(self) -> bool:
         return "weight" in [n for n, _ in self.named_parameters()]
 
-    def set_activation_calibrator(
-        self,
-        hyperparams: Dict[str, Dict[str, Any]] = None,
-    ):
-        """
-        This function sets the activation calibrators.
-        Args:
-            hyperparams: a dictionary mapping input_casts keys to a dictionary of calibration parameters.
-            Dictionary of calibration parameters can contain keys "observer_cls", "qscheme_to_overload","group_size","ch_axis";
-            if unspecified, their value defaults to HistogramObserver, None, None, None
-            if hyperparams is None, default is to set input_casts.input_cast to HistogramObserver.
-            Example value for hyperparams:
-            hyperparams={
-                "input_cast": dict(
-                    observer_cls=HistogramObserver,
-                    qscheme_to_overload: torch.per_tensor_symmetric,
-                    group_size: None,
-                    ch_axis: -1,
-                )
-                "multiplier_cast": dict(
-                    observer_cls=HistogramObserver,
-                    qscheme_to_overload: torch.per_channel_affine,
-                    group_size: 16,
-                    ch_axis: -2,
-                )
-            }
-        """
-        if self.input_casts is not None:
-            if hyperparams is None and hasattr(self.input_casts, "input_cast"):
-                hyperparams = {"input_cast": {}}
-                warnings.warn(
-                    "No calibration hyperparams specified, defaults to setting HistogramObserver for input_casts.input_cast only."
-                )
-            if len(hyperparams) != len(self.input_casts):
-                warnings.warn(
-                    "Number of keys for hyperparams does not match with length of input_casts, calibrators for some CastTos might not be set."
-                )
-            for k, params in hyperparams.items():
-                if hasattr(self.input_casts, k):
-                    observer_cls = (
-                        HistogramObserver
-                        if (
-                            "observer_cls" not in params
-                            or params["observer_cls"] is None
-                        )
-                        else params["observer_cls"]
-                    )
-                    qscheme_to_overload = (
-                        params["qscheme_to_overload"]
-                        if "qscheme_to_overload" in params
-                        else None
-                    )
-                    group_size = (
-                        params["group_size"] if "group_size" in params else None
-                    )
-                    ch_axis = params["ch_axis"] if "ch_axis" in params else None
-
-                    if ch_axis is not None:
-                        self.input_casts[k].ch_axis = self.input_casts[
-                            k
-                        ].activation_post_process.ch_axis = ch_axis
-                    if qscheme_to_overload is not None:
-                        self.input_casts[k].qscheme = qscheme_to_overload
-                        self.input_casts[k].is_per_channel = (
-                            torch.ao.quantization.utils.is_per_channel(
-                                qscheme_to_overload
-                            )
-                        )
-                    if group_size is not None:
-                        self.input_casts[k].group_size = group_size
-                    self.input_casts[k].activation_post_process = observer_cls(
-                        dtype=self.input_casts[k].format,
-                        qscheme=self.input_casts[k].qscheme,
-                        ch_axis=self.input_casts[k].ch_axis,
-                    )
-                else:
-                    raise ValueError(f"{k} is not a key in input_casts!")
-
-        else:
-            warnings.warn(
-                "cannot set up activation calibration because of a lack of input_casts",
-                RuntimeWarning,
-            )
-
-    def set_weight_calibrator(
-        self,
-        observer_cls=HistogramObserver,
-        qscheme_to_overload: Optional[torch.qscheme] = None,
-        group_size: int = None,
-        ch_axis: int = None,
-    ):
-        if self.weight_cast is not None:
-            if ch_axis is not None:
-                self.weight_cast.ch_axis = (
-                    self.weight_cast.activation_post_process.ch_axis
-                ) = ch_axis
-            if qscheme_to_overload is not None:
-                self.weight_cast.qscheme = qscheme_to_overload
-                self.weight_cast.is_per_channel = (
-                    torch.ao.quantization.utils.is_per_channel(qscheme_to_overload)
-                )
-            self.weight_cast.group_size = group_size if group_size else None
-            if self.weight_cast.group_size:
-                assert torch.ao.quantization.utils.is_per_tensor(
-                    qscheme_to_overload
-                ), "group quantization is to be used with per tensor quantization"
-                group_num = math.ceil(
-                    self.weight.shape[self.weight_cast.ch_axis] * 1.0 / group_size
-                )
-                self.weight_cast.activation_post_processes = [
-                    observer_cls(
-                        dtype=self.weight_cast.format,
-                        qscheme=self.weight_cast.qscheme,
-                        ch_axis=self.weight_cast.ch_axis,
-                    ).to(self.weight.device)
-                    for i in range(group_num)
-                ]
-            self.weight_cast.activation_post_process = observer_cls(
-                dtype=self.weight_cast.format,
-                qscheme=self.weight_cast.qscheme,
-                ch_axis=self.weight_cast.ch_axis,
-            ).to(self.weight.device)
-        else:
-            warnings.warn(
-                "cannot set up weight calibration because of a lack of weight_cast",
-                RuntimeWarning,
-            )
-
-    def enable_activation_calib(self, state: bool = True) -> None:
-        if state:
-            self.input_casts.disable_fake_quant()
-            self.input_casts.enable_observer()
-        else:
-            self.input_casts.enable_fake_quant()
-            self.input_casts.disable_observer()
-
-    def enable_weight_calib(self, state: bool = True) -> None:
-        if self._has_weight():
-            if state:
-                self.weight_cast.disable_fake_quant()
-                self.weight_cast.enable_observer()
-            else:
-                self.weight_cast.enable_fake_quant()
-                self.weight_cast.disable_observer()
-
     def update_smoothquant_scale(self, input):
         if self.smoothquant is not None:
             self.smoothquant(input, self.effective_weight)
 
-    def set_smoothquant_params(
-        self,
-        migration_strength: float = 0.5,
-    ) -> None:
-        if self.smoothquant is not None:
-            self.smoothquant.set_migration_strength(migration_strength)
+    def enable_quantizer_calib(self, state: bool, hyperparams) -> None:
+        if hyperparams.inputs is not None:
+            for _k in self.input_casts.keys():
+                self.input_casts[_k].enable_calibration(
+                    state, **hyperparams.inputs[_k].__dict__
+                )
+        if hyperparams.outputs is not None:
+            for _k in self.output_casts.keys():
+                self.output_casts[_k].enable_calibration(
+                    state, **hyperparams.outputs[_k].__dict__
+                )
+        if self._has_weight():
+            if hyperparams.weight is not None:
+                self.weight_cast.enable_calibration(
+                    state, **hyperparams.weight.__dict__
+                )
+            if hyperparams.weight_storage is not None:
+                self.weight_storage_cast.enable_calibration(
+                    state, **hyperparams.weight_storage.__dict__
+                )
 
-    def enable_smoothquant_calib(self, state: bool = True) -> None:
+    def enable_smoothquant_calib(self, state: bool, hyperparams) -> None:
         if self.smoothquant is not None:
             if self.smoothquant.fused_to_weight[0] == 1:
                 raise RuntimeError(
                     "SmoothQuant cannot be calibrated because it has been fused to weight already"
                 )
+            self.smoothquant.set_migration_strength(hyperparams.migration_strength)
             self.smoothquant.set_dynamic(False)  # only static needs calibration
             self.smoothquant.enable(not state)
             self.smoothquant.calibrating = state
+            if not state and hyperparams.fuse_to_weight:
+                self.smoothquant.fuse_to_weight(self.weight)
 
-    def enable_optimal_brain_compression(
-        self, state: bool = True, **hyperparams
-    ) -> None:
+    def enable_optimal_brain_compression(self, state: bool, hyperparams) -> None:
         if isinstance(
             self,
             (
@@ -207,32 +83,67 @@ class LayerReconstructionMixin:
             else:
                 self.input_casts.enable_fake_quant()
                 self.weight_cast.enable_fake_quant()
-                self.obc.apply(**hyperparams)
+                self.obc.apply(**hyperparams.__dict__)
                 self.obc = None
 
-    @contextmanager
-    def calibrating_weight(self) -> None:
-        self.enable_weight_calib(True)
-        yield self
-        self.enable_weight_calib(False)
+    def enable_approximation_function_tuning(self, state: bool, hyperparams) -> None:
+        if not isinstance(self.approximation_function, NoApproximation):
+            if state:
+                self.aft = ApproximationFunctionTuner(self, hyperparams.search_space)
+                # TODO: optiization logic
+            else:
+                # TODO: determine optimum
+                self.aft = None
 
     @contextmanager
-    def calibrating_activation(self) -> None:
-        self.enable_activation_calib(True)
+    def calibrating_quantizers(self, hyperparams) -> None:
+        self.enable_quantizer_calib(True, hyperparams)
         yield self
-        self.enable_activation_calib(False)
+        self.enable_quantizer_calib(False, hyperparams)
 
     @contextmanager
-    def calibrating_smoothquant(self) -> None:
-        self.enable_smoothquant_calib(True)
+    def calibrating_smoothquant(self, hyperparams) -> None:
+        self.enable_smoothquant_calib(True, hyperparams)
         yield self
-        self.enable_smoothquant_calib(False)
+        self.enable_smoothquant_calib(False, hyperparams)
 
     @contextmanager
-    def optimal_brain_compressing(self, **hyperparams) -> None:
-        self.enable_optimal_brain_compression(True, **hyperparams)
+    def optimal_brain_compressing(self, hyperparams) -> None:
+        self.enable_optimal_brain_compression(True, hyperparams)
         yield self
-        self.enable_optimal_brain_compression(False, **hyperparams)
+        self.enable_optimal_brain_compression(False, hyperparams)
+
+    @contextmanager
+    def tuning_approximation_function(self, hyperparams) -> None:
+        self.enable_approximation_function_tuning(True, hyperparams)
+        yield self
+        self.enable_approximation_function_tuning(False, hyperparams)
+
+
+class ApproximationFunctionTuner:
+    def __init__(self, module, search_space):
+        self.module = module
+        self.search_space = search_space
+        self.solver = partial(gp_minimize, n_calls=20)
+
+    def optimize(self, input, *args, **kwargs):
+        self.module.approximator.function = copy.deepcopy(
+            self.module.approximator.function)
+        module_aft = self.module.aft
+        #To avoid infinite recursion in the module's forward pass
+        self.module.aft = None
+        @skopt.utils.use_named_args(self.search_space)
+        def obj_func(**extra_params):
+            self.module.approximator.function.extra_params.update(extra_params)
+            _ = self.module(input, *args, **kwargs)
+            _e = self.module.approximation_error
+            return torch.nn.functional.mse_loss(_e, torch.zeros_like(_e)).item()
+
+        _res = self.solver(obj_func, self.search_space)
+        self.module.aft = module_aft
+        self.module.approximator.function.extra_params.update(
+            {_p.name: _opt for _p, _opt in zip(self.search_space, _res.x)}
+        )
 
 
 class OptimalBrainCompressor:
