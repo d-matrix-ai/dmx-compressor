@@ -1,11 +1,11 @@
 import math
-from typing import Optional, Dict, Any
 import torch
 import skopt
 from skopt import gp_minimize
+import numpy as np
 import copy
+from typing import Optional
 from functools import partial
-import warnings
 from contextlib import contextmanager
 from dmx.compressor.numerical.observer import HistogramObserver
 from dmx.compressor.functional.approximate import NoApproximation
@@ -90,9 +90,7 @@ class LayerReconstructionMixin:
         if not isinstance(self.approximation_function, NoApproximation):
             if state:
                 self.aft = ApproximationFunctionTuner(self, hyperparams.search_space)
-                # TODO: optiization logic
             else:
-                # TODO: determine optimum
                 self.aft = None
 
     @contextmanager
@@ -118,6 +116,60 @@ class LayerReconstructionMixin:
         self.enable_approximation_function_tuning(True, hyperparams)
         yield self
         self.enable_approximation_function_tuning(False, hyperparams)
+
+    @contextmanager
+    def slanc_tuning(self, hyperparams) -> None:
+        if (
+            isinstance(self, (torch.nn.LayerNorm, torch.nn.RMSNorm))
+            and not isinstance(self.approximation_function, NoApproximation)
+            and self.approximation_function.algorithm == "vsimd"
+        ):
+            if hyperparams.position == "post_attn":
+                W_V = (
+                    hyperparams.prev_layer.v_proj.get_parameter("weight")
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+                P = (
+                    hyperparams.prev_layer.out_proj.get_parameter("weight")
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+                norm = P @ W_V
+                assert norm.shape[0] == norm.shape[1]
+                norm += np.eye(norm.shape[0])
+                norm *= np.linalg.norm(self.weight.detach().cpu().numpy(), ord=2)
+                # norm *= prev_ln_weight # gives less scale
+                norm = np.linalg.norm(norm, ord="fro")
+            elif hyperparams.position == "post_mlp":
+                A = (
+                    hyperparams.prev_layer.fc1.get_parameter("weight")
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+                B = (
+                    hyperparams.prev_layer.fc2.get_parameter("weight")
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+                norm = (
+                    np.linalg.norm(self.weight.detach().cpu().numpy(), ord=2)
+                    * np.linalg.norm(A, ord=2)
+                    * np.linalg.norm(B, ord=2)
+                )
+        #Since the approximator is shared between all instances of same module
+        #deepcopy to allow each simd module to have different simd parameters
+        self.approximator.function = copy.deepcopy(self.approximator.function)
+
+        #SLANC assumes the layernorm input will be divided by norm
+        #However, the SIMD kernels multiply the input by the norm parameter
+        #Hence the 1/x transformation
+        self.approximator.function.extra_params.update({"norm": 1.0/norm})
+        yield self
 
 
 class ApproximationFunctionTuner:

@@ -93,6 +93,16 @@ class DmxApproximationFunctionTuningHyperparams:
     search_space: Optional[Space] = None
 
 
+@dataclass
+class DmxSLaNCHyperparams:
+    r"""
+    SLaNC hyperparamters with default values
+    """
+
+    position: Optional[str] = None  # "post_attn" or "post_mlp"
+    prev_layer: Optional[torch.nn.Module] = None
+
+
 class DmxQuantizerCalibrationRecipe(DmxBaseRecipe):
     r"""
     Fake quantizer calibration recipe
@@ -131,3 +141,14 @@ class DmxApproximationFunctionTuningRecipe(DmxBaseRecipe):
     def __init__(self, hp_gen, **kwargs):
         super().__init__(hp_gen, **kwargs)
         self.recipe_context_manager = DmxModule.tuning_approximation_function
+
+
+class DmxSLaNCRecipe(DmxBaseRecipe):
+    r"""
+    SLaNC norm tuning for LayerNorm|RMSNorm recipe
+    Paper: https://arxiv.org/abs/2410.10553
+    """
+
+    def __init__(self, hp_gen, **kwargs):
+        super().__init__(hp_gen, **kwargs)
+        self.recipe_context_manager = DmxModule.slanc_tuning
