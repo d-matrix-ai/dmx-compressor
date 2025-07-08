@@ -235,3 +235,79 @@ def apply_rotary_embeddings(x, cos_embedding, sin_embedding):
     sin = sin_embedding.unsqueeze(1)
     x_embed = (x * cos) + (ApplyRotaryPosEmbBase().rotate_half(x) * sin)
     return x_embed
+
+
+class LlamaRotaryEmbedding(
+    DmxModule, transformers.models.llama.modeling_llama.LlamaRotaryEmbedding
+):
+    def __init__(self, config, device=None):
+        super().__init__(config, device)
+        self.cos = None
+        self.sin = None
+        self.input_casts = CastToDict(
+            OrderedDict(
+                {
+                    "x_cast": CastTo(),
+                    "position_ids_cast": CastTo(),
+                }
+            )
+        )
+        self.output_casts = CastToDict(
+            OrderedDict({"cos_cast": CastTo(), "sin_cast": CastTo()})
+        )
+
+    def _forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
+        _output = self.approx_forward((x, cos, sin))
+        return _output
+
+    def _forward(self, x, position_ids):
+        if "dynamic" in self.rope_type:
+            self._dynamic_frequency_update(position_ids, device=x.device)
+
+        # Core RoPE block
+        inv_freq_expanded = (
+            self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
+        )
+        position_ids_expanded = position_ids[:, None, :].float()
+        # Force float32 (see https://github.com/huggingface/transformers/pull/29285)
+        device_type = x.device.type
+        device_type = (
+            device_type
+            if isinstance(device_type, str) and device_type != "mps"
+            else "cpu"
+        )
+        with torch.autocast(device_type=device_type, enabled=False):
+            freqs = (
+                inv_freq_expanded.float() @ position_ids_expanded.float()
+            ).transpose(1, 2)
+            emb = torch.cat((freqs, freqs), dim=-1)
+            cos = emb.cos()
+            sin = emb.sin()
+
+        # Advanced RoPE types (e.g. yarn) apply a post-processing scaling factor, equivalent to scaling attention
+        cos = cos * self.attention_scaling
+        sin = sin * self.attention_scaling
+
+        self.sin = sin.to(dtype=x.dtype)
+        self.cos = cos.to(dtype=x.dtype)
+        return self.cos, self.sin
+
+    @classmethod
+    def from_raw(cls, raw: torch.nn.Module) -> DmxModule:
+        initial_dmx = cls(raw.config, raw.inv_freq.device)
+        initial_dmx.update_params_with_raw(raw)
+        return initial_dmx
+
+    def to_compiler_graph(self) -> Graph:
+        if self.sin is None:
+            raise ValueError(
+                "forward of LlamaROPE must be called before to_compiler_graph"
+            )
+
+        g = DmxGraph()
+        with g.inserting_after():
+            g.create_placeholders(["x", "position_ids"])
+            sin = g.get_attr("sin")
+            cos = g.get_attr("cos")
+            g.output((cos, sin))
+        return g
