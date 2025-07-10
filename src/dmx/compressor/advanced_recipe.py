@@ -101,6 +101,7 @@ class DmxSLaNCHyperparams:
 
     position: Optional[str] = None  # "post_attn" or "post_mlp"
     prev_layer: Optional[torch.nn.Module] = None
+    prev_ln_weight: Optional[torch.Tensor] = None    
 
 
 class DmxQuantizerCalibrationRecipe(DmxBaseRecipe):

@@ -124,23 +124,29 @@ class LayerReconstructionMixin:
             and not isinstance(self.approximation_function, NoApproximation)
             and self.approximation_function.algorithm == "vsimd"
         ):
+            prev_ln_weight = (
+                hyperparams.prev_ln_weight.detach().cpu().numpy().astype(np.float32)
+            )
+
             if hyperparams.position == "post_attn":
                 W_V = (
                     hyperparams.prev_layer.v_proj.get_parameter("weight")
                     .detach()
                     .cpu()
                     .numpy()
+                    .astype(np.float32)
                 )
                 P = (
                     hyperparams.prev_layer.out_proj.get_parameter("weight")
                     .detach()
                     .cpu()
                     .numpy()
+                    .astype(np.float32)
                 )
                 norm = P @ W_V
                 assert norm.shape[0] == norm.shape[1]
                 norm += np.eye(norm.shape[0])
-                norm *= np.linalg.norm(self.weight.detach().cpu().numpy(), ord=2)
+                norm *= prev_ln_weight
                 # norm *= prev_ln_weight # gives less scale
                 norm = np.linalg.norm(norm, ord="fro")
             elif hyperparams.position == "post_mlp":
@@ -149,26 +155,29 @@ class LayerReconstructionMixin:
                     .detach()
                     .cpu()
                     .numpy()
+                    .astype(np.float32)
                 )
                 B = (
                     hyperparams.prev_layer.fc2.get_parameter("weight")
                     .detach()
                     .cpu()
                     .numpy()
+                    .astype(np.float32)
                 )
                 norm = (
-                    np.linalg.norm(self.weight.detach().cpu().numpy(), ord=2)
+                    np.linalg.norm(prev_ln_weight, ord=1)
                     * np.linalg.norm(A, ord=2)
                     * np.linalg.norm(B, ord=2)
+                    / prev_ln_weight.shape[0]
                 )
-        #Since the approximator is shared between all instances of same module
-        #deepcopy to allow each simd module to have different simd parameters
+        # Since the approximator is shared between all instances of same module
+        # deepcopy to allow each simd module to have different simd parameters
         self.approximator.function = copy.deepcopy(self.approximator.function)
 
-        #SLANC assumes the layernorm input will be divided by norm
-        #However, the SIMD kernels multiply the input by the norm parameter
-        #Hence the 1/x transformation
-        self.approximator.function.extra_params.update({"norm": 1.0/norm})
+        # SLANC assumes the layernorm input will be divided by norm
+        # However, the SIMD kernels multiply the input by the norm parameter
+        # Hence the 1/x transformation
+        self.approximator.function.extra_params.update({"norm": 1.0 / norm})
         yield self
 
 
@@ -180,10 +189,12 @@ class ApproximationFunctionTuner:
 
     def optimize(self, input, *args, **kwargs):
         self.module.approximator.function = copy.deepcopy(
-            self.module.approximator.function)
+            self.module.approximator.function
+        )
         module_aft = self.module.aft
-        #To avoid infinite recursion in the module's forward pass
+        # To avoid infinite recursion in the module's forward pass
         self.module.aft = None
+
         @skopt.utils.use_named_args(self.search_space)
         def obj_func(**extra_params):
             self.module.approximator.function.extra_params.update(extra_params)
