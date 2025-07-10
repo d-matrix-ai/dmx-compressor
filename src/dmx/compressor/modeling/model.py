@@ -555,7 +555,7 @@ class DmxConfig(dict):
         Returns:
             A DmxConfig object vreated from yaml file
         """
-        from dmx.compressor.utils import load_config_file
+        from dmx.compressor.utils.io import load_config_file
 
         return cls(load_config_file(fname))
 
@@ -566,7 +566,7 @@ class DmxConfig(dict):
         Args:
             fname (str): file path of the yaml file
         """
-        from dmx.compressor.utils import save_config_file
+        from dmx.compressor.utils.io import save_config_file
 
         save_config_file(dict(self), fname)
 
