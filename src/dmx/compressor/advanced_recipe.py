@@ -99,8 +99,15 @@ class DmxSLaNCHyperparams:
     SLaNC hyperparamters with default values
     """
 
-    position: Optional[str] = None  # "post_attn" or "post_mlp"
-    prev_layer: Optional[torch.nn.Module] = None
+    position: Optional[str] = None  # "post_attn" or "post_mlp" or "first"
+    mlp_type: Optional[str] = None # None or "standard" or "llama"
+    device: Optional[torch.device] = None # device of layer norm
+    prev_ln_weight: Optional[torch.nn.Module] = None # previous layer norm weight
+    fc1: Optional[torch.nn.Module] = None # fc1 from previous standard mlp layer
+    fc2: Optional[torch.nn.Module] = None # fc2 from previous standard mlp layer
+    v_proj: Optional[torch.nn.Module] = None # v_proj from (self/cross) attention layer
+    o_proj: Optional[torch.nn.Module] = None # o_proj from (self/cross) attention layer
+
 
 
 class DmxQuantizerCalibrationRecipe(DmxBaseRecipe):
