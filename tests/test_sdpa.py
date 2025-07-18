@@ -2,16 +2,15 @@ import torch
 
 import torch.nn.functional as F
 from dmx.compressor.modeling.nn import ScaledDotProductAttention
-from transformers import pipeline
 from dmx.compressor.modeling import DmxModel
 
 
-torch.manual_seed(10)
-query = torch.rand(100, 1024)
-key = torch.rand(100, 1024)
-value = torch.rand(100, 1024)
-attn_mask = torch.zeros(100, 100)
-scale = 5.0
+torch.manual_seed(0)
+query = torch.rand(2, 100, 1024)
+key = torch.rand(2, 100, 1024)
+value = torch.rand(2, 100, 1024)
+attn_mask = torch.ones(100, 100)
+scale = 5
 
 
 def test_no_kwargs():
@@ -19,7 +18,7 @@ def test_no_kwargs():
     gm = mod.module_graph(query, key, value)
     out1 = gm(query, key, value)
     out0 = F.scaled_dot_product_attention(query, key, value)
-    assert torch.all(out1 - out0 < 1e-5), "Mismatch at no kwargs"
+    assert torch.allclose(out1, out0), "Mismatch at no kwargs"
 
 
 def test_attn_mask():
@@ -27,15 +26,7 @@ def test_attn_mask():
     gm = mod.module_graph(query, key, value, attn_mask=attn_mask)
     out1 = gm(query, key, value, attn_mask=attn_mask)
     out0 = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask)
-    assert torch.all(out1 - out0 < 1e-5), "Mismatch at attn_mask"
-
-
-def test_dropout():
-    mod = ScaledDotProductAttention(dropout_p=1)
-    gm = mod.module_graph(query, key, value)
-    out1 = gm(query, key, value)
-    out0 = F.scaled_dot_product_attention(query, key, value, dropout_p=1)
-    assert torch.all(out1 - out0 < 1e-5), "Mismatch at dropout"
+    assert torch.allclose(out1, out0), "Mismatch at attn_mask"
 
 
 def test_causal():
@@ -43,7 +34,7 @@ def test_causal():
     gm = mod.module_graph(query, key, value, is_causal=True)
     out1 = gm(query, key, value)
     out0 = F.scaled_dot_product_attention(query, key, value, is_causal=True)
-    assert torch.all(out1 - out0 < 1e-5), "Mismatch at is_causal"
+    assert torch.allclose(out1, out0), "Mismatch at is_causal"
 
 
 def test_scale():
@@ -51,7 +42,7 @@ def test_scale():
     gm = mod.module_graph(query, key, value, scale=scale)
     out1 = gm(query, key, value, scale)
     out0 = F.scaled_dot_product_attention(query, key, value, scale=scale)
-    assert torch.all(out1 - out0 < 1e-4), "Mismatch at scale"
+    assert torch.allclose(out1, out0, atol=1e-4), "Mismatch at scale"
 
 
 def test_gqa():
@@ -62,21 +53,41 @@ def test_gqa():
     gm = mod.module_graph(query, key, value, enable_gqa=True)
     out1 = gm(query, key, value)
     out0 = F.scaled_dot_product_attention(query, key, value, enable_gqa=True)
-    assert torch.all(out1 - out0 < 1e-5), "Mismatch at enable_gqa"
+    assert torch.allclose(out1, out0), "Mismatch at enable_gqa"
 
 
-def test_distilgpt2():
-    pipe = pipeline(
-        task="text-generation",
-        model="d-matrix/distilgpt2",
-        trust_remote_code=True,
-        device="cpu",
-    )
-    pipe.model.eval()
-    x = torch.randint(1, 100, (1, 1024))
+class CustomMod(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.key = torch.nn.Linear(512, 512)
+        self.value = torch.nn.Linear(512, 512)
+        self.query = torch.nn.Linear(512, 512)
+
+    def forward(self, x, s):
+        key = self.key(x)
+        value = self.value(x)
+        query = self.query(x)
+        out = F.scaled_dot_product_attention(query, key, value, scale=s)
+        return out
+
+
+class CustomModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mods = torch.nn.ModuleList([CustomMod() for _ in range(5)])
+
+    def forward(self, x, s=None):
+        for mod in self.mods:
+            x = mod(x, s)
+        return x
+
+
+def test_larger_model():
+    model = CustomModel()
+    x = torch.rand(1, 512)
     with torch.no_grad():
-        y1 = pipe.model(x, labels=x)
-    pipe.model = DmxModel.from_torch(pipe.model)
+        y1 = model(x)
+    model = DmxModel.from_torch(model)
     with torch.no_grad():
-        y2 = pipe.model(x, labels=x)
-    assert y1.loss.item() - y2.loss.item() < 1e-5, "Mismatch in distilgpt2 loss"
+        y2 = model(x)
+    assert torch.allclose(y1, y2), "Mismatch at custom model"

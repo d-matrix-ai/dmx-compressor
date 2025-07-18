@@ -37,6 +37,7 @@ transformer_module_mapping = {
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmxnn.RMSNorm,
     "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmxnn.GemmaRMSNorm,
     "transformers.models.mistral.modeling_mistral.MistralRMSNorm": dmxnn.RMSNorm,
+    "transformers.models.llama.modeling_llama.LlamaRotaryEmbedding": dmxnn.LlamaRotaryEmbedding,
 }
 
 dmx_aware_functional_mappings = {

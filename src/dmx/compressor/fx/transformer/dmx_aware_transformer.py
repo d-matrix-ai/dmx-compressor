@@ -63,7 +63,7 @@ class DMXAwareTransformer(fx.Transformer):
             return super().call_module(target, args, kwargs)
         self.add_submod(target, dmx_aware_mapping[node_key].from_raw(curr_mod))
         new_node = self.new_graph.create_node(
-            "call_module", target, args=(args[0].node,)
+            "call_module", target, args=tuple(arg.node for arg in args)
         )
         return Proxy(new_node, self.tracer)
 

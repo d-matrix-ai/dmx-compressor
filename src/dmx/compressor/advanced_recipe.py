@@ -109,7 +109,6 @@ class DmxSLaNCHyperparams:
     o_proj: Optional[torch.nn.Module] = None # o_proj from (self/cross) attention layer
 
 
-
 class DmxQuantizerCalibrationRecipe(DmxBaseRecipe):
     r"""
     Fake quantizer calibration recipe

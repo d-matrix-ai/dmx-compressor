@@ -124,6 +124,10 @@ class LayerReconstructionMixin:
             and not isinstance(self.approximation_function, NoApproximation)
             and self.approximation_function.algorithm == "vsimd"
         ):
+            prev_ln_weight = (
+                hyperparams.prev_ln_weight.detach().cpu().numpy().astype(np.float32)
+            )
+
             if hyperparams.position == "post_attn":
                 dev = hyperparams.device
                 prev_ln_weight = hyperparams.prev_ln_weight.get_parameter("weight").detach().to(torch.float32)
@@ -197,10 +201,12 @@ class ApproximationFunctionTuner:
 
     def optimize(self, input, *args, **kwargs):
         self.module.approximator.function = copy.deepcopy(
-            self.module.approximator.function)
+            self.module.approximator.function
+        )
         module_aft = self.module.aft
-        #To avoid infinite recursion in the module's forward pass
+        # To avoid infinite recursion in the module's forward pass
         self.module.aft = None
+
         @skopt.utils.use_named_args(self.search_space)
         def obj_func(**extra_params):
             self.module.approximator.function.extra_params.update(extra_params)
