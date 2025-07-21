@@ -124,10 +124,6 @@ class LayerReconstructionMixin:
             and not isinstance(self.approximation_function, NoApproximation)
             and self.approximation_function.algorithm == "vsimd"
         ):
-            prev_ln_weight = (
-                hyperparams.prev_ln_weight.detach().cpu().numpy().astype(np.float32)
-            )
-
             if hyperparams.position == "post_attn":
                 dev = hyperparams.device
                 prev_ln_weight = hyperparams.prev_ln_weight.get_parameter("weight").detach().to(torch.float32)
