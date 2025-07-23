@@ -106,7 +106,7 @@ class DmxSLaNCHyperparams:
     fc1: Optional[torch.nn.Module] = None # fc1 from previous standard mlp layer
     fc2: Optional[torch.nn.Module] = None # fc2 from previous standard mlp layer
     v_proj: Optional[torch.nn.Module] = None # v_proj from (self/cross) attention layer
-    o_proj: Optional[torch.nn.Module] = None # o_proj from (self/cross) attention layer
+    o_proj: Optional[torch.nn.Module] = None # o_proj/out_proj from (self/cross) attention layer
 
 
 class DmxQuantizerCalibrationRecipe(DmxBaseRecipe):
