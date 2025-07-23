@@ -96,7 +96,7 @@ class DmxModelMixin:
                                is_configurable(m) and \
                                f'_gm.{n}' not in [x[0] for x in all_modules]]
                 all_modules.extend(new_modules)
-            return tuple(all_modules)
+            return (x for x in all_modules)
         else:
             return ((n, m) for n, m in self.named_modules() if is_configurable(m))
 
