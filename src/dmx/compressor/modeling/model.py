@@ -86,7 +86,14 @@ class DmxModelMixin:
 
     def named_dmx_modules(self):
         r""" "Returns a list of named modules that are dmx configurable"""
-        return ((n, m) for n, m in self.named_modules() if is_configurable(m))
+        all_modules = []
+        for gm in self._gms.values():
+            new_modules = [(f'_gm.{n}',m) for n,m in gm.named_modules() if \
+                           is_configurable(m) and \
+                           n not in [x[0] for x in all_modules]]
+            all_modules.extend(new_modules)
+        return tuple(all_modules)
+
 
     def freeze(self, config_file="./config.yaml"):
         """
