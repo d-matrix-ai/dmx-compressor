@@ -488,6 +488,10 @@ class DmxModel(DmxModelMixin):
                     DmxModel.deepcopy_args(_args),
                     DmxModel.deepcopy_args(_kwargs),
                 )
+                if _m.transformed:
+                    current_config = _m.dmx_config
+                else:
+                    current_config = {}
                 if sig_key in _m._gms:
                     warnings.warn("Reusing graph module from past")
                     _m._gm = _m._gms[sig_key]
@@ -498,13 +502,14 @@ class DmxModel(DmxModelMixin):
                     ), DmxModel.deepcopy_args(_kwargs)
                     DmxModel._add_transformed_gm(_m, transform_args, transform_kwargs)
                     _m._gms[sig_key] = _m._gm
-
+                
                 _m._forward = DmxModel._get_transformed_forward(_m)
 
                 _m.transformed = True
                 # configure the model
                 for _config, _rules in _m._dmx_configuration_queue:
                     _m._apply_config(_config, *_rules)
+                _m._apply_config(current_config)
                 _m.train(_is_training)
                 _m.forward = partial(temp_forward, _m)
 
