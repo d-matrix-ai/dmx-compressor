@@ -90,7 +90,7 @@ class DmxModelMixin:
         for gm in self._gms.values():
             new_modules = [(f'_gm.{n}',m) for n,m in gm.named_modules() if \
                            is_configurable(m) and \
-                           n not in [x[0] for x in all_modules]]
+                           f'_gm.{n}' not in [x[0] for x in all_modules]]
             all_modules.extend(new_modules)
         return tuple(all_modules)
 
