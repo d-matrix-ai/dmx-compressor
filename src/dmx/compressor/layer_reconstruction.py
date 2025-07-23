@@ -124,60 +124,68 @@ class LayerReconstructionMixin:
             and not isinstance(self.approximation_function, NoApproximation)
             and self.approximation_function.algorithm == "vsimd"
         ):
-            prev_ln_weight = (
-                hyperparams.prev_ln_weight.detach().cpu().numpy().astype(np.float32)
-            )
-
             if hyperparams.position == "post_attn":
+                dev = hyperparams.device
+                prev_ln_weight = hyperparams.prev_ln_weight.get_parameter("weight").detach().to(torch.float32)
                 W_V = (
-                    hyperparams.prev_layer.v_proj.get_parameter("weight")
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .astype(np.float32)
+                    hyperparams.v_proj.get_parameter("weight")
+                    .detach().to(torch.float32)
                 )
                 P = (
-                    hyperparams.prev_layer.out_proj.get_parameter("weight")
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .astype(np.float32)
+                    hyperparams.o_proj.get_parameter("weight")
+                    .detach().to(torch.float32)
                 )
-                norm = P @ W_V
+                assert(P.shape[1] % W_V.shape[0] == 0)
+                num_kv_heads = P.shape[1] // W_V.shape[0]
+                norm = P @ (W_V.repeat(num_kv_heads, 1))
                 assert norm.shape[0] == norm.shape[1]
-                norm += np.eye(norm.shape[0])
+                norm += torch.eye(norm.shape[0], device=dev)
                 norm *= prev_ln_weight
-                # norm *= prev_ln_weight # gives less scale
-                norm = np.linalg.norm(norm, ord="fro")
-            elif hyperparams.position == "post_mlp":
+                norm = torch.linalg.norm(norm, ord="fro")
+            elif hyperparams.position == "post_mlp" \
+                    and hyperparams.mlp_type == "standard":
+                prev_ln_weight = hyperparams.prev_ln_weight.get_parameter("weight").detach().to(torch.float32)
                 A = (
-                    hyperparams.prev_layer.fc1.get_parameter("weight")
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .astype(np.float32)
+                    hyperparams.fc1.get_parameter("weight")
+                    .detach().to(torch.float32)
                 )
                 B = (
-                    hyperparams.prev_layer.fc2.get_parameter("weight")
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .astype(np.float32)
+                    hyperparams.fc2.get_parameter("weight")
+                    .detach().to(torch.float32)
                 )
                 norm = (
-                    np.linalg.norm(prev_ln_weight, ord=1)
-                    * np.linalg.norm(A, ord=2)
-                    * np.linalg.norm(B, ord=2)
+                    torch.linalg.norm(prev_ln_weight, ord=1)
+                    * torch.linalg.norm(A, ord=2)
+                    * torch.linalg.norm(B, ord=2)
                     / prev_ln_weight.shape[0]
                 )
-        # Since the approximator is shared between all instances of same module
-        # deepcopy to allow each simd module to have different simd parameters
-        self.approximator.function = copy.deepcopy(self.approximator.function)
+            elif hyperparams.position == "post_mlp" \
+                    and hyperparams.mlp_type == "llama":
+                prev_ln_weight = hyperparams.prev_ln_weight.get_parameter("weight").detach().to(torch.float32)
+                W_gate = (
+                        hyperparams.gate_proj.get_parameter('weight')
+                        .detach().to(torch.float32)
+                        )
+                W_up = (
+                        hyperparams.up_proj.get_parameter('weight')
+                        .detach().to(torch.float32)
+                        )
+                W_down = (
+                        hyperparams.down_proj.get_parameter('weight')
+                        .detach().to(torch.float32)
+                        )
+                norm = torch.linalg.norm(W_down @ (W_up * prev_ln_weight), 'fro') \
+                        * torch.linalg.norm(W_gate * prev_ln_weight, ord=2)
+            elif hyperparams.position == "first":
+                norm = 1.0
+            #Since the approximator is shared between all instances of same module
+            #deepcopy to allow each simd module to have different simd parameters
+            self.approximator.function = copy.deepcopy(self.approximator.function)
 
-        # SLANC assumes the layernorm input will be divided by norm
-        # However, the SIMD kernels multiply the input by the norm parameter
-        # Hence the 1/x transformation
-        self.approximator.function.extra_params.update({"norm": 1.0 / norm})
+            #SLANC assumes the layernorm input will be divided by norm
+            #However, the SIMD kernels multiply the input by the norm parameter
+            #Hence the 1/x transformation
+            self.approximator.function.extra_params.update({"norm": 1.0/norm})
         yield self
 
 
