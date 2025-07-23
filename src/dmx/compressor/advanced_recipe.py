@@ -105,6 +105,9 @@ class DmxSLaNCHyperparams:
     prev_ln_weight: Optional[torch.nn.Module] = None # previous layer norm weight
     fc1: Optional[torch.nn.Module] = None # fc1 from previous standard mlp layer
     fc2: Optional[torch.nn.Module] = None # fc2 from previous standard mlp layer
+    up_proj: Optional[torch.nn.Module] = None # up_proj from llama mlp layer
+    down_proj: Optional[torch.nn.Module] = None # down_proj from llama mlp layer
+    gate_proj: Optional[torch.nn.Module] = None # gate_proj from llama mlp layer
     v_proj: Optional[torch.nn.Module] = None # v_proj from (self/cross) attention layer
     o_proj: Optional[torch.nn.Module] = None # o_proj/out_proj from (self/cross) attention layer
 
