@@ -92,9 +92,9 @@ class DmxModelMixin:
         if hasattr(self,'_gms') and self._gms is not None:
             all_modules = []
             for gm in self._gms.values():
-                new_modules = [(f'_gm.{n}',m) for n,m in gm.named_modules() if \
+                new_modules = [(n,m) for n,m in gm.named_modules() if \
                                is_configurable(m) and \
-                               f'_gm.{n}' not in [x[0] for x in all_modules]]
+                               n not in [x[0] for x in all_modules]]
                 all_modules.extend(new_modules)
             return (x for x in all_modules)
         else:
