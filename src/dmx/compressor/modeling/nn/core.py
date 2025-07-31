@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import time
-from typing import Optional
+from typing import Optional,List
 from contextlib import contextmanager
 from types import SimpleNamespace
 import torch
@@ -9,6 +9,7 @@ from torch.fx import Graph
 import inspect
 
 from dmx.compressor.numerical import NumericalCastMixin, Same, CastTo
+from dmx.compressor.plugins import PluginLayerData,PluginBase
 from dmx.compressor.sparse import (
     WeightSparseMixin,
     Dense,
@@ -53,7 +54,8 @@ class DmxModule(
 
     is_compound = False
     functional_forward = None
-
+    plugins : List[PluginBase] = []
+    
     def __init__(self, *args, state_dict_url: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.state_dict_url = state_dict_url
@@ -226,6 +228,20 @@ class DmxModule(
             self.aft.optimize(_input, *args, **kwargs)
         _output = self._forward(_input, *args, **kwargs)
         output = self.output_casts(_output, output=True)
+        plugin_data = PluginLayerData(input_before_cast = input,
+                                      input_after_cast = _input,
+                                      output_before_cast = _output,
+                                      output_after_cast = output,
+                                      mod = self,
+                                      args = args,
+                                      kwargs = kwargs)
+        plugins_copy = DmxModule.plugins.copy()
+        for p in plugins_copy:
+            #To avoid infinite recursion if the plugin calls forward on the DmxModule
+            DmxModule.plugins.remove(p)
+            p.process_layer(plugin_data)
+            DmxModule.plugins = plugins_copy.copy()
+            
         if self.flop_counter_enabled:
             self.count_flops(input, output)
         if self.align_boundary_dtype:
