@@ -5,6 +5,12 @@ This file documents fixes/features added to dmx.compressor
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v0.1.10]
+  - torch >2.7 support
+  - SLaNC advanced mode recipe, normalization layer extra parameters tuning
+  - Updated GraphBuilder API for to_compiler_graph functions
+  - other minor changes
+
 ## [v0.1.9]
   - SBFP weight storage option
   - updating dmir_compiler to dmx_compiler
