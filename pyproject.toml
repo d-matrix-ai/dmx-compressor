@@ -21,7 +21,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-datasets = "^3.0"
+datasets = ">=2.0,<3.0"
 numpy = "^1.22.3"
 bidict = "^0.22.0"
 parse = "^1.19.0"
