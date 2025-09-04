@@ -68,7 +68,7 @@ def clip_model_maker(return_kwargs=False):
     device = torch.device("cuda")
 
     model = CLIPModel.from_pretrained(CLIP_MODEL_NAME).to(device)
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    processor = CLIPProcessor.from_pretrained(CLIP_MODEL_NAME)
 
     ds = datasets.load_dataset(
         "HuggingFaceM4/COCO",
@@ -129,9 +129,10 @@ def clip_vision_model_maker():
 
 def main():
     active_modes = [
-        EVALUATION_MODE.VANILLA,
+        # EVALUATION_MODE.VANILLA,
         EVALUATION_MODE.BASELINE,
-        EVALUATION_MODE.BASIC,
+        EVALUATION_MODE.FP8,
+        # EVALUATION_MODE.BASIC,
         EVALUATION_MODE.BASIC_NOVSIMD,
     ]
 

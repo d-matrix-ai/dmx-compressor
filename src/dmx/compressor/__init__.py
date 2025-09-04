@@ -214,6 +214,95 @@ config_rules = SimpleNamespace(
             ),
         ),
     ],
+    FP8=[
+        DmxConfigRule(
+            module_types=(nn.Linear,),
+            module_config=dict(
+                input_formats=[format.AFLOAT8],
+                weight_format=format.AFLOAT8,
+                bias_format=format.FLOAT32,
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.Conv1d,
+                nn.Conv2d,
+                nn.ConvTranspose2d,
+            ),
+            module_config=dict(
+                input_formats=[format.AFLOAT8],
+                weight_format=format.AFLOAT8,
+                bias_format=format.FLOAT32,
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ResAdd,),
+            module_config=dict(
+                input_formats=[format.FLOAT16, format.FLOAT16],
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ActActMatMul,),
+            module_config=dict(
+                input_formats=[format.AFLOAT8, format.AFLOAT8],
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.Embedding,),
+            module_config=dict(
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.MaxPool2d,
+                nn.AdaptiveAvgPool2d,
+                nn.AvgPool2d,
+            ),
+            module_config=dict(
+                input_formats=[format.FLOAT16],
+                output_formats=[format.FLOAT16],
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(
+                nn.ReLU,
+                nn.ReLU6,
+                nn.GELUBase,
+                nn.QuickGELU,
+                nn.SiLU,
+                nn.Tanh,
+                nn.Softmax,
+                nn.LayerNorm,
+                nn.RMSNorm,
+                nn.BatchNorm2d,
+                nn.GroupNorm,
+                nn.Exp,
+            ),
+            module_config=dict(
+                input_formats=[format.FLOAT16],
+                output_formats=[format.FLOAT16],
+                approximation_function=default_approx.NONE,
+            ),
+        ),
+        DmxConfigRule(
+            module_types=(nn.ApplyRotaryPosEmb,),
+            module_config=dict(
+                input_formats=[
+                    format.FLOAT16,
+                    format.FLOAT16,
+                    format.FLOAT16,
+                    format.FLOAT16,
+                ],
+                output_formats=[format.FLOAT16, format.FLOAT16],
+                approximation_function=default_approx.NONE,
+            ),
+        ),
+    ],
     BASIC=[
         DmxConfigRule(
             module_types=(nn.Linear,),
