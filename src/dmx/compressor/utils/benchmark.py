@@ -5,6 +5,7 @@ from collections import defaultdict
 from dmx.compressor.modeling import DmxModel
 import time
 from dmx.compressor.functional import NoApproximation
+from dmx.compressor import config_rules
 from tabulate import tabulate
 import enum
 import gc
@@ -22,6 +23,7 @@ from typing import (
 class EVALUATION_MODE(enum.Enum):
     VANILLA = "Vanilla"
     BASELINE = "Baseline"
+    FP8 = "fp8"
     BASIC = "Basic"
     BASIC_NOVSIMD = "Basic_NoVSIMD"
 
@@ -49,6 +51,12 @@ def prepare_model(
     if evaluation_mode == EVALUATION_MODE.BASELINE:
         model = DmxModel.from_torch(model)
         model.to_baseline_mode()
+        model_runner(model)
+    elif evaluation_mode == EVALUATION_MODE.FP8:
+        model = DmxModel.from_torch(model)
+        # First config to the baseline mode then apply FP8 config rules
+        model.to_baseline_mode()
+        model.configure(None, *config_rules.FP8)
         model_runner(model)
     elif evaluation_mode in [EVALUATION_MODE.BASIC, EVALUATION_MODE.BASIC_NOVSIMD]:
         model = DmxModel.from_torch(model)
