@@ -129,10 +129,10 @@ def clip_vision_model_maker():
 
 def main():
     active_modes = [
-        # EVALUATION_MODE.VANILLA,
+        EVALUATION_MODE.VANILLA,
         EVALUATION_MODE.BASELINE,
         EVALUATION_MODE.FP8,
-        # EVALUATION_MODE.BASIC,
+        EVALUATION_MODE.BASIC,
         EVALUATION_MODE.BASIC_NOVSIMD,
     ]
 
