@@ -56,7 +56,7 @@ def prepare_model(
         model = DmxModel.from_torch(model)
         # First config to the baseline mode then apply FP8 config rules
         model.to_baseline_mode()
-        model.configure(None, config_rules.FP8)
+        model.configure(None, *config_rules.FP8)
         model_runner(model)
     elif evaluation_mode in [EVALUATION_MODE.BASIC, EVALUATION_MODE.BASIC_NOVSIMD]:
         model = DmxModel.from_torch(model)
