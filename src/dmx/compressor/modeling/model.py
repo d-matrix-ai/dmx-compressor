@@ -171,6 +171,18 @@ class DmxModelMixin:
             self.configure(None, *config_rules.SBFP_WEIGHT_STORAGE)
             self.forward_weight_hypernets()
 
+    def to_fp8_mode(self):
+        """
+        Configures a transformed DmxModel to the FP8 mode on dmx hardware.
+
+        Returns:
+            The configured model.
+        """
+        from dmx.compressor import config_rules
+
+        self.to_baseline_mode()
+        self.configure(None, *config_rules.FP8)
+
     @contextmanager
     def keep_dmx_config(self):
         _old_dmx_config_queue = deepcopy(self._dmx_configuration_queue)
