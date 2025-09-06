@@ -981,6 +981,11 @@ class Softmax(DmxModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
+    def approximator_wrapper(self,inputs,approx_args,approx_kwargs,**wrapper_kwargs):
+        if 'input_clamp' in wrapper_kwargs:
+            inputs = [torch.clamp(x,min= wrapper_kwargs['input_clamp']) for x in inputs]
+        return self.approximator(*inputs,*approx_args,**approx_kwargs)
+    
     def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward((_input,), dim=self.dim)
         return _output

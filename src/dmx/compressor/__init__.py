@@ -109,31 +109,31 @@ default_approx = SimpleNamespace(
     RELU=ApproximationFunction.from_shorthand("NONE"),
     RELU6=ApproximationFunction.from_shorthand("NONE"),
     SILU=ApproximationFunction.from_shorthand(
-        "SILU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "SILU[vsimd]{}()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     SOFTMAX=ApproximationFunction.from_shorthand(
-        "SOFTMAX[vsimd](max_adjust=0.1141)" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "SOFTMAX[vsimd]{input_clamp=-100}(max_adjust=0.1141)" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     GELU=ApproximationFunction.from_shorthand("NONE"),
     QUICK_GELU=ApproximationFunction.from_shorthand(
-        "QUICK_GELU[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "QUICK_GELU[vsimd]{}()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     TANH=ApproximationFunction.from_shorthand("NONE"),
     BATCH_NORM_2D=ApproximationFunction.from_shorthand("NONE"),
     LAYER_NORM=ApproximationFunction.from_shorthand(
-        "LAYER_NORM[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "LAYER_NORM[vsimd]{}()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     RMS_NORM=ApproximationFunction.from_shorthand(
-        "RMS_NORM[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "RMS_NORM[vsimd]{}()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     GROUP_NORM=ApproximationFunction.from_shorthand("NONE"),
     EXP=ApproximationFunction.from_shorthand(
-        "EXP[vsimd](knorm=0,kmax=15,use_exp_large=True)"
+        "EXP[vsimd]{}(knorm=0,kmax=15,use_exp_large=True)"
         if VSIMD_OP_REF_AVAILABLE
         else "NONE"
     ),
     APPLY_LLAMA_ROPE=ApproximationFunction.from_shorthand(
-        "APPLY_LLAMA_ROPE[vsimd]()" if VSIMD_OP_REF_AVAILABLE else "NONE"
+        "APPLY_LLAMA_ROPE[vsimd]{}()" if VSIMD_OP_REF_AVAILABLE else "NONE"
     ),
     NONE=ApproximationFunction.from_shorthand("NONE"),
 )

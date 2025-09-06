@@ -1,4 +1,4 @@
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable,Dict,Any
 from parse import parse
 from bidict import bidict
 import torch
@@ -104,12 +104,15 @@ class TorchFunctionApproximation(ApproximationFunction):
     This class specifies an approximation function for a member of torch.nn.functional.
     """
 
-    def __init__(self, func_id: None, algorithm: str = "vsimd", **extra_params):
+    def __init__(self, func_id: None, algorithm: str = "vsimd",
+                 wrapper_params : Dict[str,Any] = {},
+                 extra_params : Dict[str,Any] = {}):
         super().__init__()
         self.func_id = func_id
         self.torch_functional = torch_function_mapping[func_id]
         self.func_name = self.torch_functional.__name__
         self.algorithm = algorithm
+        self.wrapper_params = wrapper_params
         self.extra_params = extra_params
 
     @classmethod
@@ -119,14 +122,16 @@ class TorchFunctionApproximation(ApproximationFunction):
         could_be_empty_str = lambda _s: _s
         could_be_empty_str.pattern = r".*"
         conf = parse(
-            "{func_id:w}[{algorithm:w}]({extra_params:z})",
+            "{func_id:w}[{algorithm:w}]{{{wrapper_params:z}}}({extra_params:z})",            
             sh,
             {"z": could_be_empty_str},
         )
         _func_id = conf["func_id"]
         _algo = conf["algorithm"]
         _extra_params = string_to_kwargs(conf["extra_params"])
-        return cls(func_id=_func_id, algorithm=_algo, **_extra_params)
+        _wrapper_params = string_to_kwargs(conf["wrapper_params"])        
+        return cls(func_id=_func_id, algorithm=_algo,wrapper_params = _wrapper_params,extra_params = _extra_params)        
+
 
     def execute(self, *args, **kwargs):
         if self.algorithm == "vsimd":
@@ -148,7 +153,7 @@ class TorchFunctionApproximation(ApproximationFunction):
         from dmx.compressor.utils.io import kwargs_to_string
 
         return (
-            f"{self.func_id}[{self.algorithm}]({kwargs_to_string(**self.extra_params)})"
+            f"{self.func_id}[{self.algorithm}]{{{kwargs_to_string(**self.wrapper_params)}}}({kwargs_to_string(**self.extra_params)})"            
         )
 
 
@@ -161,12 +166,14 @@ class CustomFunctionApproximation(ApproximationFunction):
         self,
         func_id: None,
         algorithm: str = "vsimd",
-        **extra_params,
+        wrapper_params : Dict[str,Any] = {},
+        extra_params : Dict[str,Any] = {},        
     ):
         super().__init__()
         self.func_id = func_id
         self.func_name, self.custom_functional = custom_function_mapping[func_id]
         self.algorithm = algorithm
+        self.wrapper_params = wrapper_params
         self.extra_params = extra_params
 
     @classmethod
@@ -176,14 +183,15 @@ class CustomFunctionApproximation(ApproximationFunction):
         could_be_empty_str = lambda _s: _s
         could_be_empty_str.pattern = r".*"
         conf = parse(
-            "{func_id:w}[{algorithm:w}]({extra_params:z})",
+            "{func_id:w}[{algorithm:w}]{{{wrapper_params:z}}}({extra_params:z})",            
             sh,
             {"z": could_be_empty_str},
         )
         _func_id = conf["func_id"]
         _algo = conf["algorithm"]
         _extra_params = string_to_kwargs(conf["extra_params"])
-        return cls(func_id=_func_id, algorithm=_algo, **_extra_params)
+        _wrapper_params = string_to_kwargs(conf["wrapper_params"])        
+        return cls(func_id=_func_id, algorithm=_algo,wrapper_params = _wrapper_params,extra_params = _extra_params)        
 
     def execute(self, *args, **kwargs):
         if self.algorithm == "vsimd":
@@ -205,7 +213,7 @@ class CustomFunctionApproximation(ApproximationFunction):
         from dmx.compressor.utils.io import kwargs_to_string
 
         return (
-            f"{self.func_id}[{self.algorithm}]({kwargs_to_string(**self.extra_params)})"
+            f"{self.func_id}[{self.algorithm}]{{{kwargs_to_string(**self.wrapper_params)}}}({kwargs_to_string(**self.extra_params)})"
         )
 
 
@@ -268,6 +276,9 @@ class ApproximationMixin:
         self.approximator = Approximate()  # if isinstance(self, DmxModule) else None
         self.approximation_error = None
 
+    def approximator_wrapper(self,inputs,approx_args,approx_kwargs,**wrapper_kwargs):
+        return self.approximator(*inputs,*approx_args,**approx_kwargs)
+    
     def approx_forward(self, inputs, *args, **kwargs):
         if not self.functional_forward is None:
             _output = self.functional_forward(*inputs, *args, **kwargs)
@@ -278,7 +289,7 @@ class ApproximationMixin:
             (NoApproximation,),
         ):
             with torch.no_grad():
-                _approx = self.approximator(*inputs, *args, **kwargs)
+                _approx = self.approximator_wrapper(inputs,args,kwargs,**self.approximator.function.wrapper_params)                
                 if isinstance(_approx,tuple): #for modules that return multiple values
                     assert isinstance(_output,tuple), \
                         'module and its approximation should both return a tuple'
