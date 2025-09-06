@@ -99,6 +99,11 @@ class CastToDict(torch.nn.ModuleDict):
             )
         return param
 
+    def set_pre_transform(self,pre_transforms : Union[Dict,tuple,list]):
+        pre_transforms = self.pack_to_dict(pre_transforms)
+        for k,t in pre_transforms.items():
+            self[k].set_pre_transform(t)
+    
     def set_format(self, format: Union[Dict, tuple, list]):
         format = self.pack_to_dict(format)
         for k, f in format.items():
@@ -154,6 +159,7 @@ class CastTo(FakeQuantize):
         self.block_dim = block_dim
         self.enable_fake_quant()
         self.disable_observer()
+        self.pre_transform = {}
 
     def set_format(self, format: Union[str, torch.dtype, Format]):
         if isinstance(format, str):
@@ -163,6 +169,13 @@ class CastTo(FakeQuantize):
             self.dtype = format
             self.activation_post_process.dtype = format
 
+    def set_pre_transform(self,pre_transform : Dict):
+        self.pre_transform = pre_transform.copy()
+        if 'format' in self.pre_transform \
+           and isinstance(self.pre_transform['format'],str):
+            self.pre_transform['format'] = Format.from_shorthand(
+                self.pre_transform['format'])
+            
     def _observer_step(self, x):
         r"""
         Helper method for stepping observer in forward(),
@@ -223,8 +236,38 @@ class CastTo(FakeQuantize):
             sc, zp = self.scale, self.zero_point
         return sc.to(x.device), zp.to(x.device)
 
+    def apply_shaping_seq(self,x,shaping_list):
+        reverse_shaping_seq = []
+        for shape_op,shape_args in shaping_list:
+            orig_shape = x.size()
+            if shape_op == 'view':
+                x = x.reshape(*shape_args)
+                reverse_shaping_seq.append(('view',orig_shape))
+            elif shape_op == 'permute':
+                x = x.permute(*shape_args)
+                reverse_shaping_seq.append(('permute',
+                                            torch.LongTensor(shape_args).argsort().tolist()))
+            elif shape_op == 'flatten':
+                x = x.flatten(*shape_args)
+                reverse_shaping_seq.append(('view',orig_shape))
+                
+            else:
+                raise Exception(f'unknown shape op {shape_op}')
+
+
+            
+        return x,reverse_shaping_seq[::-1]
+    
     def forward(self, x):
         self.physical_dtype = x.dtype
+        reverse_shaping_seq = None
+        shortcut_x_val = None
+        if 'shaping' in self.pre_transform:
+            x,reverse_shaping_seq = self.apply_shaping_seq(x,self.pre_transform['shaping'])
+        if 'noquant_shortcut' in self.pre_transform:
+            shortcut_x_val = x[self.pre_transform['noquant_shortcut']].clone()
+        if 'format' in self.pre_transform:
+            x = CastToFormat.apply(x, self.pre_transform['format'], self.block_dim)
         if (
             self.observer_enabled[0] == 1
             and x is not None
@@ -253,8 +296,15 @@ class CastTo(FakeQuantize):
                     x = (x - zp) * sc
             else:  # torch.dtype
                 x = super().forward(x)
-        return x.to(self.physical_dtype)
 
+        if 'noquant_shortcut' in self.pre_transform:
+            x = x.clone() #SO we don't slice into the output of CastToFormat.apply
+            x[self.pre_transform['noquant_shortcut']] = shortcut_x_val
+        if reverse_shaping_seq is not None:
+            x,_ = self.apply_shaping_seq(x,reverse_shaping_seq)
+
+        return x.to(self.physical_dtype)
+        
     def enable_calibration(
         self,
         state: bool = True,
@@ -303,9 +353,9 @@ class CastTo(FakeQuantize):
 
     def extra_repr(self):
         if self.format.blocked:
-            return f"format = dtype = {repr(self.format)}, block_dim = {self.block_dim} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}"
+            return f"format = dtype = {repr(self.format)}, block_dim = {self.block_dim} \nfake_quant_enabled = {bool(self.fake_quant_enabled)},pre_transform = {self.pre_transform}"
         else:
-            return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}, group_size = {self.group_size}"
+            return f"format = dtype = {repr(self.format)}, qscheme = {self.qscheme}, ch_axis = {self.ch_axis} \nfake_quant_enabled = {bool(self.fake_quant_enabled)}, observer_enabled = {bool(self.observer_enabled)}, scale = {self.scale.cpu().numpy()}, zero_point = {self.zero_point.cpu().numpy()}, group_size = {self.group_size}, pre_transform = {self.pre_transform}"
 
 
 class Quantize(torch.nn.quantized.Quantize):

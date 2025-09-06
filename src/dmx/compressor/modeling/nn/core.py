@@ -73,14 +73,22 @@ class DmxModule(
         # numerics transformation
         if "input_formats" in config:
             self.input_casts.set_format(format=config["input_formats"])
+        if "pre_input_transform" in config:
+            self.input_casts.set_pre_transform(config["pre_input_transform"])
         if "output_formats" in config:
             self.output_casts.set_format(format=config["output_formats"])
+        if "pre_output_transform" in config:
+            self.output_casts.set_pre_transform(config["pre_output_transform"])
+            
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_storage_cast is not None and "weight_storage_format" in config:
             self.weight_storage_cast.set_format(format=config["weight_storage_format"])
         if self.weight_cast is not None and "weight_format" in config:
             self.weight_cast.set_format(format=config["weight_format"])
+        if self.weight_cast is not None and "pre_weight_transform" in config:
+            self.weight_cast.set_pre_transform(config["pre_weight_transform"])
+            
         if self.bias_cast is not None and "bias_format" in config:
             self.bias_cast.set_format(format=config["bias_format"])
         if self.smoothquant is not None and "smoothquant_scale_format" in config:
