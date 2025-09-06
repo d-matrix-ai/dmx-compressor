@@ -1,11 +1,8 @@
 import pytest
 import torch
-import torch
 from dmx.compressor import DmxModel
 from dmx.compressor.numerical.cast import CastTo
 from dmx.compressor import format,config_rules
-
-from dmx.compressor.modeling import nn as dmxnn
 
 
 RANDOM_SEED = 0
