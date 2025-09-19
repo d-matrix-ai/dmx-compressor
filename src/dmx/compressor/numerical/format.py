@@ -16,7 +16,7 @@ try:
     )
 
     NUMERICS_UTILS_AVAILABLE = True
-except ModuleNotFoundError:
+except (ModuleNotFoundError,ImportError):
     NUMERICS_UTILS_AVAILABLE = False
 
 
