@@ -219,6 +219,17 @@ class FloatingPoint(Format):
                 rounding=self.rounding,
             )
         )
+        # subnormal flushing for float16
+        if repr(self) == "FP[1|5|10,15](FN)":
+            smallest_normal = torch.finfo(torch.float16).smallest_normal
+            subnormal_threshold = torch.tensor(
+                smallest_normal, dtype=torch.float16, device=x.device
+            )
+            x = torch.where(
+                x.abs() < subnormal_threshold,
+                torch.tensor(0.0, dtype=torch.float16),
+                x,
+            )
         return x.abs() if self.unsigned else x
 
     @property
