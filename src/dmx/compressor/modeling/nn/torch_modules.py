@@ -70,8 +70,8 @@ class Mul(DmxModule):
         self.input_casts = CastToDict(
             OrderedDict(
                 {
-                    "input_cast": CastTo(block_dim=-1),
-                    "multiplier_cast": CastTo(block_dim=-2),
+                    "input_cast": CastTo(),
+                    "multiplier_cast": CastTo(),
                 }
             )
         )
@@ -137,18 +137,18 @@ class ScaledDotProductAttention(DmxModule):
         enable_gqa=False,
     ):
         L, S = query.size(-2), key.size(-2)
-        scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
+        scale_factor = torch.tensor(1 / math.sqrt(query.size(-1)), dtype=torch.float16) if scale is None else scale
         attn_bias = torch.zeros(L, S, dtype=query.dtype).to(query.device)
 
         if is_causal:
             assert attn_mask is None
             temp_mask = torch.ones(L, S, dtype=torch.bool).tril(diagonal=0)
-            attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
+            attn_bias.masked_fill_(temp_mask.logical_not(), -10000.0)
             attn_bias.to(query.dtype)
 
         if attn_mask is not None:
             if attn_mask.dtype == torch.bool:
-                attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
+                attn_bias.masked_fill_(attn_mask.logical_not(), -10000.0)
             else:
                 attn_bias = self.resadd(attn_bias, attn_mask)
 
@@ -156,8 +156,9 @@ class ScaledDotProductAttention(DmxModule):
             key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
             value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
-        attn_weight = self.matmul(query, self.mul(key.transpose(-2, -1), scale_factor))
+        attn_weight = self.matmul(query, key.transpose(-2, -1))
         attn_weight = self.resadd(attn_weight, attn_bias)
+        attn_weight = self.mul(attn_weight, scale_factor)
         attn_weight = self.softmax(attn_weight)
         attn_weight = self.dropout(attn_weight)
         return self.matmul(attn_weight, value)
@@ -1058,6 +1059,11 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
             normalized_shape, eps=eps, elementwise_affine=elementwise_affine
         )
         self.functional_forward = F.layer_norm
+
+    def approximator_wrapper(self,inputs,approx_args,approx_kwargs,**wrapper_kwargs):
+        if 'tile_size' in wrapper_kwargs:
+            approx_kwargs.update({'number_of_tiles' : inputs[0].shape[-1] // wrapper_kwargs['tile_size']})
+        return self.approximator(*inputs,*approx_args,**approx_kwargs)
 
     def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward(
