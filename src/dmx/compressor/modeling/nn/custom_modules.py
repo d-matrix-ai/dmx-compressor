@@ -237,7 +237,7 @@ def apply_rotary_embeddings(x, cos_embedding, sin_embedding):
     return x_embed
 
 
-class LlamaRotaryEmbedding(
+class RotaryEmbedding(
     DmxModule, transformers.models.llama.modeling_llama.LlamaRotaryEmbedding
 ):
     def __init__(self, config, device=None):
@@ -255,10 +255,6 @@ class LlamaRotaryEmbedding(
         self.output_casts = CastToDict(
             OrderedDict({"cos_cast": CastTo(), "sin_cast": CastTo()})
         )
-
-    def _forward(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
-        _output = self.approx_forward((x, cos, sin))
-        return _output
 
     def _forward(self, x, position_ids):
         if "dynamic" in self.rope_type:

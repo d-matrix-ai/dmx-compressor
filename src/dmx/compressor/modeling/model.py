@@ -1,6 +1,6 @@
 import torch
 import re
-import warnings
+import logging
 from collections import OrderedDict
 from inspect import signature, _empty
 from types import SimpleNamespace
@@ -17,15 +17,24 @@ from typing import (
     get_type_hints,
 )
 from functools import partial
+
+import transformers.modeling_outputs
 from dmx.compressor.modeling.nn import *
 from dmx.compressor.fx.transform import (
     substitute_transform,
     prepare_tracing_inputs,
     make_compiler_graph,
     dmx_aware_mapping,
+    export_substitute_transform,
 )
 from dmx.compressor.fx.transformer import get_op_set_from
 from dmx.compressor.utils.fx.visualize_graph import visualize_graph
+import torch.utils._pytree as pytree
+from transformers.cache_utils import Cache
+from transformers.modeling_outputs import BaseModelOutput
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class DmxModelMixin:
@@ -254,22 +263,84 @@ class DmxModelMixin:
         return _rec
 
     @staticmethod
-    def _add_transformed_gm(_model, args, kwargs):
-        input_names, concrete_args, dummy_inputs = prepare_tracing_inputs(
-            _model, args, kwargs
-        )
-        _model._gm = substitute_transform(
-            _model,
-            input_names=input_names,
-            concrete_args=concrete_args,
-            dummy_inputs=dummy_inputs,
-            additional_mappings=_model.additional_dmx_aware_mappings,
-        )
-        if not isinstance(_model._gm, DmxModule):
-            DmxModel.post_process_gm(_model, args, kwargs)
+    def _add_transformed_gm(_model, args, kwargs, export=False):
+        if hasattr(_model, "old_forward"):
+            _model.forward = _model.old_forward
+        if export:
+            if _model.additional_dmx_aware_mappings is not None:
+                logger.info(
+                    "Using addtional mappings, remember to register_fake for custom ops!"
+                )
+            export_kwargs = DmxModel.process_inputs_for_export(_model, args, kwargs)
+            _model._gm = export_substitute_transform(
+                _model,
+                kwargs=export_kwargs,
+                additional_mappings=_model.additional_dmx_aware_mappings,
+            )
+        else:
+            input_names, concrete_args, dummy_inputs = prepare_tracing_inputs(
+                _model, args, kwargs
+            )
+            _model._gm = substitute_transform(
+                _model,
+                input_names=input_names,
+                concrete_args=concrete_args,
+                dummy_inputs=dummy_inputs,
+                additional_mappings=_model.additional_dmx_aware_mappings,
+            )
+            if not isinstance(_model._gm, DmxModule):
+                DmxModel.post_process_gm(_model, args, kwargs)
 
     @staticmethod
-    def _get_transformed_forward(_model):
+    def process_inputs_for_export(model, args, kwargs):
+        # make sure kwargs are in the same order as the signature
+        new_kwargs = {}
+        for name, val in (
+            signature(model.forward).bind(*args, **kwargs).arguments.items()
+        ):
+            if name == "past_key_values" and isinstance(val, Cache):
+                cache_type = type(val)
+                new_kwargs[name] = cache_type.to_legacy_cache(val)
+            elif isinstance(val, BaseModelOutput):
+                new_kwargs[name] = val.to_tuple()
+            else:
+                new_kwargs[name] = val
+        return new_kwargs
+
+    @staticmethod
+    def _get_transformed_forward_export(_model):
+        def export_forward(*_args, **_kwargs):
+            _mod_signature = signature(_model.old_forward)
+            cache_type = None
+            if "past_key_values" in _kwargs and isinstance(
+                _kwargs["past_key_values"], Cache
+            ):
+                cache_type = type(_kwargs["past_key_values"])
+                _kwargs["past_key_values"] = cache_type.to_legacy_cache(
+                    _kwargs["past_key_values"]
+                )
+            arg_list = []
+            for k, v in _mod_signature.bind(*_args, **_kwargs).arguments.items():
+                if k == "past_key_values" and isinstance(v, tuple):
+                    for l_cache in v:
+                        arg_list.extend(l_cache)
+                elif isinstance(v, BaseModelOutput):
+                    arg_list.extend(v.to_tuple())
+                else:
+                    arg_list.append(v)
+            output = pytree.tree_unflatten(
+                _model._gm.forward(*arg_list), _model._gm.out_sig
+            )
+            if cache_type is not None:
+                output["past_key_values"] = cache_type.from_legacy_cache(
+                    output["past_key_values"]
+                )
+            return output
+
+        return lambda *_args, **_kwargs: export_forward(*_args, **_kwargs)
+
+    @staticmethod
+    def _get_transformed_forward_fx(_model):
         if hasattr(_model, "old_forward"):
             _model.forward = _model.old_forward
         _mod_signature = signature(_model.forward)
@@ -279,7 +350,7 @@ class DmxModelMixin:
             for output_type in get_args(_output_cls):
                 # filter out typing classes, eg: typing.Tuple, as they will throw error with issubclass
                 if not hasattr(output_type, "__origin__") and issubclass(
-                    output_type, transformers.modeling_utils.ModelOutput
+                    output_type, transformers.modeling_outputs.ModelOutput
                 ):
                     transformer_output_cls = output_type
                     break
@@ -307,6 +378,13 @@ class DmxModelMixin:
         return _forward
 
     @staticmethod
+    def _get_transformed_forward(_model, export):
+        if export:
+            return DmxModel._get_transformed_forward_export(_model)
+        else:
+            return DmxModel._get_transformed_forward_fx(_model)
+
+    @staticmethod
     def _wrap_output_cls(outputs, cls):
         attribute_types = get_type_hints(cls)
         for key, expected_type in attribute_types.items():
@@ -321,42 +399,13 @@ class DmxModelMixin:
                     outputs[key] = DmxModel._wrap_output_cls(
                         outputs[key], expected_type
                     )  # Recursively wrap sub-objects
-
         return cls(**outputs)
 
     @staticmethod
     def is_same_signature(_model, args, kwargs):
-
-        tracing_args, tracing_kwargs = _model.tracing_kwargs
-        # if kwargs has different keys, need to retrace
-        if tracing_kwargs.keys() != kwargs.keys():
-            return False
-        # if args has different length, need to retrace
-        if len(tracing_args) != len(args):
-            return False
-        # comparing args values between tracing args and new args
-        for a, new_a in zip(tracing_args, args):
-            # if bool argument has different values, need to retrace
-            if isinstance(new_a, bool) and a != new_a:
-                return False
-            # if one in None and other is not none, need to retrace
-            if not isinstance(new_a, bool) and (new_a is None) != (a is None):
-                return False
-        # comparing kwargs values between tracing kwarg and new kwargs
-        for k in kwargs.keys():
-            # if bool argument has different values, need to retrace
-            if isinstance(kwargs[k], bool) and kwargs[k] != tracing_kwargs[k]:
-                return False
-            # if type of argument does not match, need to retrace
-            if type(kwargs[k]) != type(tracing_kwargs[k]):
-                return False
-            # if kwargs is DynamicCache and shape is different (i.e: one is empty), need to retrace.
-            # NOTE: to be deprecated
-            if isinstance(kwargs[k], transformers.DynamicCache) and len(
-                kwargs[k]
-            ) != len(tracing_kwargs[k]):
-                return False
-        return True
+        sig = DmxModel.to_signature_key(_model, args, kwargs)
+        prev_sig = DmxModel.to_signature_key(_model, *_model.tracing_kwargs)
+        return sig == prev_sig
 
     def forward_weight_hypernets(self):
         for _, _m in self.named_dmx_modules():
@@ -407,7 +456,11 @@ class DmxModelMixin:
         model: torch.nn.Module,
         submod_name: str,
         additional_dmx_aware_mappings=None,
+        export=False,
     ):
+        """
+        Only supported for fx path, submodule forward can be directly called in export path
+        """
         submod = model.get_submodule(submod_name)
         if DmxModelMixin not in submod.__class__.__bases__:
             submod.__class__.__bases__ += (DmxModelMixin,)
@@ -420,7 +473,7 @@ class DmxModelMixin:
 
         submod._dmx_configuration_queue = []
 
-        def temp_forward(_m, *_args, **_kwargs):
+        def temp_forward(_m, export, *_args, **_kwargs):
             if not model.transformed:
                 raise Exception(
                     "model forward needs to be called before submodule forward."
@@ -433,7 +486,7 @@ class DmxModelMixin:
             if not _m.transformed or not DmxModelMixin.is_same_signature(
                 _m, _args, _kwargs
             ):
-                warnings.warn("Submodule transformation triggered")
+                logging.info("Submodule transformation triggered")
                 DmxModelMixin.to_old_forward(_m)
 
                 _m.tracing_kwargs = (
@@ -445,8 +498,8 @@ class DmxModelMixin:
                     _args
                 ), DmxModelMixin.deepcopy_args(_kwargs)
 
-                DmxModelMixin._add_transformed_gm(_m, _args, _kwargs)
-                _m._forward = DmxModelMixin._get_transformed_forward(_m)
+                DmxModelMixin._add_transformed_gm(_m, _args, _kwargs, export=export)
+                _m._forward = DmxModelMixin._get_transformed_forward(_m, export=export)
                 _m.transformed = True
 
                 # We only need to tie the dmx modules in the newly created gm
@@ -471,7 +524,7 @@ class DmxModelMixin:
             return _m._forward(*_args, **_kwargs)
 
         submod.old_forward = submod.forward
-        submod.transformed_forward = partial(temp_forward, submod)
+        submod.transformed_forward = partial(temp_forward, submod, export)
         submod.forward = submod.transformed_forward
 
     @staticmethod
@@ -500,7 +553,7 @@ class DmxModelMixin:
                 value = inputs[k]
             if isinstance(value, bool) or value is None:
                 sig_key += (value,)
-            elif isinstance(value, transformers.DynamicCache) and len(value) == 0:
+            elif isinstance(value, transformers.Cache) and len(value) == 0:
                 sig_key += (None,)
             else:
                 sig_key += (repr(type(value)),)
@@ -510,7 +563,10 @@ class DmxModelMixin:
 class DmxModel(DmxModelMixin):
     @classmethod
     def from_torch(
-        cls, model: torch.nn.Module, additional_dmx_aware_mappings=None
+        cls,
+        model: torch.nn.Module,
+        additional_dmx_aware_mappings=None,
+        export=False,
     ) -> torch.nn.Module:
         if not isinstance(model, cls):
             _cls = model.__class__
@@ -529,14 +585,14 @@ class DmxModel(DmxModelMixin):
         for n, m in model.named_modules():
             if n != "":
                 DmxModel.create_submod_transform_forward(
-                    model, n, additional_dmx_aware_mappings
+                    model, n, additional_dmx_aware_mappings, export
                 )
 
-        def temp_forward(_m, *_args, **_kwargs):
+        def temp_forward(_m, export, *_args, **_kwargs):
             _is_training = _m.training
             sig_key = DmxModel.to_signature_key(_m, _args, _kwargs)
             if not _m.transformed or not DmxModel.is_same_signature(_m, _args, _kwargs):
-                warnings.warn("Model transformation triggered")
+                logger.info(f"Model transformation triggered with export = {export}")
                 DmxModelMixin.to_old_forward(_m)
                 _m.tracing_kwargs = (
                     DmxModel.deepcopy_args(_args),
@@ -547,17 +603,19 @@ class DmxModel(DmxModelMixin):
                 else:
                     current_config = {}
                 if sig_key in _m._gms:
-                    warnings.warn("Reusing graph module from past")
+                    logger.info("Reusing graph module from past")
                     _m._gm = _m._gms[sig_key]
                 else:
                     # because some args and kwargs are changed in place in forward, we need to keep a copy fo the _args and _kwargs
                     transform_args, transform_kwargs = DmxModel.deepcopy_args(
                         _args
                     ), DmxModel.deepcopy_args(_kwargs)
-                    DmxModel._add_transformed_gm(_m, transform_args, transform_kwargs)
+                    DmxModel._add_transformed_gm(
+                        _m, transform_args, transform_kwargs, export
+                    )
                     _m._gms[sig_key] = _m._gm
 
-                _m._forward = DmxModel._get_transformed_forward(_m)
+                _m._forward = DmxModel._get_transformed_forward(_m, export=export)
 
                 _m.transformed = True
                 # configure the model
@@ -571,7 +629,7 @@ class DmxModel(DmxModelMixin):
             return _m._forward(*_args, **_kwargs)
 
         model.old_forward = model.forward
-        model.transformed_forward = partial(temp_forward, model)
+        model.transformed_forward = partial(temp_forward, model, export)
         model.forward = model.transformed_forward
 
         return model

@@ -482,7 +482,7 @@ class ActivationWeightSmoothQuant(SmoothQuant):
         Returns:
             scaled weight tensor
         """
-        return self.scale_b(wgt).to(wgt.device)
+        return self.scale_b(wgt).to(wgt.device).to(wgt.dtype)
 
     def scale_input(self, inp):
         """

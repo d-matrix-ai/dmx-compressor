@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import time
-from typing import Optional,List
+from typing import Optional, List
 from contextlib import contextmanager
 from types import SimpleNamespace
 import torch
@@ -9,7 +9,7 @@ from torch.fx import Graph
 import inspect
 
 from dmx.compressor.numerical import NumericalCastMixin, Same, CastTo
-from dmx.compressor.plugins import PluginLayerData,PluginBase
+from dmx.compressor.plugins import PluginLayerData, PluginBase
 from dmx.compressor.sparse import (
     WeightSparseMixin,
     Dense,
@@ -54,8 +54,8 @@ class DmxModule(
 
     is_compound = False
     functional_forward = None
-    plugins : List[PluginBase] = []
-    
+    plugins: List[PluginBase] = []
+
     def __init__(self, *args, state_dict_url: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.state_dict_url = state_dict_url
@@ -79,7 +79,7 @@ class DmxModule(
             self.output_casts.set_format(format=config["output_formats"])
         if "pre_output_transform" in config:
             self.output_casts.set_pre_transform(config["pre_output_transform"])
-            
+
         if self.accum_cast is not None and "accum_format" in config:
             self.accum_cast.set_format(format=config["accum_format"])
         if self.weight_storage_cast is not None and "weight_storage_format" in config:
@@ -88,7 +88,7 @@ class DmxModule(
             self.weight_cast.set_format(format=config["weight_format"])
         if self.weight_cast is not None and "pre_weight_transform" in config:
             self.weight_cast.set_pre_transform(config["pre_weight_transform"])
-            
+
         if self.bias_cast is not None and "bias_format" in config:
             self.bias_cast.set_format(format=config["bias_format"])
         if self.smoothquant is not None and "smoothquant_scale_format" in config:
@@ -236,20 +236,23 @@ class DmxModule(
             self.aft.optimize(_input, *args, **kwargs)
         _output = self._forward(_input, *args, **kwargs)
         output = self.output_casts(_output, output=True)
-        plugin_data = PluginLayerData(input_before_cast = input,
-                                      input_after_cast = _input,
-                                      output_before_cast = _output,
-                                      output_after_cast = output,
-                                      mod = self,
-                                      args = args,
-                                      kwargs = kwargs)
+
+        plugin_data = PluginLayerData(
+            input_before_cast=input,
+            input_after_cast=_input,
+            output_before_cast=_output,
+            output_after_cast=output,
+            mod=self,
+            args=args,
+            kwargs=kwargs,
+        )
         plugins_copy = DmxModule.plugins.copy()
         for p in plugins_copy:
-            #To avoid infinite recursion if the plugin calls forward on the DmxModule
+            # To avoid infinite recursion if the plugin calls forward on the DmxModule
             DmxModule.plugins.remove(p)
             p.process_layer(plugin_data)
             DmxModule.plugins = plugins_copy.copy()
-            
+
         if self.flop_counter_enabled:
             self.count_flops(input, output)
         if self.align_boundary_dtype:
@@ -279,12 +282,18 @@ class DmxModule(
             raw (torch.nn.Module): the torch module to copy parameters from.
         """
         self.load_state_dict(raw.state_dict(), assign=True)
-        # Inherit device from raw module
+        # Tie parameters with raw module
         for n, m in raw.named_parameters():
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            device = m.device if m.device != "cpu" else device
-            setattr(self, n, torch.nn.Parameter(getattr(self, n).to(device)))
-        # inherit some module attributes from raw module
+            setattr(self, n, getattr(raw, n))
+            assert (
+                getattr(self, n).data_ptr() == getattr(raw, n).data_ptr()
+            ), f"Parameter {n} not tied correctly!"
+        # Tie buffers with raw module
+        for n, m in raw.named_buffers():
+            setattr(self, n, getattr(raw, n))
+            assert (
+                getattr(self, n).data_ptr() == getattr(raw, n).data_ptr()
+            ), f"Buffer {n} not tied correctly!"
         self.training = raw.training
         if hasattr(raw, "dtype"):
             self.dtype = raw.dtype

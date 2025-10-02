@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List
 import torch.fx as fx
 from torch.fx.node import Argument, Target, Node
 from torch.fx.proxy import Proxy
@@ -19,22 +19,32 @@ class DMXAwareTransformer(fx.Transformer):
     Attributes:
         module (fx.GraphModule): the module to transform
         node_name_to_scope (dict): A dictionary storing the mapping between node names and scopes
-        old_gm (fx.GraphModule): dmxmodules to reuse if module was already transformed
+        old_gms List[(fx.GraphModule)]: dmxmodules to reuse if module was already transformed
     """
 
     def __init__(
         self,
         module: fx.GraphModule,
         node_name_to_scope: dict,
-        old_gm: fx.GraphModule = None,
+        old_gms: List[fx.GraphModule] = None,
         nodeInputs: dict = None,
     ):
         super().__init__(module)
         self.module = module
         self.node_name_to_scope = node_name_to_scope
-        self.old_gm = old_gm
+        self.old_gms = old_gms
         self.dmx_aware_functional_mappings = dmx_aware_functional_mappings.copy()
         self.nodeInputs = nodeInputs
+        self.old_nodes = [n for n in module.graph.nodes]
+        self.node_counter = 0
+
+    def placeholder(self, target, args, kwargs):
+        self.node_counter += 1
+        return super().placeholder(target, args, kwargs)
+
+    def get_attr(self, target, args, kwargs):
+        self.node_counter += 1
+        return super().get_attr(target, args, kwargs)
 
     def add_dmx_aware_functional_mapping(self, target: str, dmx_module_cls):
         self.dmx_aware_functional_mappings[target] = dmx_module_cls
@@ -57,6 +67,7 @@ class DMXAwareTransformer(fx.Transformer):
 
         """
         assert isinstance(target, str)
+        self.node_counter += 1
         curr_mod = self.module.get_submodule(target)
         node_key = type(curr_mod).__module__ + "." + type(curr_mod).__name__
         if node_key not in dmx_aware_mapping:
@@ -71,21 +82,22 @@ class DMXAwareTransformer(fx.Transformer):
         """
         this function will try to reuse modules in old_gm if possible
         """
-        try:
-            self.module.add_submodule(name, self.old_gm.get_submodule(name))
-        except:
-            self.module.add_submodule(name, mod)
+        if self.old_gms is not None:
+            for old_gm in self.old_gms:
+                try:
+                    self.module.add_submodule(name, old_gm.get_submodule(name))
+                    return
+                except:
+                    continue
+        self.module.add_submodule(name, mod)
 
     def call_method(
         self, target: "Target", args: Tuple[Argument, ...], kwargs: Dict[str, Any]
     ) -> Any:
+        self.node_counter += 1
         if target in dmx_aware_method_mapping.keys():
             candidate = target
-            curr_name = get_name_for_func_nodes(
-                target,
-                self.new_graph._graph_namespace._used_names,
-                self.new_graph._graph_namespace._base_count,
-            )
+            curr_name = self.old_nodes[self.node_counter - 1].name
             scope, _ = self.node_name_to_scope[curr_name]
             new_name = scope + "." + candidate if scope != "" else candidate
 
@@ -136,16 +148,14 @@ class DMXAwareTransformer(fx.Transformer):
             A Proxy containing the new node and the tracer of the new graph
         """
         assert callable(target)
+        self.node_counter += 1
         node_key = str(target)
         if node_key not in self.dmx_aware_functional_mappings:
             return super().call_function(target, args, kwargs)
 
-        candidate = self.new_graph._target_to_str(target)
-        curr_name = get_name_for_func_nodes(
-            candidate,
-            self.new_graph._graph_namespace._used_names,
-            self.new_graph._graph_namespace._base_count,
-        )
+        candidate = self.new_graph._target_to_str(target).replace(".", "_")
+        curr_name = self.old_nodes[self.node_counter - 1].name
+
         curr_target, curr_type = self.node_name_to_scope[curr_name]
         if node_key == "<built-in function add>":
             mod_args, mod_kwargs = self.nodeInputs[curr_name]
@@ -171,13 +181,13 @@ class DMXAwareTransformer(fx.Transformer):
             cand_name = curr_target + ".actmatmul" if curr_target != "" else "actmatmul"
         else:
             cand_name = (
-                curr_target + "." + candidate if curr_target != "" else curr_name
+                curr_target + "." + candidate if curr_target != "" else candidate
             )
+
         # when cand_name is not the same as curr_name, it did not go through the create_unique_name_in_scope process, so we need to do it here.
         # We also need to add curr_name to used names, otherwise next call_function will use the same curr_name, which will map to the wrong node in the old graph. (create_name is also called in create_node
         if cand_name != curr_name:
             new_name = self.create_unique_name_in_scope(cand_name)
-            self.new_graph._graph_namespace.create_name(curr_name, None)
         else:
             new_name = curr_name
 

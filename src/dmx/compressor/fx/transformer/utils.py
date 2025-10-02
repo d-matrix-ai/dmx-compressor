@@ -1,11 +1,13 @@
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Union, Tuple
 import torch.fx as fx
 from torch.fx.proxy import Proxy
 import re
 import torch
+import transformers
+from .custom_ops import *
 
 from dmx.compressor.modeling import nn as dmxnn
-import transformers
+from packaging import version
 
 dmx_aware_mapping = {
     "torch.nn.modules.sparse.Embedding": dmxnn.Embedding,
@@ -37,8 +39,16 @@ transformer_module_mapping = {
     "transformers.models.llama.modeling_llama.LlamaRMSNorm": dmxnn.RMSNorm,
     "transformers.models.gemma.modeling_gemma.GemmaRMSNorm": dmxnn.GemmaRMSNorm,
     "transformers.models.mistral.modeling_mistral.MistralRMSNorm": dmxnn.RMSNorm,
-    "transformers.models.llama.modeling_llama.LlamaRotaryEmbedding": dmxnn.LlamaRotaryEmbedding,
+    "transformers.models.llama.modeling_llama.LlamaRotaryEmbedding": dmxnn.RotaryEmbedding,
 }
+
+if version.parse(transformers.__version__) >= version.parse("4.52.4"):
+    transformer_module_mapping.update(
+        {
+            "transformers.models.qwen3.modeling_qwen3.Qwen3RMSNorm": dmxnn.RMSNorm,
+            "transformers.models.qwen3.modeling_qwen3.Qwen3RotaryEmbedding": dmxnn.RotaryEmbedding,
+        }
+    )
 
 dmx_aware_functional_mappings = {
     "torch.nn.functional.relu": dmxnn.ReLU,
@@ -68,6 +78,24 @@ dmx_aware_method_mapping = {
     "bmm": dmxnn.ActActMatMul,
     "add": dmxnn.ResAdd,
     "mul": dmxnn.Mul,
+}
+
+dmx_aware_function_mapping_export = {
+    "aten.exp.default": dmxnn.Exp,
+    "aten.bmm.default": dmxnn.ActActMatMul,
+    "aten.mm": dmxnn.ActActMatMul,
+    "aten.matmul.default": dmxnn.ActActMatMul,
+    "aten.add.Tensor": dmxnn.ResAdd,
+    "aten.mul.Tensor": dmxnn.Mul,
+    "aten.mul_.Tensor": dmxnn.Mul,
+    "aten.relu.default": dmxnn.ReLU,
+    "aten.tanh.default": dmxnn.Tanh,
+    "aten.gelu.default": dmxnn.GELU,
+    "aten.softmax.default": dmxnn.Softmax,
+    "aten.softmax.int": dmxnn.Softmax,
+    "aten.dropout.default": dmxnn.Dropout,
+    "aten.scaled_dot_product_attention.default": dmxnn.ScaledDotProductAttention,
+    "dmx_ops.apply_rotary_pos_emb.default": dmxnn.ApplyRotaryPosEmb,
 }
 
 dmx_aware_mapping.update(transformer_module_mapping)
@@ -148,10 +176,9 @@ def get_name_for_func_nodes(
         assert match is not None
 
     base, num = match.group(1, 2)
-    if num is None or candidate in used_names:
-        num = base_count.get(candidate, 0)
-    else:
-        num = int(num)
+
+    candidate = base
+    num = base_count.get(candidate, 0)
 
     while candidate in used_names:
         num += 1

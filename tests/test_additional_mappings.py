@@ -16,6 +16,11 @@ def my_func(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return out
 
 
+@my_func.register_fake
+def _(x, y):
+    return x
+
+
 class DmxSubmod(dmxnn.DmxModule):
     def __init__(self) -> None:
         super().__init__()
@@ -54,3 +59,23 @@ def test_no_additional_mappings():
     dmx_model(x)
 
     assert hasattr(dmx_model._gm, "my_func_default") == False
+
+
+def test_no_additional_mappings_export():
+    model = Model()
+    x = torch.ones((1, 1))
+    dmx_model = DmxModel.from_torch(model, export=True)
+    dmx_model(x)
+    assert hasattr(dmx_model._gm, "my_func") == False
+
+
+def test_additional_mappings_export():
+    model = Model()
+    x = torch.ones((1, 1))
+    additional_mappings = {"torch.ops.mylib.my_func.default": DmxSubmod}
+    dmx_model = DmxModel.from_torch(
+        model, export=True, additional_dmx_aware_mappings=additional_mappings
+    )
+    dmx_model(x)
+
+    assert isinstance(dmx_model._gm.my_func, DmxSubmod)

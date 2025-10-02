@@ -45,8 +45,24 @@ def setup_model():
     return model, model0, inp
 
 
-def test_unquantized(setup_model):
-    model, model0, inp = setup_model
+@pytest.fixture
+def setup_model_export():
+    model0 = CustomModel()
+    model = CustomModel()
+    model.load_state_dict(model0.state_dict())
+    model = DmxModel.from_torch(model, export=True)
+    inp = torch.rand((1, 160))
+
+    return model, model0, inp
+
+
+@pytest.fixture(params=["setup_model", "setup_model_export"])
+def setup(request):
+    return request.getfixturevalue(request.param)
+
+
+def test_unquantized(setup):
+    model, model0, inp = setup
     assert torch.allclose(
         model(inp), model0(inp)
     ), "unquantized model produced different output from original model, should be same"
@@ -55,8 +71,8 @@ def test_unquantized(setup_model):
     ), "unquantized submodule produced different output from original submodule, should be same"
 
 
-def test_quantized(setup_model):
-    model, model0, inp = setup_model
+def test_quantized(setup):
+    model, model0, inp = setup
     model.to_basic_mode()
     basic_output = model(inp)
     ref_output = model0(inp)
@@ -76,8 +92,8 @@ def test_quantized(setup_model):
     ), "quantized model and running submodule sequentially differ, should be same"
 
 
-def test_quantize_submod(setup_model):
-    model, model0, inp = setup_model
+def test_quantize_submod(setup):
+    model, model0, inp = setup
     model.sm1.to_basic_mode()
     model(inp)
 
@@ -89,8 +105,8 @@ def test_quantize_submod(setup_model):
     ), "model with one quantized submodule should produce different output from original model"
 
 
-def test_retracing(setup_model):
-    model, model0, inp = setup_model
+def test_retracing(setup):
+    model, model0, inp = setup
     model(inp)
     assert torch.allclose(
         model0.sm1(inp, inp, False), model.sm1(inp, inp, False)
@@ -100,8 +116,8 @@ def test_retracing(setup_model):
     ), " submodule in unquantized mode should produce same output from original submodule"
 
 
-def test_dmxmod_sharing(setup_model):
-    model, model0, inp = setup_model
+def test_dmxmod_sharing(setup):
+    model, model0, inp = setup
     model(inp)
     model.sm1(inp, inp)
     model.act(inp)
@@ -113,8 +129,8 @@ def test_dmxmod_sharing(setup_model):
     ), "DmxMod activation should be shared with main gm "
 
 
-def test_forward_switching(setup_model):
-    model, model0, inp = setup_model
+def test_forward_switching(setup):
+    model, model0, inp = setup
     model.to_basic_mode()
     output_base = model0(inp)
     output_quant = model(inp)

@@ -121,7 +121,7 @@ class ScaledDotProductAttention(DmxModule):
             )
         )
         self.resadd = ResAdd()
-        self.matmul = ActActMatMul()
+        self.actmatmul = ActActMatMul()
         self.softmax = Softmax(dim=-1)
         self.dropout = Dropout(p=dropout_p)
         self.mul = Mul()
@@ -137,7 +137,11 @@ class ScaledDotProductAttention(DmxModule):
         enable_gqa=False,
     ):
         L, S = query.size(-2), key.size(-2)
-        scale_factor = torch.tensor(1 / math.sqrt(query.size(-1)), dtype=torch.float16) if scale is None else scale
+        scale_factor = (
+            torch.tensor(1 / math.sqrt(query.size(-1)), dtype=torch.float16)
+            if scale is None
+            else scale
+        )
         attn_bias = torch.zeros(L, S, dtype=query.dtype).to(query.device)
 
         if is_causal:
@@ -156,12 +160,12 @@ class ScaledDotProductAttention(DmxModule):
             key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
             value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
-        attn_weight = self.matmul(query, key.transpose(-2, -1))
+        attn_weight = self.actmatmul(query, key.transpose(-2, -1))
         attn_weight = self.resadd(attn_weight, attn_bias)
         attn_weight = self.mul(attn_weight, scale_factor)
         attn_weight = self.softmax(attn_weight)
         attn_weight = self.dropout(attn_weight)
-        return self.matmul(attn_weight, value)
+        return self.actmatmul(attn_weight, value)
 
     def module_graph(self, *args, **kwargs) -> Graph:
         from dmx.compressor.fx.transform import prepare_tracing_inputs
@@ -982,11 +986,13 @@ class Softmax(DmxModule, torch.nn.Softmax):
     def __init__(self, dim: int = -1) -> None:
         super().__init__(dim=dim)
 
-    def approximator_wrapper(self,inputs,approx_args,approx_kwargs,**wrapper_kwargs):
-        if 'input_clamp' in wrapper_kwargs:
-            inputs = [torch.clamp(x,min= wrapper_kwargs['input_clamp']) for x in inputs]
-        return self.approximator(*inputs,*approx_args,**approx_kwargs)
-    
+    def approximator_wrapper(
+        self, inputs, approx_args, approx_kwargs, **wrapper_kwargs
+    ):
+        if "input_clamp" in wrapper_kwargs:
+            inputs = [torch.clamp(x, min=wrapper_kwargs["input_clamp"]) for x in inputs]
+        return self.approximator(*inputs, *approx_args, **approx_kwargs)
+
     def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward((_input,), dim=self.dim)
         return _output
@@ -1060,10 +1066,14 @@ class LayerNorm(DmxModule, torch.nn.LayerNorm):
         )
         self.functional_forward = F.layer_norm
 
-    def approximator_wrapper(self,inputs,approx_args,approx_kwargs,**wrapper_kwargs):
-        if 'tile_size' in wrapper_kwargs:
-            approx_kwargs.update({'number_of_tiles' : inputs[0].shape[-1] // wrapper_kwargs['tile_size']})
-        return self.approximator(*inputs,*approx_args,**approx_kwargs)
+    def approximator_wrapper(
+        self, inputs, approx_args, approx_kwargs, **wrapper_kwargs
+    ):
+        if "tile_size" in wrapper_kwargs:
+            approx_kwargs.update(
+                {"number_of_tiles": inputs[0].shape[-1] // wrapper_kwargs["tile_size"]}
+            )
+        return self.approximator(*inputs, *approx_args, **approx_kwargs)
 
     def _forward(self, _input: Tensor, *args, **kwargs) -> Tensor:
         _output = self.approx_forward(
