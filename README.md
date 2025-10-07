@@ -49,7 +49,7 @@ In essence this is an extension of the [PyTorch](https://pytorch.org/) framework
 - ***fine-grain structured weight sparsity***, and 
 - ***custom operator approximation logic***.
 
-In addition, the project provides a set of optimization tools for co-design using the above features.  
+In addition, the project provides a set of optimization tools for co-design using the above features, and is extensible through a plugin architecture.
 
 
 ## Getting started
