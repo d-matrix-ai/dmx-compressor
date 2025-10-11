@@ -354,11 +354,12 @@ class BlockFloatingPoint(Format):
         exp_diff = exp - max_exp 
         int_man = (man * torch.pow(2.0,exp_diff)).int()
 
+        #Assuming n_mantissa_bits==8:
         #Check all locations that have a mantissa == -127, can we reduce the
         #quantization error if we change -127 to -128?. If we can,
         #then make the change. Make the change even if the quantization error stays the same
         #as we break the tie towards the even mantissa (-128)
-        edge_locs = (int_man == -127).nonzero()
+        edge_locs = (int_man == -(2**(n_mantissa_bits-1) - 1)).nonzero()
         if len(edge_locs) == 0:
             return dmx_result
         old_quant_error= dmx_result[edge_locs[:,0],edge_locs[:,1]] - fp32_inp[edge_locs[:,0],edge_locs[:,1]]
