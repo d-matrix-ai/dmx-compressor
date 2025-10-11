@@ -324,26 +324,54 @@ class BlockFloatingPoint(Format):
             _xs = torch.split(
                 _x.reshape((-1, xshape[-1])), self.block_size, dim=-1
             )  # slice to blocks
-            _x = torch.cat(
-                [
+            _x =  [
                     block_quantize(
                         block,
                         wl=self.precision,
                         dim=0,
-                        symmetric=self.symmetric,
+                        symmetric=True, #Force symmetric and postprocess to make asymmetric
                         rounding=self.rounding,
                     )
                     for block in _xs
-                ],
-                dim=-1,
-            )  # quantize
+                ]
+            if not self.symmetric:
+                _x = [self.make_mantissa_asymmetric(bfp16_block,fp32_block,self.precision) \
+                      for (bfp16_block,fp32_block) in zip(_x,_xs)]
+            _x = torch.cat(_x,dim = -1)
             _x = _x.reshape(xshape).transpose_(block_dim, -1)  # recover shape
+            
         return _x
 
     @property
     def bytes_per_elem(self) -> float:
         return (self.precision + 8.0 / self.block_size) / 8.0
 
+    @staticmethod
+    def make_mantissa_asymmetric(dmx_result,fp32_inp,n_mantissa_bits = 8):
+        man,exp = torch.frexp(dmx_result)
+        exp[torch.logical_and(exp == 0,man == 0)] = -200 #A number that cannot be max exponent
+        max_exp = exp.max(-1,keepdims = True)[0] - n_mantissa_bits + 1        
+        exp_diff = exp - max_exp 
+        int_man = (man * torch.pow(2.0,exp_diff)).int()
+
+        #Assuming n_mantissa_bits==8:
+        #Check all locations that have a mantissa == -127, can we reduce the
+        #quantization error if we change -127 to -128?. If we can,
+        #then make the change. Make the change even if the quantization error stays the same
+        #as we break the tie towards the even mantissa (-128)
+        edge_locs = (int_man == -(2**(n_mantissa_bits-1) - 1)).nonzero()
+        if len(edge_locs) == 0:
+            return dmx_result
+        old_quant_error= dmx_result[edge_locs[:,0],edge_locs[:,1]] - fp32_inp[edge_locs[:,0],edge_locs[:,1]]
+        candidate_quant_error = old_quant_error - torch.pow(2.0,max_exp[:,0][edge_locs[:,0]])
+        subtract_1_locs = edge_locs[candidate_quant_error.abs() <= old_quant_error.abs()]
+
+        int_man[subtract_1_locs[:,0],subtract_1_locs[:,1]] -= 1
+        new_result = torch.ldexp(int_man,max_exp)
+
+        return new_result
+    
+    
     @classmethod
     def from_shorthand(cls, sh: str):
         conf = parse(
