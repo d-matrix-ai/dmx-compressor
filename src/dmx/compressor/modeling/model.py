@@ -226,16 +226,21 @@ class DmxModelMixin:
         submodules_to_monitor: List[str] = [],
         save_checkpoint_to: Optional[str] = None,
     ):
+        seen_modules = set()
+        submodules_to_monitor = [x for x in submodules_to_monitor if not (x in seen_modules or seen_modules.add(x))]
+
         self._monitoring_records = {_sm: [] for _sm in submodules_to_monitor}
+
+        dmx_modules = dict(self.named_dmx_modules())
+
         with ExitStack() as stack:
-            yield [
-                stack.enter_context(
-                    self._gm.get_submodule(_sm).monitoring(
-                        self._monitoring_records[_sm]
-                    ),
-                )
-                for _sm in submodules_to_monitor
-            ]
+            for _sm in submodules_to_monitor:
+                try:
+                    subm = dmx_modules[f"_gm.{_sm}"]
+                except Exception:
+                    raise AttributeError(f"Submodule {_sm} not found in named_dmx_modules")
+                stack.enter_context(subm.monitoring(self._monitoring_records[_sm]))
+            yield
 
     def get_monitoring_records(self, submodules_to_monitor: List[str] = []):
         _rec = self._monitoring_records
@@ -245,16 +250,21 @@ class DmxModelMixin:
 
     @contextmanager
     def measure_runtimes(self, device, submodules_to_measure: List[str] = []):
+        seen_modules = set()
+        submodules_to_measure = [x for x in submodules_to_measure if not (x in seen_modules or seen_modules.add(x))]
+
         self._runtime_records = {_sm: [] for _sm in submodules_to_measure}
+
+        dmx_modules = dict(self.named_dmx_modules())
+
         with ExitStack() as stack:
-            yield [
-                stack.enter_context(
-                    self._gm.get_submodule(_sm).measuring_runtime(
-                        self._runtime_records[_sm], device
-                    ),
-                )
-                for _sm in submodules_to_measure
-            ]
+            for _sm in submodules_to_measure:
+                try:
+                    subm = dmx_modules[f"_gm.{_sm}"]
+                except Exception:
+                    raise AttributeError(f"Submodule {_sm} not found in named_dmx_modules")
+                stack.enter_context(subm.measuring_runtime(self._runtime_records[_sm], device))
+            yield
 
     def get_runtime_records(self):
         _rec = self._runtime_records
