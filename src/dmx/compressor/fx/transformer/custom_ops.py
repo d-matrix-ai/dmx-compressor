@@ -18,7 +18,6 @@ def _(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     return q, k
 
 
-transformers.models.llama.modeling_llama.apply_rotary_pos_emb = apply_rotary_pos_emb
-
 if version.parse(transformers.__version__) >= version.parse("4.52.4"):
+    transformers.models.llama.modeling_llama.apply_rotary_pos_emb = apply_rotary_pos_emb
     transformers.models.qwen3.modeling_qwen3.apply_rotary_pos_emb = apply_rotary_pos_emb
