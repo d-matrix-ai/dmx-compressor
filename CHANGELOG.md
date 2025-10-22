@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [v0.1.11]
-  - torch.export FXIR tracing suppoer
+  - torch.export FXIR tracing support (need to be on torch 2.9 and transformers 4.52.4)
+  - Support for quantized submodules
+  - Enable asymmetric quantization for BFP formats
 
 ## [v0.1.10]
   - torch >2.7 support
