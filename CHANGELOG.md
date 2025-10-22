@@ -5,6 +5,9 @@ This file documents fixes/features added to dmx.compressor
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v0.1.11]
+  - torch.export FXIR tracing suppoer
+
 ## [v0.1.10]
   - torch >2.7 support
   - SLaNC advanced mode recipe, normalization layer extra parameters tuning
